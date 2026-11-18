@@ -29,7 +29,7 @@ class Path {
   }
 }
 
-function frame(yaw, pitch, phase = null, route, lang = "en") {
+function frame(yaw, pitch, phase = null, route, lang = 'en', width = 534) {
   let land;
   const devices = [], active = [], names = [];
   const nothing = () => {};
@@ -39,10 +39,11 @@ function frame(yaw, pitch, phase = null, route, lang = "en") {
     fill(path, rule) { if (rule === 'evenodd') land = path; },
     stroke(path) { if (path?.d && this.strokeStyle === networkInk.line && this.lineWidth > 1.5) active.push(path); },
     arc(x, y, r) { if (r === roleSize.device) devices.push([x, y]); },
-    measureText(s) { return { width: [...s].length * 6 }; },
-    fillText(name) { if (this.globalAlpha > .05) names.push(name); },
+    measureText(s) { return { width: [...s].length * parseFloat(this.font.split(' ')[1]) * .57 }; },
+    fillText(name) { if (this.globalAlpha >= .5) names.push(name); },
   }, { get: (obj, key) => obj[key] ?? nothing });
-  atlasPainter({ getContext: () => ctx, width: 534, height: 424 }, lang).draw(yaw * rad, phase, pitch * rad, route);
+  const painter = atlasPainter({ getContext: () => ctx, width: 534, height: 424 }, lang);
+  painter.size(width); painter.draw(yaw * rad, phase, pitch * rad, route);
   return {
     devices, active, names,
     async landAtCentre() {
@@ -54,11 +55,11 @@ function frame(yaw, pitch, phase = null, route, lang = "en") {
 
 test('rotating the atlas keeps the Atlantic water and hides the routes on its far side', async (t) => {
   // Tile canvases carry only the print texture. Render the real land path independently through SVG.
-  globalThis.Path2D = Path;
+  globalThis.Path2D = Path; globalThis.devicePixelRatio = 1;
   globalThis.document = { createElement: () => ({ getContext: () => ({
     beginPath() {}, moveTo() {}, lineTo() {}, arc() {}, stroke() {}, fill() {},
   }) }) };
-  t.after(() => { delete globalThis.Path2D; delete globalThis.document; });
+  t.after(() => { delete globalThis.Path2D; delete globalThis.document; delete globalThis.devicePixelRatio; });
 
   // Home longitude is 25°W. At 40°W, 26°N the antipode lies inside Australia, which used to fill the sea.
   assert.equal(await frame(-15, 26).landAtCentre(), false);
@@ -73,6 +74,13 @@ test('rotating the atlas keeps the Atlantic water and hides the routes on its fa
   assert.deepEqual(frame(35, 45, .25, 0, 'ru').names.sort(), ['Москва', 'Омск']);
   assert.deepEqual(frame(35, 45, .75, 0, 'ru').names.sort(), ['Амстердам', 'Москва']);
   assert.deepEqual(frame(35, 45).names, [], 'static poses carry no moving labels');
+  for (const width of [350, 564]) for (const lang of ['en', 'ru', 'fa']) {
+    const names = itineraries[0].slice(0, 2).map(c => c.names[lang]).sort();
+    for (const t of [1, 2.5, 3.75]) {
+      const yaw = 2.25 * (t - .375); // slow eastward turn after its opening ramp
+      assert.deepEqual(frame(yaw, 26, t/8.5, 0, lang, width).names.sort(), names, `${lang} at ${width}px and ${t}s`);
+    }
+  }
 });
 
 test('a relay receives the trace before forwarding it; all examples follow the near great-circle path', () => {

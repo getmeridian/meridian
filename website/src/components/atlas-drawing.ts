@@ -257,11 +257,15 @@ export function atlasPainter(canvas: HTMLCanvasElement, locale = document.docume
         let length = labelWidths.get(name);
         if (length === undefined) { length = ctx.measureText(name).width; labelWidths.set(name, length); }
         const w = length + 7, h = labelSize + 4, pad = 6;
-        const spots = z <= .21 ? [] : [[x+pad,y-h-pad/2], [x-w-pad,y-h-pad/2], [x+pad,y+pad/2],
+        // A label aligned with the mark's midline can tuck inside the horizon
+        // without dropping onto the next city in a short relay chain.
+        const inward = (y < cy ? 1 : -1) * pad / 2;
+        const spots = z <= .12 ? [] : [[x+pad,y-h/2+inward], [x-w-pad,y-h/2+inward],
+          [x+pad,y-h/2], [x-w-pad,y-h/2], [x+pad,y-h-pad/2], [x-w-pad,y-h-pad/2], [x+pad,y+pad/2],
           [x-w-pad,y+pad/2], [x-w/2,y+pad], [x-w/2,y-h-pad]].filter(([left, top]) =>
           ![left,left+w].some(a => [top,top+h].some(b => Math.hypot(a-cx,b-cy) > radius-3)) &&
           !marks.some(([a,b]) => a>left-4 && a<left+w+4 && b>top-4 && b<top+h+4));
-        return { name, w, h, spots, fade: clamp((z - .21) / .18) * opacity };
+        return { name, w, h, spots, fade: clamp((z - .12) / .16) * opacity };
       };
       const dest = candidates(cities[to], positions[to]), origin = candidates(cities[from], positions[from]);
       let d: number[] | undefined = dest.spots[0], o: number[] | undefined = origin.spots[0];
