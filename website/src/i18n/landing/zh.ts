@@ -8,22 +8,16 @@ export const zh: LandingStrings = {
   'page.ogAlt': 'Meridian：自建 VPN，一人一条链接。',
 
   // Hero
-  'hero.kicker': '开源 / 自托管',
   'hero.title': '自建 VPN，<em>一人一条链接。</em>',
   'hero.sub': 'Meridian 在你的服务器上搭建 VPN，Reality 连接看起来像普通的 HTTPS 流量。你邀请的每个人都有自己的专属链接。',
   'hero.cta': '开始搭建',
   'hero.demo': '体验演示',
   'hero.docs': '阅读文档',
   'hero.grab': '旋转地球或查看连接路线',
-  'hero.gesture': '拖动旋转，轻点查看路线。',
   'hero.keys': '用方向键旋转，按 Home 复位，按 Enter 查看连接路线。',
   'hero.pause': '暂停地球动画',
-  'hero.replay': '重播地球动画',
   'hero.resume': '继续播放地球动画',
-  'hero.figure': '图 01 / 连接图',
-  'hero.server': '服务器',
-  'hero.device': '设备',
-  'hero.mapAlt': '地球仪上，三台设备连接到同一台私人服务器。',
+  'hero.mapAlt': '地球仪展示了几条示例路线，包括从鄂木斯克经莫斯科到阿姆斯特丹。',
 
   // Server requirements and project license
   'spec.server': '服务器系统',

@@ -8,22 +8,16 @@ export const fa: LandingStrings = {
   'page.ogAlt': 'Meridian: VPN خودتان، با یک لینک خصوصی.',
 
   // Hero
-  'hero.kicker': 'متن‌باز / روی سرور شما',
   'hero.title': 'VPN خودتان، <em>با یک لینک خصوصی.</em>',
   'hero.sub': 'Meridian روی سرور شما VPN راه می‌اندازد. ترافیک اتصال Reality شبیه HTTPS معمولی است و هر نفر با لینک خصوصی خودش وصل می‌شود.',
   'hero.cta': 'راه‌اندازی Meridian',
   'hero.demo': 'دیدن نمونه‌ها',
   'hero.docs': 'مطالعهٔ مستندات',
   'hero.grab': 'چرخاندن کره یا نمایش مسیرها',
-  'hero.gesture': 'برای چرخاندن بکشید. برای دیدن مسیرها ضربه بزنید.',
   'hero.keys': 'با کلیدهای جهت‌نما کره را بچرخانید، با Home به نمای اول برگردید و با Enter مسیرها را ببینید.',
   'hero.pause': 'مکث در پویانمایی کرهٔ زمین',
-  'hero.replay': 'پخش دوبارهٔ پویانمایی کرهٔ زمین',
   'hero.resume': 'ادامهٔ پویانمایی کرهٔ زمین',
-  'hero.figure': 'شکل ۰۱ / نقشهٔ اتصال',
-  'hero.server': 'سرور',
-  'hero.device': 'دستگاه',
-  'hero.mapAlt': 'تصویر کرهٔ زمین با سه دستگاه متصل به یک سرور خصوصی.',
+  'hero.mapAlt': 'روی کرهٔ زمین چند مسیر نمونه دیده می\u200cشود، از جمله مسیر اومسک به آمستردام از راه مسکو.',
 
   // Server requirements and project license
   'spec.server': 'سیستم‌عامل سرور',

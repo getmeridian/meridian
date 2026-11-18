@@ -1,95 +1,116 @@
-// The SVG is the complete first paint. Geography loads on sight, or on explicit input under reduced motion.
+// The engraving is the first paint. Load geography only when seen, or on deliberate input under reduced motion.
 type Painter = ReturnType<typeof import('./atlas-drawing').atlasPainter>;
-type State = 'still' | 'running' | 'paused' | 'settled' | 'dragging' | 'coasting';
-const rad = Math.PI / 180, home = 26 * rad, duration = 4400, friction = 190;
+type State = 'still' | 'spinning' | 'tracing' | 'paused' | 'settled' | 'dragging' | 'coasting';
+const rad = Math.PI / 180, home = 26 * rad, turn = 2.25 * rad / 1000, period = 1000 / 24;
+const friction = 190, passage = 8500, tapPassage = 3200;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 const wrap = (v: number) => Math.atan2(Math.sin(v), Math.cos(v));
 const latitude = (v: number) => clamp(v, -65 * rad, 65 * rad);
 
-export function mountAtlas(figure: HTMLElement) {
+export function mountAtlas(figure: HTMLElement, loadPainter = () => import('./atlas-drawing')) {
   const canvas = figure.querySelector('canvas')!;
   const grab = figure.querySelector<HTMLButtonElement>('[data-atlas-grab]')!;
   const motion = figure.querySelector<HTMLButtonElement>('[data-atlas-motion]')!;
-  const hint = figure.querySelector<HTMLElement>('.hero__gesture')!;
   const stage = canvas.parentElement!, poster = stage.querySelector('img')!;
-  const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
-  // Read once: polling the same live query from Chromium’s frame loop can swallow its change event.
-  let reduced = motionPreference.matches;
+  const preference = matchMedia('(prefers-reduced-motion: reduce)');
+  // Reading this live query every frame can swallow Chromium’s change event.
+  let reduced = preference.matches;
   if (!('PointerEvent' in window && 'IntersectionObserver' in window && 'ResizeObserver' in window)) return;
 
   let painter: Painter | undefined, loading = false, failed = false, visible = false, away = false, manual = false;
-  let yaw = 0, pitch = home, signal: number | null = null;
-  let story: { from: number; delta: number; lat: number; far: boolean; time: number } | undefined;
-  let paused = false, vx = 0, vy = 0, coasting = false, dirty = true;
-  let frame = 0, last = 0, lastPaint = -Infinity, suppressClick = false;
+  let yaw = 0, pitch = home, phase = 0, route: number | undefined, signal: number | null = 0;
+  let paused = false, tracing = false, coasting = false, ramp = 0, vx = 0, vy = 0, dirty = true;
+  let frame = 0, timer = 0, last = 0, deadline = 0, suppressClick = false;
   let pointer: { id: number; x: number; y: number; lastX: number; lastY: number; at: number; radius: number; moved: boolean } | undefined;
   const awake = () => visible && !document.hidden && !away;
   const allowed = () => !reduced || manual;
+  const moving = () => !pointer && !reduced && (!paused || tracing);
   function state(value: State) {
-    if (figure.dataset.state === value) return;
-    figure.dataset.state = value;
-    const label = value === 'running' ? motion.dataset.pause : value === 'paused' ? motion.dataset.resume : motion.dataset.replay;
-    motion.setAttribute('aria-label', label!); motion.title = label!;
-  }
-  function paint(now: number) {
-    painter!.draw(yaw, signal, pitch);
-    if (!figure.hasAttribute('data-painted')) figure.setAttribute('data-painted', '');
-    dirty = false; lastPaint = now;
-  }
-  function cancelFrame() {
-    cancelAnimationFrame(frame); frame = 0; last = 0;
-  }
-  function schedule() {
-    if (!frame && painter && awake() && allowed() && (dirty || coasting || (story && !paused))) {
-      if (!last) last = performance.now();
-      frame = requestAnimationFrame(tick);
+    if (figure.dataset.state !== value) figure.dataset.state = value;
+    const held = paused && !tracing;
+    if (motion.hasAttribute('data-paused') !== held || !motion.title) {
+      motion.toggleAttribute('data-paused', held);
+      const label = held ? motion.dataset.resume! : motion.dataset.pause!;
+      motion.setAttribute('aria-label', label); motion.title = label;
     }
+  }
+  function describe() {
+    state(pointer?.moved ? 'dragging' : coasting ? 'coasting' : reduced ? manual ? 'settled' : 'still'
+      : paused && !tracing ? 'paused' : tracing ? 'tracing' : 'spinning');
+  }
+  function paint() {
+    painter!.draw(yaw, signal, pitch, route);
+    if (!figure.hasAttribute('data-painted')) figure.setAttribute('data-painted', '');
+    dirty = false;
+  }
+  function stop() {
+    if (timer) window.clearTimeout(timer);
+    if (frame) cancelAnimationFrame(frame);
+    frame = timer = last = deadline = 0;
+  }
+  function schedule(immediate = false) {
+    if (!painter || !awake() || !allowed() || (!dirty && !moving() && !coasting)) return;
+    if (immediate && timer) { window.clearTimeout(timer); timer = 0; }
+    if (frame || timer) return;
+    const now = performance.now(); if (!last) last = now;
+    const delay = immediate || pointer || coasting ? 0 : Math.max(0, deadline - now - 8);
+    if (delay < 2) frame = requestAnimationFrame(tick);
+    else timer = window.setTimeout(() => { timer = 0; frame = requestAnimationFrame(tick); }, delay);
   }
   function tick(now: number) {
     frame = 0;
-    // Use elapsed time, not frame counts. A suspended tab can't accumulate a giant fling.
-    const dt = clamp(now - last, 0, 48); last = now;
-    if (story && !paused) {
-      story.time = Math.min(duration, story.time + dt);
-      const t = story.time / duration, u = Math.min(1, story.far ? t / .31 : t), ease = u*u*(3-2*u);
-      yaw = wrap(story.from + story.delta * ease); pitch = story.lat + (home - story.lat) * ease;
-      signal = story.far && t < .28 ? null : story.far ? (t - .28) / .72 : t;
-      // A short narrative at 30 fps; publish every available frame during manipulation.
-      if (now - lastPaint >= 1000 / 30 - 1 || t === 1) paint(now);
-      if (t === 1) { story = undefined; signal = null; state('settled'); }
-    } else if (coasting) {
-      const damping = Math.exp(-dt / friction), distance = friction * (1 - damping);
-      yaw = wrap(yaw + vx * distance);
+    const dt = clamp(now - last, 0, 80); last = now;
+    if (coasting) {
+      // Ease into the normal turn instead of snapping to a stop or fighting the next grab.
+      const baseline = paused || reduced ? 0 : turn, damping = Math.exp(-dt / friction);
+      const distance = friction * (1 - damping);
+      yaw = wrap(yaw + baseline * dt + (vx - baseline) * distance);
       const next = pitch + vy * distance; pitch = latitude(next); if (pitch !== next) vy = 0;
-      vx *= damping; vy *= damping;
-      if (Math.hypot(vx, vy) < .00010) { coasting = false; state('settled'); }
-      paint(now);
-    } else if (dirty) paint(now);
-    if (!coasting && (!story || paused)) last = 0;
+      vx = baseline + (vx - baseline) * damping; vy *= damping;
+      if (Math.hypot(vx - baseline, vy) < .00010) { coasting = false; ramp = 1; chooseRoute(false); describe(); }
+      dirty = true;
+    } else if (moving()) {
+      ramp = Math.min(1, ramp + dt / 750);
+      if (!paused) yaw = wrap(yaw + turn * ramp * dt);
+      const interval = Math.floor(phase);
+      phase += dt / (tracing ? tapPassage : passage);
+      if (Math.floor(phase) !== interval) {
+        tracing = false; route = undefined;
+        if (paused) signal = null;
+        describe();
+      }
+      if (!paused || tracing) signal = phase;
+      dirty = true;
+    }
+    if (dirty) paint();
+    if (moving() && !coasting) {
+      deadline = Math.max(now - period, Math.min(deadline || now, now + period)) + period;
+    } else { deadline = 0; if (!coasting) last = 0; }
     schedule();
   }
-  function resetPose() {
-    story = undefined; coasting = paused = false; vx = vy = 0; signal = null; dirty = true;
+  function chooseRoute(next: boolean) {
+    if (!painter) return;
+    phase = Math.floor(phase) + 1;
+    route = painter.nextRoute(yaw, pitch, next ? route : undefined);
+    signal = reduced ? phase + .50 : phase;
+    dirty = true;
   }
-  function trace(destination: number) {
-    resetPose();
-    if (reduced) { yaw = destination; pitch = home; state('settled'); }
-    else {
-      const delta = wrap(destination - yaw);
-      story = { from: yaw, delta, lat: pitch, far: Math.abs(delta) > 45*rad || Math.abs(pitch-home) > 20*rad, time: 0 };
-      state('running');
-    }
+  function restAfterInput() {
+    ramp = 0; coasting = tracing = false;
+    if (!paused && !reduced) chooseRoute(false);
+    describe(); schedule(true);
   }
   async function prepare() {
     loading = true;
     try {
       await poster.decode();
       if (!awake() || !allowed()) return;
-      const { atlasPainter } = await import('./atlas-drawing');
+      const { atlasPainter } = await loadPainter();
       if (!awake() || !allowed()) return;
       painter = atlasPainter(canvas);
+      if (manual && signal !== null) chooseRoute(false);
     } catch {
-      failed = true; grab.hidden = hint.hidden = motion.hidden = true;
+      failed = true; grab.hidden = motion.hidden = true;
       figure.removeAttribute('data-painted'); state('still');
     } finally { loading = false; }
     if (painter) sync();
@@ -97,36 +118,31 @@ export function mountAtlas(figure: HTMLElement) {
   function sync() {
     if (failed) return;
     if (!awake()) {
-      cancelFrame(); dropPointer(); coasting = false;
-      if (story) state('paused');
-      else if (figure.dataset.state === 'coasting') state('settled');
+      stop(); releasePointer(); coasting = false; ramp = 0;
+      if (painter && !reduced) state('paused');
       return;
     }
-    grab.hidden = hint.hidden = false;
-    motion.hidden = !painter || reduced;
+    grab.hidden = false; motion.hidden = !painter || reduced;
     if (!allowed()) return;
     if (!painter) { if (!loading) void prepare(); return; }
     if (painter.size(stage.clientWidth)) dirty = true;
-    if (!manual && !story && figure.dataset.state === 'still') trace(16 * rad);
-    if (story) state(paused ? 'paused' : 'running');
-    if (dirty) paint(performance.now());
-    schedule();
+    if (dirty) paint();
+    describe(); schedule();
   }
   function deliberate() {
     manual = true;
     if (!painter && !loading && awake() && !failed) void prepare();
   }
-  function dropPointer() {
+  function releasePointer() {
     const p = pointer; pointer = undefined;
     if (!p) return;
-    if (p.moved) { suppressClick = true; state('settled'); }
+    if (p.moved) suppressClick = true;
     if (grab.hasPointerCapture(p.id)) grab.releasePointerCapture(p.id);
   }
   grab.addEventListener('pointerdown', e => {
-    if (!e.isPrimary) { dropPointer(); return; }
+    if (!e.isPrimary) { releasePointer(); restAfterInput(); return; }
     if (e.button !== 0 || pointer) return;
-    suppressClick = false;
-    if (coasting) { coasting = false; state('settled'); }
+    suppressClick = false; coasting = false; vx = vy = 0; stop();
     pointer = { id: e.pointerId, x: e.clientX, y: e.clientY, lastX: e.clientX, lastY: e.clientY,
       at: e.timeStamp, radius: Math.max(1, grab.getBoundingClientRect().width / 2), moved: false };
     grab.setPointerCapture(e.pointerId);
@@ -135,57 +151,60 @@ export function mountAtlas(figure: HTMLElement) {
     const p = pointer;
     if (!p || p.id !== e.pointerId) return;
     if (!p.moved) {
-      const x = e.clientX-p.x, y = e.clientY-p.y;
-      if (Math.hypot(x,y) < 5) return;
-      if (e.pointerType === 'touch' && Math.abs(y) > Math.abs(x)*1.15) {
-        suppressClick = true; dropPointer(); return;
+      const x = e.clientX - p.x, y = e.clientY - p.y;
+      if (Math.hypot(x, y) < 5) return;
+      if (e.pointerType === 'touch' && Math.abs(y) > Math.abs(x) * 1.15) {
+        suppressClick = true; releasePointer(); describe(); schedule(); return;
       }
-      resetPose(); p.moved = true; deliberate(); state('dragging');
+      tracing = false; signal = null; p.moved = true; deliberate(); describe();
     }
-    const dx = -(e.clientX-p.lastX) / p.radius, dy = (e.clientY-p.lastY) / p.radius;
-    const dt = clamp(e.timeStamp-p.at, 4, 100), blend = 1 - Math.exp(-dt/30);
-    vx += (clamp(dx/dt, -.008, .008) - vx) * blend;
-    vy += (clamp(dy/dt, -.005, .005) - vy) * blend;
+    const dx = -(e.clientX - p.lastX) / p.radius, dy = (e.clientY - p.lastY) / p.radius;
+    const dt = clamp(e.timeStamp - p.at, 4, 100), blend = 1 - Math.exp(-dt / 30);
+    vx += (clamp(dx / dt, -.008, .008) - vx) * blend; vy += (clamp(dy / dt, -.005, .005) - vy) * blend;
     yaw = wrap(yaw + dx); pitch = latitude(pitch + dy); dirty = true;
-    p.lastX = e.clientX; p.lastY = e.clientY; p.at = e.timeStamp; schedule();
+    p.lastX = e.clientX; p.lastY = e.clientY; p.at = e.timeStamp; schedule(true);
   });
   grab.addEventListener('pointerup', e => {
     const p = pointer;
     if (!p || p.id !== e.pointerId) return;
-    const flick = p.moved && !reduced && e.timeStamp - p.at < 90 && Math.hypot(vx,vy) > .00035;
-    dropPointer();
-    if (flick) { coasting = true; state('coasting'); schedule(); }
+    const flick = p.moved && !paused && !reduced && e.timeStamp - p.at < 90 && Math.hypot(vx, vy) > .00035;
+    releasePointer();
+    if (flick) { coasting = true; describe(); schedule(true); }
+    else if (p.moved) restAfterInput();
+    else { describe(); schedule(); }
   });
   for (const name of ['pointercancel', 'lostpointercapture'] as const) {
-    grab.addEventListener(name, e => { if (pointer?.id === e.pointerId) dropPointer(); });
+    grab.addEventListener(name, e => {
+      if (pointer?.id !== e.pointerId) return;
+      const moved = pointer.moved; releasePointer();
+      if (moved) restAfterInput(); else { describe(); schedule(); }
+    });
   }
   grab.addEventListener('click', e => {
     if (e.detail && suppressClick) { suppressClick = false; return; }
-    deliberate(); trace(reduced ? 0 : 16 * rad); sync();
+    deliberate(); coasting = false; tracing = !reduced; signal = 0; chooseRoute(true); dirty = true;
+    describe(); sync();
   });
   grab.addEventListener('keydown', e => {
     if (e.altKey || e.metaKey || e.ctrlKey || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(e.key)) return;
-    e.preventDefault(); deliberate(); resetPose();
+    e.preventDefault(); deliberate(); stop(); coasting = tracing = false; signal = null;
     if (e.key === 'Home') { yaw = 0; pitch = home; }
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') yaw = wrap(yaw + (e.key === 'ArrowLeft' ? -15 : 15)*rad);
-    else pitch = latitude(pitch + (e.key === 'ArrowUp' ? 10 : -10)*rad);
-    state('settled'); schedule();
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') yaw = wrap(yaw + (e.key === 'ArrowLeft' ? -15 : 15) * rad);
+    else pitch = latitude(pitch + (e.key === 'ArrowUp' ? 10 : -10) * rad);
+    dirty = true; restAfterInput();
   });
   motion.addEventListener('click', () => {
-    deliberate();
-    if (story) { paused = !paused; cancelFrame(); }
-    else trace(Math.abs(wrap(yaw - 16*rad)) < 8*rad ? 0 : 16*rad);
-    sync();
+    const wasMoving = !paused || tracing;
+    paused = wasMoving; tracing = coasting = false; ramp = 0; stop(); describe(); sync();
   });
-  const observer = new IntersectionObserver(([entry]) => {
+  new IntersectionObserver(([entry]) => {
     visible = entry.isIntersecting && entry.intersectionRatio >= .12; sync();
-  }, { threshold: [0, .12] });
-  observer.observe(stage);
+  }, { threshold: [0, .12] }).observe(stage);
   new ResizeObserver(sync).observe(stage);
   document.addEventListener('visibilitychange', sync);
-  motionPreference.addEventListener('change', event => {
-    reduced = event.matches;
-    cancelFrame(); dropPointer(); resetPose(); manual = false; yaw = 0; pitch = home;
+  preference.addEventListener('change', event => {
+    reduced = event.matches; stop(); releasePointer();
+    manual = tracing = coasting = false; yaw = phase = ramp = 0; pitch = home; route = undefined; signal = 0; dirty = true;
     figure.removeAttribute('data-painted'); state('still'); sync();
   });
   window.addEventListener('pagehide', () => { away = true; sync(); });

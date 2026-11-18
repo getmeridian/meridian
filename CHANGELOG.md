@@ -19,8 +19,9 @@ newest first; the last is what 4.0 changes compared with 3.x.
   Settings section is visible. The personal page puts app installation and
   import first, with account details still one tap away.
 - The public tour shows the current panel and connection page in four languages.
-  Drag or flick the globe to explore it, or tap to follow three connections.
-  Arrow keys rotate it too; reduced motion keeps it still between inputs.
+  The globe turns slowly through example VPN routes, including Omsk via Moscow
+  to Amsterdam. Drag to turn it or tap to follow a route through its relay.
+  Arrow keys rotate it too; pause and reduced motion keep the view still.
   CLI help now works offline and lists the owner panel under Get started.
 - Traffic and quotas use familiar labels such as MB and GB in the panel,
   connection page and CLI. Existing limits keep exactly the same byte values.

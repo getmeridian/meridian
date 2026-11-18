@@ -16,7 +16,6 @@ const specs = [
 <section class="hero" aria-labelledby="hero-title">
   <div class="container hero__spread">
     <div class="hero__copy">
-      <p class="hero__kicker atlas-label">{t('hero.kicker')}</p>
       <h1 class="hero__title" id="hero-title" set:html={t('hero.title')} />
       <p class="hero__sub">{t('hero.sub')}</p>
       <div class="hero__actions btn-row">
@@ -30,28 +29,15 @@ const specs = [
         <canvas width="534" height="424" aria-hidden="true"></canvas>
         <button class="hero__grab" data-atlas-grab type="button" hidden aria-label={t('hero.grab')}
           aria-describedby="atlas-gesture-help" aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown Home"></button>
+        <span class="hero__sr" id="atlas-gesture-help">{t('hero.keys')}</span>
+        <button class="hero__motion" data-atlas-motion type="button" hidden aria-label={t('hero.pause')}
+          data-pause={t('hero.pause')} data-resume={t('hero.resume')}>
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path class="hero__pause" d="M7 5v10m6-10v10" />
+            <path class="hero__play" d="m6 4 9 6-9 6z" />
+          </svg>
+        </button>
       </div>
-      <figcaption class="hero__legend">
-        <span class="hero__figure">{t('hero.figure')}</span>
-        <span class="hero__symbols">
-          <span><i class="hero__key hero__key--server"></i>{t('hero.server')}</span>
-          <span><i class="hero__key"></i>{t('hero.device')}</span>
-        </span>
-        <span class="hero__motion-slot">
-          <button class="hero__motion" data-atlas-motion type="button" hidden aria-label={t('hero.replay')}
-            data-pause={t('hero.pause')} data-replay={t('hero.replay')} data-resume={t('hero.resume')}>
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <path class="hero__pause" d="M7 5v10m6-10v10" />
-              <path class="hero__play" d="m7 4 9 6-9 6z" />
-              <path class="hero__replay" d="M4 8a6.2 6.2 0 1 1 .4 5M4 3v5h5" />
-            </svg>
-          </button>
-        </span>
-        <span class="hero__gesture" id="atlas-gesture-help" hidden>
-          <svg width="14" height="12" viewBox="0 0 18 14" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 7h15m-12-3-3 3 3 3m9-6 3 3-3 3"/></svg>
-          {t('hero.gesture')}<span class="hero__sr">{t('hero.keys')}</span>
-        </span>
-      </figcaption>
     </figure>
   </div>
   <div class="hero__specs">
@@ -68,7 +54,7 @@ const specs = [
 
 <script>
   import { mountAtlas } from './atlas-motion';
-  document.querySelectorAll<HTMLElement>('[data-atlas]').forEach(mountAtlas);
+  document.querySelectorAll<HTMLElement>('[data-atlas]').forEach(figure => mountAtlas(figure));
 </script>
 
 <style>
@@ -80,8 +66,6 @@ const specs = [
     padding-block: clamp(24px, 2.15vw, 36px);
   }
   .hero__copy { padding-block: 12px; }
-  .hero__kicker { display: flex; align-items: center; gap: 12px; margin-bottom: clamp(18px, 2vw, 30px); }
-  .hero__kicker::before { content: ''; width: 34px; height: 2px; background: var(--ac); }
   .hero__title {
     font-size: clamp(3.25rem, 5.65vw, 5.55rem);
     line-height: 1.01;
@@ -118,28 +102,18 @@ const specs = [
   .hero__grab:active, [data-state="dragging"] .hero__grab { cursor: grabbing; }
   .hero__grab:focus-visible { border-radius: 50%; outline: 2px solid var(--ac-text); outline-offset: 5px; }
   .hero__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .hero__legend .hero__gesture { flex: 1 0 100%; font: .74rem/1.4 var(--label-font); color: var(--t2); }
-  .hero__gesture svg { color: var(--ac-text); flex-shrink: 0; }
-  .hero__legend .hero__gesture[hidden], .hero__grab[hidden] { display: none; }
-  .hero__motion-slot { width: 40px; height: 30px; justify-content: flex-end; }
-  .hero__motion { display: grid; place-items: center; position: relative; width: 30px; height: 30px; padding: 0;
-    border: 1px solid var(--b2); border-radius: 50%; color: var(--ac-text); background: var(--bg); cursor: pointer; }
-  .hero__motion[hidden], .hero__motion path { display: none; }
-  .hero__motion:hover { border-color: var(--ac-text); background: var(--band); }
-  .hero__motion:focus-visible { outline: 2px solid var(--ac-text); outline-offset: 3px; }
-  .hero__motion::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; }
-  [data-state="running"] .hero__pause, [data-state="paused"] .hero__play, [data-state="settled"] .hero__replay, [data-state="dragging"] .hero__replay, [data-state="coasting"] .hero__replay { display: block; }
-  .hero__plate img { display: block; width: 100%; height: auto; }
-  .hero__legend {
-    display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px;
-    border-top: 1px solid var(--b2); padding-top: 9px; margin: 5px 4.5% 0;
-    color: var(--t3); font: 500 .69rem/1.5 var(--label-font);
+  .hero__motion {
+    position: absolute; inset-inline-end: 5%; bottom: 3%; display: grid; place-items: center;
+    width: 28px; height: 28px; padding: 0; border-radius: 50%; border: 1px solid var(--b2);
+    background: var(--bg); color: var(--t2); cursor: pointer;
   }
-  .hero__legend > span, .hero__symbols > span { display: inline-flex; align-items: center; gap: 7px; }
-  .hero__legend .hero__symbols { gap: 13px; }
-  .hero__figure { margin-inline-end: auto; }
-  .hero__key { width: 7px; height: 7px; border: 1.5px solid var(--ac-text); border-radius: 50%; }
-  .hero__key--server { border-radius: 0; transform: rotate(45deg); background: var(--ac); }
+  .hero__motion::after { content: ''; position: absolute; inset: -8px; border-radius: 50%; }
+  .hero__motion:hover { color: var(--ac-text); border-color: var(--ac-text); }
+  .hero__motion:focus-visible { border-radius: 50%; outline: 2px solid var(--ac-text); outline-offset: 3px; }
+  .hero__motion[hidden], .hero__grab[hidden], .hero__play { display: none; }
+  .hero__motion[data-paused] .hero__play { display: block; }
+  .hero__motion[data-paused] .hero__pause { display: none; }
+  .hero__plate img { display: block; width: 100%; height: auto; }
   .hero__specs { background: var(--band); border-block: 1px solid var(--b1); }
   .container.hero__spec-list { display: grid; grid-template-columns: 1fr 1.2fr .9fr; padding-block: 21px; }
   .hero__spec { position: relative; min-width: 0; padding-inline-start: 44px; }
@@ -159,12 +133,10 @@ const specs = [
     .container.hero__spread { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-block: 36px 22px; }
     .hero__copy { padding: 0; }
     .hero__title, .hero__title:lang(ru) { font-size: clamp(3rem, 10.5vw, 4.7rem); }
-    .hero__kicker { margin-bottom: 16px; }
     .hero__sub { margin-block: 16px 20px; }
     .hero__actions.btn-row { column-gap: 18px; }
     .hero__actions .btn { padding-inline: 16px; gap: 8px; }
     .hero__plate { max-width: 395px; }
-    .hero__legend { margin-inline: 0; }
     .container.hero__spec-list { grid-template-columns: 1fr 1.4fr .85fr; padding-block: 14px; gap: 10px; }
     .hero__spec, .hero__spec + .hero__spec { padding-inline-start: 0; border: none; }
     .hero__spec dd { font-size: .87rem; }
