@@ -125,7 +125,11 @@ The drill then creates a post-snapshot witness account, stops the control servic
 this disposable VM, and restores the saved snapshot to its original address from an
 empty managing home containing only the device key. The witness must disappear;
 the old identities, links, documents, limits, and a working connection must return
-at a newer epoch. Set `REALVM_RELEASE_CHECKS=1` as well to test a live panel settings
+at a newer epoch. Both transport checks use bob. Because the same node keeps its
+traffic counters across recovery, the drill waits for two reports after the first
+probe; the first may already have been in flight. The restored accounts and subscription headers must include exactly
+the upload and download bytes that probe added; all subscription bodies and the
+other person's counters must remain byte-identical. Set `REALVM_RELEASE_CHECKS=1` as well to test a live panel settings
 edit while the node agent is stopped, stale-write protection, and persistence after
 a reviewed apply. The agent is restarted even on failure. The same run checks
 that each restored person's no-JavaScript page gives them their own usable app

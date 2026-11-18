@@ -28,7 +28,7 @@ from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
 from meridian.servers import ServerRegistry
 from meridian.ssh import CommandResult
 from meridian.update import get_pypi_releases
-from tests.realvm import handover_drill
+from tests.realvm import handover_drill, handover_traffic
 from tests.realvm.domain_support import is_rate_limited, verification_counts
 from tests.realvm.release_checks import verify_release_changes
 from tests.realvm.upgrade_support import (
@@ -462,12 +462,18 @@ class UpgradeVerifier:
             handover.verify_checkout_install()
             handover.check_stale_copy()
             handover.unchanged_apply()
-            # Prove traffic on the normal upgrade too, before rolling back to the b12 snapshot.
+            start = handover_traffic.await_report(self)
             self.verify_traffic()
+            # The first report accepted after the probe can already have been in flight.
+            at_finish = handover_traffic.await_report(self)
+            first = handover_traffic.await_report(self, newer=at_finish)
+            end = handover_traffic.await_report(self, newer=first)
+            restored_clients, restored_docs = handover_traffic.replay_expectations(start, end, before_clients, before)
             handover.restore_snapshot(people)
             handover.verify_checkout_install()
             self.wait_for("The restored checkout agent", lambda: self.agent_current(expected_agent))
-            self.verify_accounts(before_clients, urls, before, "restored", named=True)
+            handover_traffic.await_report(self, replay=end)
+            self.verify_accounts(restored_clients, urls, restored_docs, "restored", named=True)
             handover.unchanged_apply()
         self.verify_traffic()
         if self.env.get("REALVM_RELEASE_CHECKS") == "1":
@@ -491,7 +497,8 @@ class UpgradeVerifier:
         failures = compare_subscriptions(subscriptions, self.capture(urls, phase))
         if failures:
             raise VerificationError("Subscriptions changed:\n" + "\n".join(failures))
-        self.pass_check("all documents and subscription-userinfo headers are byte-identical")
+        suffix = " including the original person's measured transport traffic" if phase == "restored" else ""
+        self.pass_check("all document bytes and subscription-userinfo headers match" + suffix)
         preserved = (
             "id",
             "status",
