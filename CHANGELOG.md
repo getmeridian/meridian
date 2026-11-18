@@ -14,6 +14,12 @@ newest first; the last is what 4.0 changes compared with 3.x.
 
 ### Since 4.0.0b17
 
+- Overview links each server warning to the right place and separates routine
+  account states from problems. On phones, People filters fold away and every
+  Settings section is visible. The personal page puts app installation and
+  import first, with account details still one tap away.
+- The public tour shows the current panel and connection page in four languages.
+  CLI help now works offline and lists the owner panel under Get started.
 - The owner can edit the subscription title, refresh interval and public contact in
   Settings, and the provider, traffic allowance and payment dates under Servers.
   The panel shows what will change, asks for identity confirmation when the public
