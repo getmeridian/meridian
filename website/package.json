@@ -5,7 +5,7 @@
   "private": true,
   "packageManager": "pnpm@10.33.3",
   "scripts": {
-    "dev": "uv run --project .. python ../scripts/build_showcase.py public/demo >/dev/null 2>&1; astro dev",
+    "dev": "uv run --project .. python ../scripts/build_showcase.py public/demo && astro dev",
     "build": "node scripts/diagrams.mjs && pnpm run scripts:test && astro build && node scripts/check-runtime-assets.mjs",
     "scripts:test": "node --test scripts/*.test.mjs",
     "preview": "astro preview",

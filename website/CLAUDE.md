@@ -13,7 +13,7 @@ cd website && pnpm install && pnpm run build   # Astro + Starlight + Pagefind
 **Diagrams render before the build** — Mermaid blocks stay in the Markdown; `src/lib/diagrams.mjs` swaps each for a checked-in SVG that `node scripts/diagrams.mjs render` draws in Chromium and that colours itself from theme variables, so no diagram JavaScript reaches readers.
 **i18n and one look** — docs are per-locale Markdown, the landing static HTML per locale (`src/i18n/CLAUDE.md`); landing, blog, and docs share tokens and components (`src/styles/CLAUDE.md`).
 **Self-hosted everything** — `scripts/check-runtime-assets.mjs` fails the build on any external request in HTML, CSS, or JavaScript, rerun after the demos join `dist`.
-**Demos are recorded, not hand-written** — `scripts/build_showcase.py` seeds a real control service with an invented fleet, records its responses, validates them against today's models, and writes `/demo/` and `/demo/console/` (the unchanged console plus the in-memory `website/demo/demo.js` shim). Neither ships in the package.
+**Demos are recorded, not hand-written** — `scripts/build_showcase.py` seeds a real control service with an invented fleet, records its responses, validates them against today's models, and writes `/demo/` and `/demo/console/` (the unchanged console plus the in-memory `website/demo/demo.js` shim). Neither ships in the package. The dev server maps their directory URLs to the recorded index files just like the static host.
 **pnpm with guardrails** — `pnpm-workspace.yaml` blocks exotic transitive sources, enforces a release-age delay, and allows build scripts only for trusted packages.
 **App links** — `src/data/apps.json` is the source of truth, validated against the page template and Python constants.
 

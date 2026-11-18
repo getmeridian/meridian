@@ -119,6 +119,18 @@ export default defineConfig({
     format: 'directory',
   },
   vite: {
+    // A static host serves directory indexes. Give the recorded demos the same URLs in dev,
+    // preserving the browser address so relative files and language choices resolve normally.
+    plugins: [{
+      name: 'demo-directory-index',
+      apply: 'serve',
+      configureServer(server) {
+        server.middlewares.use((req, _res, next) => {
+          if (req.url) req.url = req.url.replace(/^(\/demo\/(?:console\/|sub\/[A-Za-z0-9_-]+\/)?)($|\?)/, '$1index.html$2');
+          next();
+        });
+      },
+    }],
     // tokens.css writes colors as light-dark(); Lightning CSS lowers it (and other
     // newer syntax) for browsers older than these, e.g. Safari on iOS 16.
     build: { cssTarget: ['chrome107', 'edge107', 'firefox104', 'safari16'] },
