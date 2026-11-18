@@ -11,7 +11,7 @@
       spec("allowance_bytes", "presentation.allowance_gib", { type: "text", inputmode: "decimal" }, "presentation.empty_allowance"),
       spec("reset_day", "server_allowance.reset_day", { type: "number", min: 1, max: 31, required: true }),
       spec("pay_on", "server_allowance.payment_anchor", { type: "date" }),
-      spec("pay_every", "server_allowance.repeat", {}, null, [
+      spec("pay_every", "server_allowance.repeat", {}, "presentation.date_required", [
         ["", "server_allowance.one_off"], ["month", "server_allowance.month"], ["year", "server_allowance.year"]]),
     ];
     return [
@@ -25,8 +25,8 @@
     return key === "allowance_bytes" ? M.gbText(value) : value == null ? "" : String(value);
   }
   function display(field, value) {
+    if (field.options) return M.t(field.options.find(function (option) { return option[0] === (value || ""); })[1]);
     if (value == null || value === "") return M.t("presentation.unset");
-    if (field.options) return M.t(field.options.find(function (option) { return option[0] === value; })[1]);
     return inputValue(field.key, value);
   }
   function review(rows) {
@@ -63,6 +63,14 @@
         f.input.addEventListener("input", function () { f.input.setCustomValidity(""); });
         fieldset.appendChild(M.field(f.label, f.input, f.hint));
       });
+      var payDate = server && defs.find(function (f) { return f.key === "pay_on"; }).input;
+      var recurrence = server && defs.find(function (f) { return f.key === "pay_every"; }).input;
+      function syncPayment() {
+        if (!payDate) return;
+        if (!payDate.value) recurrence.value = "";
+        recurrence.disabled = !payDate.value;
+      }
+      if (payDate) payDate.addEventListener("input", syncPayment);
       function load() {
         submit.disabled = true; reload.hidden = true; error.textContent = "";
         return M.api("GET", "api/settings/presentation").then(function (state) {
@@ -74,7 +82,7 @@
             f.input.value = f.initial = inputValue(f.key, base[f.key]);
             f.input.disabled = false; f.input.setCustomValidity("");
           });
-          submit.disabled = false; M.trackForm(form); M.resetDraft(form); defs[0].input.focus();
+          syncPayment(); submit.disabled = false; M.trackForm(form); M.resetDraft(form); defs[0].input.focus();
         }).catch(function (e) {
           error.textContent = M.errorText(e); reload.hidden = false;
         });
@@ -82,10 +90,9 @@
       form.addEventListener("submit", function (event) {
         event.preventDefault();
         if (!base || submit.disabled || !form.reportValidity()) return;
-        var patch = {}, rows = [], contact = {}, payment = null;
+        var patch = {}, rows = [], contact = {};
         for (var i = 0; i < defs.length; i++) {
           var f = defs[i], key = f.key, raw = f.input.value.trim(), value = raw;
-          if (key === "pay_on") payment = raw;
           if (raw === f.initial) continue;
           if (key === "allowance_bytes" && raw) {
             var parsed = M.parseQuotaBytes(raw, "GiB");
@@ -96,9 +103,6 @@
           if (key === "text" || key === "link") contact[key] = value;
           else patch[key] = value;
           rows.push({ label: f.label, before: display(f, base[key]), after: display(f, value) });
-        }
-        if (server && !payment && defs[4].input.value) {
-          defs[3].input.setCustomValidity(M.t("presentation.date_required")); defs[3].input.reportValidity(); return;
         }
         if (!rows.length) { close(true); return; }
         if (Object.keys(contact).length) patch.owner_contact = Object.assign({ text: "", link: "" }, base.owner_contact, contact);

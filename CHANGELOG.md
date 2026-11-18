@@ -12,6 +12,17 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b17
+
+- The owner can edit the subscription title, refresh interval and public contact in
+  Settings, and the provider, traffic allowance and payment dates under Servers.
+  The panel shows what will change, asks for identity confirmation when the public
+  contact changes, and protects newer edits from an older tab. Applying the
+  topology again preserves these settings (#139).
+- A personal connection page now offers a link to copy into a VPN app even when
+  JavaScript is disabled. Offline, it shows how to reconnect without saving the
+  personal link or account details in the browser (#94).
+
 ### Since 4.0.0b16
 
 #### Added
