@@ -67,7 +67,7 @@ class DeliveryPolicy(CoreModel):
     @model_validator(mode="after")
     def bounded(self) -> Self:
         if len(self.model_dump_json().encode()) > MAX_DELIVERY_POLICY_BYTES:
-            raise ValueError("A delivery policy must fit within 64 KiB. Use fewer rules or values.")
+            raise ValueError("A delivery policy must fit within 64 KB (65,536 bytes). Use fewer rules or values.")
         return self
 
 
@@ -99,7 +99,7 @@ class DeliveryPolicySettings(CoreModel):
             raise ValueError("Unknown delivery policies: " + ", ".join(missing) + ".")
         size = len(json.dumps([policy.to_data() for policy in self.delivery_policies], ensure_ascii=False).encode())
         if size > MAX_DELIVERY_CATALOG_BYTES:
-            raise ValueError("The delivery policy catalog must fit within 256 KiB.")
+            raise ValueError("The delivery policy catalog must fit within 256 KB (262,144 bytes).")
         return self
 
 

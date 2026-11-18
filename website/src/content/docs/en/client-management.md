@@ -132,7 +132,7 @@ Renewals and anniversary resets clear both period upload and download, including
 `--duration N` gives 1–3650 days from first use, with each day lasting 24 hours in UTC. Only the first accepted traffic reported by an agent activates it; opening the connection page or fetching a subscription never does. Before activation, the CLI, panel, and page say “valid for 30 days from first use”; afterwards they show the actual expiry. Choose a duration or `--expires`, not both. Setting a duration on an already-used account uses its recorded first traffic; if that historical time is unknown, set a fixed expiry. `--duration none` clears the duration while keeping an existing activated expiry. Extending an unused account adds days to its pending duration without activating it.
 
 ```bash
-meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client add example --duration 30 --limit 50GB --reset month_rolling --reset-day 31
 meridian client set example --renew-months 1 --renewals 3 --dry-run --json
 meridian client set example --renew-months 1 --renewals 3 --yes --json
 meridian client set example --renew-days 7 --renewals unlimited --yes

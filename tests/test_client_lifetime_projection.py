@@ -87,5 +87,5 @@ def test_client_show_prints_lifetime_and_period_start_in_every_locale(
         i18n.set_locale("en")
     output = capsys.readouterr().err
     catalog = i18n.catalog(locale)
-    assert catalog["client.label.lifetime"] in output and "5 GiB" in output
+    assert catalog["client.label.lifetime"] in output and "5 GB" in output
     assert catalog["client.label.period_started"] in output and stamp in output

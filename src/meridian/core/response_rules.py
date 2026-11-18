@@ -143,5 +143,5 @@ class ResponseRuleSettings(DeliveryPolicySettings):
             len(json.dumps([rule.to_data() for rule in self.response_rules], ensure_ascii=False).encode())
             > MAX_RESPONSE_RULE_BYTES
         ):
-            raise ValueError("Response rules must fit within 64 KiB. Use fewer rules or shorter text.")
+            raise ValueError("Response rules must fit within 64 KB (65,536 bytes). Use fewer rules or shorter text.")
         return self

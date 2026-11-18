@@ -134,7 +134,7 @@ meridian client reset-traffic alice
 `--duration N` даёт от 1 до 3650 дней с первого использования. День — это 24 часа по UTC. Отсчёт начинается только с первого трафика, принятого от агента: открытие страницы и получение подписки его не запускают. До этого CLI, панель и страница показывают срок с первого использования, после — точную дату окончания. Выберите длительность или `--expires`. Для уже использованного аккаунта длительность отсчитывается от сохранённого первого трафика; если эта дата неизвестна, задайте фиксированный срок. `--duration none` убирает длительность, сохраняя уже установленную дату окончания. Продление неиспользованного аккаунта добавляет дни к ожидающему сроку и не запускает отсчёт.
 
 ```bash
-meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client add example --duration 30 --limit 50GB --reset month_rolling --reset-day 31
 meridian client set example --renew-months 1 --renewals 3 --dry-run --json
 meridian client set example --renew-months 1 --renewals 3 --yes --json
 meridian client set example --renew-days 7 --renewals unlimited --yes

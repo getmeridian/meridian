@@ -134,7 +134,7 @@ apply، بازاستقرار و تغییرات سرورها هرگز سقف و �
 `--duration N` اعتبار را از اولین استفاده، بین ۱ تا ۳۶۵۰ روز تعیین می‌کند؛ هر روز ۲۴ ساعت UTC است. فقط اولین ترافیک پذیرفته‌شده از عامل مدت را فعال می‌کند؛ باز کردن صفحه یا دریافت اشتراک هیچ‌وقت آن را آغاز نمی‌کند. پیش از فعال‌سازی، CLI، پنل و صفحه مدت اعتبار از اولین استفاده را نشان می‌دهند؛ پس از آن تاریخ پایان واقعی را نمایش می‌دهند. مدت یا `--expires` را انتخاب کنید. برای حساب استفاده‌شده، زمان اولین ترافیک ثبت‌شده مبناست؛ اگر این زمان تاریخی نامعلوم است، تاریخ پایان مشخص تعیین کنید. `--duration none` مدت را پاک می‌کند اما تاریخ پایان فعال‌شده را حفظ می‌کند. تمدید حساب استفاده‌نشده روزها را به مدتِ در انتظار اضافه می‌کند و آن را فعال نمی‌کند.
 
 ```bash
-meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client add example --duration 30 --limit 50GB --reset month_rolling --reset-day 31
 meridian client set example --renew-months 1 --renewals 3 --dry-run --json
 meridian client set example --renew-months 1 --renewals 3 --yes --json
 meridian client set example --renew-days 7 --renewals unlimited --yes

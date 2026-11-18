@@ -134,7 +134,7 @@ meridian client reset-traffic alice
 `--duration N` 设置首次使用后 1–3650 天的有效期，每天为 24 个 UTC 小时。只有节点代理首次报告并被接受的流量会开始计时；打开连接页面或获取订阅不会开始计时。激活前，CLI、面板和页面显示“首次使用后有效 30 天”；激活后显示真实到期时间。有效天数与 `--expires` 二选一。对已使用账户设置有效期时，使用已记录的首次流量时间；历史时间未知时须设置固定到期时间。`--duration none` 清除有效天数并保留已激活的到期时间。延长尚未使用的账户只增加待激活天数，不会激活账户。
 
 ```bash
-meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client add example --duration 30 --limit 50GB --reset month_rolling --reset-day 31
 meridian client set example --renew-months 1 --renewals 3 --dry-run --json
 meridian client set example --renew-months 1 --renewals 3 --yes --json
 meridian client set example --renew-days 7 --renewals unlimited --yes

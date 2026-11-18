@@ -45,10 +45,10 @@ def test_expiry_display(expires_at: str, shown: str) -> None:
 @pytest.mark.parametrize(
     ("strategy", "limit", "shown"),
     [
-        ("MONTH", 50 * GIB, "12.4 GiB / 50 GiB (resets monthly)"),
-        ("NO_RESET", 50 * GIB, "12.4 GiB / 50 GiB"),
-        ("", 0, "12.4 GiB"),
-        ("MONTH_ROLLING", 50 * GIB, "12.4 GiB / 50 GiB (resets monthly on the chosen UTC day)"),
+        ("MONTH", 50 * GIB, "12.4 GB / 50 GB (resets monthly)"),
+        ("NO_RESET", 50 * GIB, "12.4 GB / 50 GB"),
+        ("", 0, "12.4 GB"),
+        ("MONTH_ROLLING", 50 * GIB, "12.4 GB / 50 GB (resets monthly on the chosen UTC day)"),
     ],
     ids=["monthly", "no-reset", "unlimited", "panel-rolling"],
 )
@@ -147,7 +147,7 @@ def test_client_show_prints_usage_against_the_limit_and_the_expiry(
             run_show("alice")
 
     output = capsys.readouterr().err
-    assert "Traffic   " in output and "/ 50 GiB (resets monthly)" in output
+    assert "Traffic   " in output and "/ 50 GB (resets monthly)" in output
     assert any(line.split() == ["Expires", FUTURE_DAY] for line in output.splitlines())
 
 

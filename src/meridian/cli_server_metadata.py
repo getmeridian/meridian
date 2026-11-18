@@ -10,7 +10,7 @@ from meridian.cli_options import Json, Yes
 def server_set_cmd(
     name: str = typer.Argument(..., metavar="NAME", help="Declared server name, profile ID, or address"),
     allowance: str | None = typer.Option(
-        None, "--allowance", metavar="SIZE", help="Monthly bytes: 20TB, 50GiB, or none"
+        None, "--allowance", metavar="SIZE", help="Monthly traffic: 20TB, 50GB, or none"
     ),
     reset_day: str | None = typer.Option(
         None, "--reset-day", metavar="DAY", help="UTC reset day, 1–31; short months use their last day"
@@ -30,8 +30,8 @@ def server_set_cmd(
 ) -> None:
     """Review and apply a server's allowance, provider, or payment date
 
-    Omitted options keep their values. Allowances use the client quota parser:
-    GB/TB are aliases for GiB/TiB. Accepted upload + download is approximate;
+    Omitted options keep their values. As with client quotas, 1 GB is
+    1,073,741,824 bytes. Accepted upload + download is approximate;
     overhead, the server's own downloads, and relay forwarding are excluded.
     Servers without a traffic agent are not measured.
 

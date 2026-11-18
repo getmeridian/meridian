@@ -317,7 +317,7 @@ meridian server remove NAME_OR_IP [--yes]
 
 | 服务器设置 | 默认值 | 含义 |
 |---|---|---|
-| `--allowance SIZE` | 未设置 | 每月字节额度，例如 20TB 或 50GiB；`none` 清除。与用户配额相同，GB/TB 是二进制单位 GiB/TiB 的别名 |
+| `--allowance SIZE` | 未设置 | 每月流量限额，例如 `20TB` 或 `50GB`；`none` 取消限额。与用户配额一样，1 GB 等于 1,073,741,824 字节 |
 | `--reset-day DAY` | 1 | UTC 时间每月第 1–31 天的零点；较短月份使用最后一天 |
 | `--provider TEXT` | 空 | 单行纯文本，最多 80 个字符；`none` 清除名称 |
 | `--pay-on DATE` | 未设置 | YYYY-MM-DD，也可填写已过期的单次付款日期；`none` 同时清除日期和重复周期 |

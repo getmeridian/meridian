@@ -317,7 +317,7 @@ The control service stores allowances and payment dates for the fleet’s declar
 
 | Server setting | Default | Meaning |
 |---|---|---|
-| `--allowance SIZE` | not set | Monthly bytes, such as 20TB or 50GiB; `none` clears it. GB/TB are binary aliases for GiB/TiB, as with client quotas |
+| `--allowance SIZE` | not set | Monthly traffic, such as `20TB` or `50GB`; `none` clears the limit. As with client quotas, 1 GB is 1,073,741,824 bytes |
 | `--reset-day DAY` | 1 | UTC midnight on day 1–31; a short month uses its last day |
 | `--provider TEXT` | empty | Plain text on one line, up to 80 characters; `none` clears it |
 | `--pay-on DATE` | not set | YYYY-MM-DD, including a past one-off payment; `none` clears both date and repeat |

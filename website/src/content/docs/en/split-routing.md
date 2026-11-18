@@ -125,7 +125,7 @@ Actions are `{"kind":"proxy"}`, `{"kind":"direct"}`, `{"kind":"block"}`, or `{"k
 
 DNS resolvers use `transport: doh | dot | plain`, a unicast IP `address`, and an optional `port` (443, 853, or 53 by default). DoH accepts a bounded `path`; plain DNS accepts `protocol: udp | tcp`. Encrypted resolvers must have a certificate valid for their IP. Hostname bootstrap, credentials, raw templates, and regex rules are refused. Xray supports DoH/plain but omits DoT and fake-IP; Mihomo and sing-box support all three transports and fake-IP; Stash keeps its native DNS mode and omits fake-IP. Base64 carries neither routing nor DNS settings. An omitted DNS choice is never converted to a weaker transport.
 
-Each policy has at most 128 rules, 64 values per domain/IP match, and four resolvers; the catalog has at most 64 policies. A policy must fit within 64 KiB and the catalog within 256 KiB. Geodata names must exist in the pinned files clients already have. No policy adds remote rule-set fetching; sing-box omits geosite and non-private geoip matches. Refresh the subscription after applying a change.
+Each policy has at most 128 rules, 64 values per domain/IP match, and four resolvers; the catalog has at most 64 policies. A policy must fit within 64 KB (65,536 bytes) and the catalog within 256 KB (262,144 bytes). Geodata names must exist in the pinned files clients already have. No policy adds remote rule-set fetching; sing-box omits geosite and non-private geoip matches. Refresh the subscription after applying a change.
 
 
 ### Private person routing
@@ -206,7 +206,7 @@ Policy precedence is: **private person override → matched app rule → agreein
 
 Typed `headers` accept `profile_title` (1–100 characters), `update_interval_hours` (whole hours, 1–168), `support_url` (up to 2048 characters, absolute https:, tg:, or mailto:, without credentials), and `announce` (up to 500 characters). Text must be one plain line; titles and announcements are encoded as UTF-8 Base64. An empty support URL or announcement removes that inherited header; omitted or null fields inherit. Other header names and control characters are refused.
 
-There are at most 64 rules and 64 KiB of rule data. Names use up to 48 lowercase letters, digits, hyphens, or underscores; literals use 1–256 characters. Duplicate names, equivalent conditions, and rules wholly covered by an earlier rule are refused. Put narrow exceptions before broader prefixes. User-Agent and Accept are evaluated transiently, never stored or logged, at every privacy level.
+There are at most 64 rules and 64 KB (65,536 bytes) of rule data. Names use up to 48 lowercase letters, digits, hyphens, or underscores; literals use 1–256 characters. Duplicate names, equivalent conditions, and rules wholly covered by an earlier rule are refused. Put narrow exceptions before broader prefixes. User-Agent and Accept are evaluated transiently, never stored or logged, at every privacy level.
 
 ### Test a request
 

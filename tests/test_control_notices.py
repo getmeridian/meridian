@@ -79,7 +79,7 @@ def test_notice_substitutions_encode_unicode_after_rendering_each_person(fleet: 
     decoded = base64.b64decode(
         fleet.service.subscription(person.sub_token).headers["announce"].removeprefix("base64:")
     ).decode()
-    assert decoded == f"پیام 测试 person: {expiry:%Y-%m-%d %H:%M UTC}, 2, 0 B/1 GiB"
+    assert decoded == f"پیام 测试 person: {expiry:%Y-%m-%d %H:%M UTC}, 2, 0 B/1 GB"
     assert (
         "other: No expiry, —, 0 B/Unlimited"
         in base64.b64decode(

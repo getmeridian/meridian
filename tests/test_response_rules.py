@@ -288,7 +288,7 @@ def test_rule_count_and_total_encoded_catalog_size_are_bounded() -> None:
     ]
     with pytest.raises(ValidationError):
         DeliveryIntent.model_validate({"response_rules": rules})
-    with pytest.raises(ValidationError, match="64 KiB"):
+    with pytest.raises(ValidationError, match="65,536 bytes"):
         DeliveryIntent.model_validate({"response_rules": rules[:64]})
 
 
