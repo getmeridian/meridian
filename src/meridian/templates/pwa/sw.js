@@ -43,12 +43,17 @@ function reconnectPage() {
   var lang = (self.navigator.language || 'en').toLowerCase().split('-')[0];
   if (!Object.prototype.hasOwnProperty.call(messages, lang)) lang = 'en';
   var copy = messages[lang];
+  // This static stylesheet is authorized by its exact hash below, so offline needs no asset request.
+  var style = 'html{color-scheme:light dark;font:100%/1.55 system-ui,sans-serif}' +
+    'body{max-width:34rem;margin:clamp(3rem,12vh,8rem) auto;padding:0 1.5rem}' +
+    'small{font-weight:650;color:#525963}h1{font-size:clamp(1.7rem,5vw,2.4rem);line-height:1.18;margin:.6rem 0}' +
+    'p{margin:.8rem 0}@media(prefers-color-scheme:dark){small{color:#b6bdc6}}';
   var html = '<!doctype html><html lang="' + lang + '" dir="' + (lang === 'fa' ? 'rtl' : 'ltr') +
     '"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
-    copy[0] + '</title><main><h1>' + copy[0] + '</h1><p>' + copy[1] + '</p></main></html>';
+    copy[0] + '</title><style>' + style + '</style><main><small>Meridian</small><h1>' + copy[0] + '</h1><p>' + copy[1] + '</p></main></html>';
   return new Response(html, { status: 503, headers: {
     'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
-    'Content-Security-Policy': "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    'Content-Security-Policy': "default-src 'none'; style-src 'sha256-0YdGyZvqf26tNxFCKGHAi7uHuI/IxLE+6ga07uaWr60='; base-uri 'none'; frame-ancestors 'none'",
     'X-Robots-Tag': 'noindex, nofollow, noarchive'
   } });
 }

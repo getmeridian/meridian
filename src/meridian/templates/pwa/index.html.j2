@@ -38,7 +38,7 @@
     <h1 id="manual-setup-title">{{ copy[0] }}</h1>
     {% if subscription_url %}
     <p id="manual-setup-help">{{ copy[1] }}</p>
-    <input class="manual-url" type="text" readonly dir="ltr" aria-labelledby="manual-setup-title" aria-describedby="manual-setup-help" value="{{ subscription_url }}">
+    <textarea class="manual-url" readonly rows="3" dir="ltr" aria-labelledby="manual-setup-title" aria-describedby="manual-setup-help">{{ subscription_url }}</textarea>
     {% else %}
     <p>{{ copy[2] }}</p>
     {% endif %}

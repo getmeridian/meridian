@@ -132,6 +132,12 @@ def test_offline_reconnect_page_never_remembers_a_person(
       localStorage.setItem('separate-app-setting', 'keep');
       sessionStorage.setItem('seeded','yes');
     }""")
+    # Seed the cache state of a previous worker before the personal page registers the new one.
+    page.goto(subscription_url.rsplit("/", 1)[0] + "/~pwa/sw.js")
+    page.evaluate("""async () => {
+      await (await caches.open('pwa-0123456789abcdef')).put('/sub/~pwa/old/app.js?private', new Response('old'));
+      await caches.open('other-site-cache');
+    }""")
     connected(page, subscription_url, "Luma")
     assert page.evaluate("""() => new Promise(resolve => {
       if (navigator.serviceWorker.controller) { resolve(true); return; }
@@ -143,14 +149,17 @@ def test_offline_reconnect_page_never_remembers_a_person(
     assert page.evaluate("localStorage.getItem('separate-app-setting')") == "keep"
     storage = page.evaluate("JSON.stringify(localStorage)")
     assert "meridian-account:" not in storage and subscription_url.split("/")[-1] not in storage
+    names = page.evaluate("caches.keys()")
+    assert "pwa-0123456789abcdef" not in names and "other-site-cache" in names
     cached = page.evaluate("""async () => (await Promise.all((await caches.keys()).map(async key =>
-      (await (await caches.open(key)).keys()).map(req=>new URL(req.url).pathname)))).flat()""")
-    assert cached and all("/sub/~pwa/" in path for path in cached)
+      (await (await caches.open(key)).keys()).map(req=>req.url)))).flat()""")
+    assert cached and all("/sub/~pwa/" in url and "?" not in url for url in cached)
     context.set_offline(True)
     browser_faults.expect("503")
     reply = page.reload()
     assert reply and reply.from_service_worker and reply.status == 503 and reply.headers["cache-control"] == "no-store"
     expect(page.get_by_role("heading", name="Connection page unavailable")).to_be_visible()
+    expect(page.locator("html")).to_have_css("font-family", "system-ui, sans-serif")
     assert "Luma" not in page.content() and subscription_url.split("/")[-1] not in page.content()
     assert not page.locator("a, input, img").count()
     context.set_offline(False)
