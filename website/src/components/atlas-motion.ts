@@ -12,6 +12,11 @@ export function mountAtlas(figure: HTMLElement, loadPainter = () => import('./at
   const grab = figure.querySelector<HTMLButtonElement>('[data-atlas-grab]')!;
   const motion = figure.querySelector<HTMLButtonElement>('[data-atlas-motion]')!;
   const stage = canvas.parentElement!, poster = stage.querySelector('img')!;
+  // On a direct link to (for example) #setup, browsers can show the hero for a few
+  // frames before scrolling to the bookmark. Keep the engraving through that jump.
+  const target = window.location.hash && document.getElementById(window.location.hash.slice(1));
+  const bookmarkUntil = target && target.getBoundingClientRect().top > stage.getBoundingClientRect().bottom
+    ? performance.now() + 650 : 0;
   const preference = matchMedia('(prefers-reduced-motion: reduce)');
   // Reading this live query every frame can swallow Chromium’s change event.
   let reduced = preference.matches;
@@ -20,7 +25,7 @@ export function mountAtlas(figure: HTMLElement, loadPainter = () => import('./at
   let painter: Painter | undefined, loading = false, failed = false, visible = false, away = false, manual = false;
   let yaw = 0, pitch = home, phase = 0, route: number | undefined, signal: number | null = 0;
   let paused = false, tracing = false, coasting = false, ramp = 0, vx = 0, vy = 0, dirty = true;
-  let frame = 0, timer = 0, last = 0, deadline = 0, suppressClick = false;
+  let frame = 0, timer = 0, bookmarkTimer = 0, last = 0, deadline = 0, suppressClick = false;
   let pointer: { id: number; x: number; y: number; lastX: number; lastY: number; at: number; radius: number; moved: boolean } | undefined;
   const awake = () => visible && !document.hidden && !away;
   const allowed = () => !reduced || manual;
@@ -117,6 +122,7 @@ export function mountAtlas(figure: HTMLElement, loadPainter = () => import('./at
   }
   function sync() {
     if (failed) return;
+    if (!awake() || !allowed()) { window.clearTimeout(bookmarkTimer); bookmarkTimer = 0; }
     if (!awake()) {
       stop(); releasePointer(); coasting = false; ramp = 0;
       if (painter && !reduced) state('paused');
@@ -124,13 +130,19 @@ export function mountAtlas(figure: HTMLElement, loadPainter = () => import('./at
     }
     grab.hidden = false; motion.hidden = !painter || reduced;
     if (!allowed()) return;
-    if (!painter) { if (!loading) void prepare(); return; }
+    if (!painter) {
+      const delay = bookmarkUntil - performance.now();
+      if (!manual && delay > 0) {
+        if (!bookmarkTimer) bookmarkTimer = window.setTimeout(() => { bookmarkTimer = 0; sync(); }, delay + 1);
+      } else if (!loading) void prepare();
+      return;
+    }
     if (painter.size(stage.clientWidth)) dirty = true;
     if (dirty) paint();
     describe(); schedule();
   }
   function deliberate() {
-    manual = true;
+    manual = true; window.clearTimeout(bookmarkTimer); bookmarkTimer = 0;
     if (!painter && !loading && awake() && !failed) void prepare();
   }
   function releasePointer() {
