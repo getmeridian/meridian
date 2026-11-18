@@ -447,7 +447,7 @@ Reissue and deletion accept optional `{"cut_off": true}`; rotation includes it a
 
 ## Owner contact on connection pages
 
-`meridian fleet contact` reads the contact saved in your reviewed fleet intent. Set public instructions and a contact link with a review first:
+`meridian fleet contact` reads the public contact from the control service. Review your changes before saving:
 
 ```bash
 meridian fleet contact --text "Ask for help" --link mailto:help@example.com --dry-run --json
@@ -455,7 +455,7 @@ meridian fleet contact --text "Ask for help" --link mailto:help@example.com --ye
 meridian fleet contact --text "" --link none --yes
 ```
 
-Instructions are one line of plain text, up to 120 characters. Links must use `https:`, `tg:`, or `mailto:`; Meridian validates and canonicalizes them. The fields are independent: omitted options keep their values, `--text ""` clears instructions, and `--link none` clears the link. A JSON change requires `--yes`; a dry run and a declined review preserve your fleet. Export/import carries `delivery.owner_contact.text` and `delivery.owner_contact.link`. **Settings → General** in the web panel shows the contact with the CLI command to change it.
+Instructions are one line of plain text, up to 120 characters. Links must use `https:`, `tg:`, or `mailto:`; Meridian validates and canonicalizes them. The fields are independent: omitted options keep their values, `--text ""` clears instructions, and `--link none` clears the link. A JSON change requires `--yes`; a dry run and a declined review preserve your fleet. The panel and CLI edit the same contact; the panel asks for a recent sign-in before changing it.
 
 The connection page's help section and the support page show these public instructions and a **Contact owner** link in all four interface languages. The link opens only when clicked; the pages use local assets. When contact is configured, the support page keeps it visible and offers **Open connection page**. Apps receive the link in `support-url`; without a link, that header keeps its local support-page URL. The personal page URL stays unchanged.
 
@@ -563,7 +563,7 @@ Restore also preserves earlier profile use and refuses snapshot profiles that di
 
 `plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
 
-Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `node add` or `fleet contact`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.
+Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `node add`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.
 
 A fresh fleet can introduce profiles through `setup --intent`. Bootstrap is allowed only while the service has no declaration fingerprint, no named profiles, and no non-default memberships. If the service holds profiles without a fingerprint, run `meridian apply` to review them before other topology commands.
 

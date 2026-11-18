@@ -15,6 +15,8 @@ description: System architecture, traffic flow, and service topology.
 - **Realm** — the TCP forwarder on relay servers.
 - **uTLS** — client connections copy a browser's TLS Client Hello (Chrome, with Firefox copies as backup entries), so they look like ordinary browser traffic.
 
+The first reviewed deployment seeds the subscription title, refresh interval, public owner contact and server billing from the fleet configuration. After that the panel and CLI edit these values in the control service. Each save checks the version it was reviewed against. Saving these settings works even if an exit is offline. A later topology apply preserves the edits; the deployer still owns network configuration and access rules.
+
 ## Service topology
 
 ### Single server (`meridian deploy IP`)

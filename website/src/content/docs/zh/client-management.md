@@ -448,7 +448,7 @@ scrape_configs:
 
 ## 连接页面上的所有者联系信息
 
-`meridian fleet contact` 显示已审阅的服务器配置中保存的联系信息。先审阅公开说明和联系链接：
+`meridian fleet contact` 从控制服务读取当前的公开联系方式。保存前可以先预览：
 
 ```bash
 meridian fleet contact --text "需要帮助时请联系我" --link mailto:help@example.com --dry-run --json
@@ -456,7 +456,7 @@ meridian fleet contact --text "需要帮助时请联系我" --link mailto:help@e
 meridian fleet contact --text "" --link none --yes
 ```
 
-说明为一行纯文本，最多 120 个字符。链接只能使用 `https:`、`tg:` 或 `mailto:`；Meridian 会验证并规范化链接。两个字段相互独立：未指定的选项保留原值，`--text ""` 清除说明，`--link none` 清除链接。使用 JSON 更改时需要 `--yes`；试运行和拒绝确认都会保留原配置。导出和导入会保留 `delivery.owner_contact.text` 与 `delivery.owner_contact.link`。网页面板的**设置 → 常规**显示联系信息及用于更改的 CLI 命令。
+说明为一行纯文本，最多 120 个字符。链接只能使用 `https:`、`tg:` 或 `mailto:`；Meridian 会验证并规范化链接。两个字段相互独立：未指定的选项保留原值，`--text ""` 清除说明，`--link none` 清除链接。使用 JSON 更改时需要 `--yes`；试运行和拒绝确认都会保留原配置。 面板和命令行编辑同一份联系方式。在面板更改前需要重新确认身份。
 
 连接页面的帮助区和支持页面会显示公开说明及 **联系所有者** 链接，并支持全部四种界面语言。链接仅在点击后打开；页面资源均在本地。当联系信息已设置时，支持页面会保持显示它，并提供 **打开连接页面**。应用通过 `support-url` 接收链接；没有链接时，该响应头保留本地支持页面的地址。个人连接页面地址保持不变。
 
@@ -564,7 +564,7 @@ CLI 无法读取用户时会报告服务访问错误。配置变更导致访问�
 
 `plan` 和 `apply` 会同时审核服务中已有的配置与拟应用的拓扑。移除最后一个配置也必须经过审核和并发变更校验；只要仍有成员，就会被拒绝。
 
-所有应用路径，包括 `setup --intent`、通过 `--restart` 重新设置，以及 `node add`、`fleet contact` 等命令，都会在保存拓扑或写入服务器前，将访问配置 ID 和授权声明与服务核对。已保存但尚未应用的访问配置修改不能随其他命令应用：请使用 `meridian profile` 或 `meridian fleet import` 修改配置，或运行 `meridian apply` 审核已保存的修改。更换协议或中继伪装名称可能改变同一个 `exit:` 或 `gateway:` 授权所包含的连接；这些变化由拓扑命令自身的审核覆盖。
+所有应用路径，包括 `setup --intent`、通过 `--restart` 重新设置，以及 `node add` 等命令，都会在保存拓扑或写入服务器前，将访问配置 ID 和授权声明与服务核对。已保存但尚未应用的访问配置修改不能随其他命令应用：请使用 `meridian profile` 或 `meridian fleet import` 修改配置，或运行 `meridian apply` 审核已保存的修改。更换协议或中继伪装名称可能改变同一个 `exit:` 或 `gateway:` 授权所包含的连接；这些变化由拓扑命令自身的审核覆盖。
 
 新部署可以通过 `setup --intent` 引入访问配置。只有服务尚无声明指纹、命名访问配置和非 `default` 成员关系时，才允许初始化。如果服务已有访问配置但没有声明指纹，请先运行 `meridian apply` 审核，再使用其他拓扑命令。
 
