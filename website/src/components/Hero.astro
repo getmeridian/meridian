@@ -24,13 +24,26 @@ const specs = [
         <a href="#demo" class="atlas-link">{t('hero.demo')} <AtlasIcon name="down" size={16} /></a>
       </div>
     </div>
-    <figure class="hero__plate">
-      <img src={globe} width="534" height="424" alt={t('hero.mapAlt')} fetchpriority="high" decoding="async" />
+    <figure class="hero__plate" data-atlas data-state="still">
+      <div class="hero__globe">
+        <img src={globe} width="534" height="424" alt={t('hero.mapAlt')} fetchpriority="high" decoding="async" />
+        <canvas width="534" height="424" aria-hidden="true"></canvas>
+      </div>
       <figcaption class="hero__legend">
         <span class="hero__figure">{t('hero.figure')}</span>
         <span class="hero__symbols">
           <span><i class="hero__key hero__key--server"></i>{t('hero.server')}</span>
           <span><i class="hero__key"></i>{t('hero.device')}</span>
+        </span>
+        <span class="hero__motion-slot">
+          <button class="hero__motion" type="button" hidden aria-label={t('hero.replay')}
+            data-pause={t('hero.pause')} data-replay={t('hero.replay')} data-resume={t('hero.resume')}>
+            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path class="hero__pause" d="M7 5v10m6-10v10" />
+              <path class="hero__play" d="m7 4 9 6-9 6z" />
+              <path class="hero__replay" d="M4 8a6.2 6.2 0 1 1 .4 5M4 3v5h5" />
+            </svg>
+          </button>
         </span>
       </figcaption>
     </figure>
@@ -46,6 +59,11 @@ const specs = [
     </dl>
   </div>
 </section>
+
+<script>
+  import { mountAtlas } from './atlas-motion';
+  document.querySelectorAll<HTMLElement>('[data-atlas]').forEach(mountAtlas);
+</script>
 
 <style>
   .container.hero__spread {
@@ -82,6 +100,20 @@ const specs = [
   }
   .hero__actions.btn-row { align-items: center; gap: 12px 26px; }
   .hero__plate { min-width: 0; max-width: 610px; width: 100%; justify-self: center; }
+  .hero__globe { position: relative; }
+  .hero__globe canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .hero__globe canvas { transition: opacity .24s ease; }
+    [data-painted] .hero__globe canvas { opacity: 1; }
+  }
+  .hero__motion-slot { width: 40px; height: 30px; justify-content: flex-end; }
+  .hero__motion { display: grid; place-items: center; position: relative; width: 30px; height: 30px; padding: 0;
+    border: 1px solid var(--b2); border-radius: 50%; color: var(--ac-text); background: var(--bg); cursor: pointer; }
+  .hero__motion[hidden], .hero__motion path { display: none; }
+  .hero__motion:hover { border-color: var(--ac-text); background: var(--band); }
+  .hero__motion:focus-visible { outline: 2px solid var(--ac-text); outline-offset: 3px; }
+  .hero__motion::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; }
+  [data-state="running"] .hero__pause, [data-state="paused"] .hero__play, [data-state="settled"] .hero__replay { display: block; }
   .hero__plate img { display: block; width: 100%; height: auto; }
   .hero__legend {
     display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px;

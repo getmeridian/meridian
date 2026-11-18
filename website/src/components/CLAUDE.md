@@ -4,7 +4,7 @@
 
 **Stateless + presentational** — components take props (strings already translated by the page) and render HTML; interactivity is small vanilla scripts, and everything reads without JavaScript.
 
-**One landing** — `Landing.astro` renders the home page for any `locale`; `pages/index.astro` and `pages/[locale]/index.astro` only pass it. The connection atlas is one cacheable SVG; its key and description are localized HTML. The two recorded demos precede setup, with the video beside the commands and advanced material in native disclosures.
+**One landing** — `Landing.astro` renders the home page for any `locale`; `pages/index.astro` and `pages/[locale]/index.astro` only pass it. The connection atlas starts as a cacheable engraving. Only a visible atlas with motion allowed loads the orthographic canvas; the turn runs once and Replay is explicit. Keep the printed and moving bearings aligned. The two recorded demos precede setup, with the video beside the commands and advanced material in native disclosures.
 
 **Shared pieces** — `Nav` mirrors Starlight's header (height, logo, link style) and uses a `<details>` mobile menu; `LanguagePicker` is plain links; `SectionHead`, `.btn`, `.card`, `.pill` (global.css) open and style every section; `Footer` is the one footer; `blog/` holds `BlogCard`, `BlogListing`, and the post helpers.
 

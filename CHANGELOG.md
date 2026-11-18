@@ -19,7 +19,10 @@ newest first; the last is what 4.0 changes compared with 3.x.
   Settings section is visible. The personal page puts app installation and
   import first, with account details still one tap away.
 - The public tour shows the current panel and connection page in four languages.
+  The globe turns to follow three connections and respects reduced motion.
   CLI help now works offline and lists the owner panel under Get started.
+- Traffic and quotas use familiar labels such as MB and GB in the panel,
+  connection page and CLI. Existing limits keep exactly the same byte values.
 - The owner can edit the subscription title, refresh interval and public contact in
   Settings, and the provider, traffic allowance and payment dates under Servers.
   The panel shows what will change, asks for identity confirmation when the public

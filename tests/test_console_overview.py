@@ -364,7 +364,9 @@ def test_quick_actions_use_the_desktop_header_and_reserve_a_solid_phone_bar(loca
     )
     layout = result["layout"]
     assert layout["singleActionGroup"] and layout["primary"] and layout["headerActions"]
-    assert layout["dates"] == ["2026-11-01", "2026-11-02"] and "4 KB" in layout["peak"]
+    assert layout["dates"] == ["2026-11-01", "2026-11-02"]
+    unit = {"en": "KB", "ru": "КБ", "fa": "کیلوبایت", "zh": "KB"}[locale]
+    assert f"4 {unit}" in layout["peak"]
     if width > 640:
         assert layout["position"] == "static" and layout["headerDisplay"] == "flex"
     else:
