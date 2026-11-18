@@ -233,7 +233,8 @@ if (['settings-lowering', 'settings-save', 'settings-clear'].includes(scenario))
 }
 if (scenario === 'settings-disclosures') {
   const general = active();
-  report.generalEditable = general?.querySelectorAll('input,select,textarea,form').length;
+  report.inlineFields = general?.querySelectorAll('input,select,textarea,form').length;
+  report.hasEditor = [...general.querySelectorAll('button')].some(b => b.textContent === M.t('presentation.edit'));
   report.commands = [...(general?.querySelectorAll('.settings-facts .cmd code') || [])].map(node => node.textContent);
   report.contactIsText = !!general?.textContent.includes('<img src=x onerror="window.pwned=1">');
   await M.navigate('#/settings/security'); await settle();

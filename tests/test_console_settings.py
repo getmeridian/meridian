@@ -148,7 +148,8 @@ def test_clearing_a_notice_ignores_invalid_unfinished_text_and_expiry() -> None:
 @pytest.mark.parametrize("locale", LOCALES)
 def test_general_has_copyable_commands_and_security_keeps_every_disclosure(locale: str) -> None:
     result = run("disclosures", locale)
-    assert result["generalEditable"] == 0 and len(result["commands"]) == 4
+    assert result["inlineFields"] == 0 and result["hasEditor"]
+    assert result["commands"] == ["meridian setup", "meridian fleet routing full"]
     assert result["contactIsText"] and result["injected"] is False
     assert result["securityDisclosures"] and result["privacyDisclosures"]
     assert result["learnMore"] >= 2 and result["writes"] == []

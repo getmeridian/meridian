@@ -15,7 +15,7 @@ for (const script of ['core.js', 'drafts.js', 'components.js', 'shell.js', 'pass
 const M = w.M;
 const catalog = JSON.parse(fs.readFileSync(path.join(ui, 'locales', locale + '.json')));
 M.t = (key, params = {}) => (catalog[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name] ?? ''));
-M.i18n = { langs: [locale], names: { [locale]: locale }, lang: locale };
+M.i18n = { langs: [locale], names: { [locale]: locale }, lang: locale, locale: () => locale };
 M.state = { auth: { passkeys: { reason: 'no_domain' } } };
 M.privacySection = M.noticeSection = M.languageSection = M.formatPreviewSection = M.cliHint = () => M.h('section');
 M.api = (method, url) => {
