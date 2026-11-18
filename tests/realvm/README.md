@@ -105,8 +105,9 @@ The checkout runs `plan` and `apply --yes`, then verifies the control database's
 `meta.schema_version` over SSH using `host_runtime` names, a converged JSON
 plan, unchanged people and subscription URLs/bytes/headers, bob's limit,
 expiry and usage metadata, and the node's fresh runtime agent version against
-the built agent. `meridian test` runs last, so its traffic cannot alter the
-usage headers being compared.
+the built agent. After the usage comparisons, `meridian test --client bob` must
+report a successful traffic transport for the original limited person. Basic
+reachability alone does not pass.
 
 With b12 as its source, the verifier first installs and starts the actual PyPI CLI
 before provisioning. On the old deployer and VM, uv resolves packages available

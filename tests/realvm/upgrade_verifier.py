@@ -516,11 +516,22 @@ class UpgradeVerifier:
 
     def verify_traffic(self) -> None:
         # Traffic probes come last: they must not change the usage headers being compared.
-        test = self.execute("Run meridian test end to end", [*self.current, "--json", "test"])
+        test = self.execute(
+            "Test the original limited person end to end", [*self.current, "--json", "test", "--client", "bob"]
+        )
         passed, failed, _warnings, _skipped = verification_counts(test.stdout)
-        if failed or passed <= 0:
-            raise VerificationError("meridian test produced no passing end-to-end verdict.")
-        self.pass_check("meridian test passes end to end")
+        evidence = command_data(test.stdout)
+        transports = evidence.get("transports")
+        if (
+            failed
+            or passed <= 0
+            or evidence.get("scope") != "full"
+            or evidence.get("client") != "bob"
+            or not isinstance(transports, list)
+            or not any(isinstance(transport, dict) and transport.get("outcome") == "ok" for transport in transports)
+        ):
+            raise VerificationError("The original limited person did not carry traffic through a delivered transport.")
+        self.pass_check("the original limited person carried traffic through a delivered transport")
 
 
 def main() -> int:
