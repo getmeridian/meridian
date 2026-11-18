@@ -331,7 +331,7 @@ class UpgradeVerifier:
         clients, urls = {}, {}
         for person in people:
             data = self.json_command(["client", "show", person], old=old)
-            clients[person] = client_detail(data)
+            clients[person] = client_detail(data, published=old)
             url = data.get("handoff", {}).get("subscription_url", "")
             parsed = urlsplit(url)
             if (

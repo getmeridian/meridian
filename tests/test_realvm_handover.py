@@ -13,7 +13,7 @@ from meridian.control_artifacts import ServicePackage
 from meridian.ssh import CommandResult
 from tests.realvm import handover_drill as drill
 from tests.realvm import orchestrator, upgrade_verifier
-from tests.realvm.upgrade_support import VerificationError, build_intent
+from tests.realvm.upgrade_support import VerificationError, build_intent, client_detail
 
 
 def test_b12_deploy_fixture_carries_a_non_latin_declared_person() -> None:
@@ -113,3 +113,26 @@ def test_b12_recovery_will_not_replace_an_unmarked_or_wrong_fleet_home(run) -> N
             drill_run.require_lab_workspace()
     marker.write_text("this-lab\n")
     drill_run.require_lab_workspace()
+
+
+def test_only_a_published_boolean_ownership_flag_can_be_retired_by_the_handover_verifier() -> None:
+    # Serialized shape of the original b12 ClientDetail, omitting optional defaults.
+    old = dict(
+        username="bob",
+        id="id",
+        status="active",
+        traffic_used_bytes=4,
+        traffic_limit_bytes=50,
+        traffic_reset="never",
+        expires_at="2030-01-01T23:59:59Z",
+        created_at="",
+        last_seen="",
+        declared=True,
+    )
+    assert client_detail({"client": old}, published=True).traffic_limit_bytes == 50
+    assert "declared" in old
+    with pytest.raises(ValueError, match="client metadata"):
+        client_detail({"client": old})
+    for invalid in ({**old, "declared": "yes"}, {**old, "other": True}, {**old, "traffic_limit_bytes": "broken"}):
+        with pytest.raises(ValueError, match="client metadata"):
+            client_detail({"client": invalid}, published=True)

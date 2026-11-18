@@ -295,7 +295,7 @@ def test_the_complete_upgrade_journey_uses_old_commands_then_checks_every_upgrad
                 if upgraded and change == "limit" and name == "bob":
                     person = person.model_copy(update={"traffic_limit_bytes": 0})
                 data = {
-                    "client": person.model_dump(mode="json"),
+                    "client": {**person.model_dump(mode="json"), **({"declared": True} if old else {})},
                     "handoff": {"subscription_url": f"https://{IP}/sub/{name}-opaque-token"},
                 }
             elif leaf == ["plan"]:

@@ -113,10 +113,15 @@ def command_data(output: str) -> dict[str, Any]:
     raise ValueError("The command did not return a JSON envelope with object data.")
 
 
-def client_detail(data: Mapping[str, Any]) -> ClientDetail:
+def client_detail(data: Mapping[str, Any], *, published: bool = False) -> ClientDetail:
     """Validate the shared client contract without displaying handoff links."""
     try:
-        return ClientDetail.model_validate(data["client"])
+        record = data["client"]
+        # Through b12 this was a CLI ownership flag, not account data. The
+        # handover intentionally retires it. Keep every other field strict.
+        if published and isinstance(record, dict) and isinstance(record.get("declared"), bool):
+            record = {k: v for k, v in record.items() if k != "declared"}
+        return ClientDetail.model_validate(record)
     except (ValueError, KeyError, TypeError):
         raise ValueError("Client show did not return valid client metadata.") from None
 
