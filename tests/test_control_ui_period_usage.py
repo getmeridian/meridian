@@ -30,8 +30,8 @@ def test_person_traffic_uses_the_api_period_counters_and_discloses_unattributed_
 
     assert [plain(value) for value in result["facts"][:4]] == [
         catalog["usage.up"],
-        "4 B",
+        f"4 {catalog['unit.b']}",
         catalog["usage.down"],
-        "39 B",
+        f"39 {catalog['unit.b']}",
     ]
-    assert plain(result["note"]) == catalog["person.traffic_unattributed"].replace("{bytes}", "30 B")
+    assert plain(result["note"]) == catalog["person.traffic_unattributed"].replace("{bytes}", f"30 {catalog['unit.b']}")
