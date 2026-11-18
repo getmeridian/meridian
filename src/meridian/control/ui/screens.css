@@ -243,6 +243,7 @@
 .overview-aside { min-inline-size: 0; display: grid; gap: var(--space-4); }
 .overview-page .card { padding: clamp(16px, 2vw, 24px); }
 .overview-page .overview-fleet { display: grid; grid-template-columns: minmax(0, .95fr) minmax(0, 1.55fr); gap: 0; padding: 0; }
+.overview-fleet > p, .overview-fleet > .spinner { grid-column: 1 / -1; margin: var(--space-4); }
 .fleet-summary { position: relative; isolation: isolate; overflow: hidden; padding: clamp(20px, 2.4vw, 32px);
   display: flex; flex-direction: column; justify-content: center; gap: var(--space-3); background: #252836; color: #faf7ef;
   border-start-start-radius: inherit; border-end-start-radius: inherit; }
@@ -271,7 +272,7 @@
 .attention-row:hover, .recent-row:hover { color: var(--ac-text); background: var(--band); }
 .attention-label { flex: 1; min-inline-size: 0; overflow-wrap: anywhere; }
 .attention-mark { inline-size: .45rem; block-size: .45rem; flex: none; border-radius: 50%; background: var(--control-border); }
-.mark-warn { background: var(--ac-ui); } .mark-danger { background: var(--err); }
+.mark-warn { background: var(--ac-ui); } .mark-danger { background: var(--err); border-radius: 1px; transform: rotate(45deg); }
 .attention-row .icon { flex: none; transform: scaleX(-1); color: var(--t2); inline-size: 14px; }
 [dir="rtl"] .attention-row .icon { transform: none; }
 .overview-other { border-block-start: 1px solid var(--b1); }

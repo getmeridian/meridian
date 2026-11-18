@@ -3,6 +3,8 @@
 from axe_playwright_python.sync_playwright import Axe
 from playwright.sync_api import Page, expect
 
+from meridian.control.models import UserUpdate
+from meridian.control.service import ControlService
 from tests.e2e.helpers import ready
 
 
@@ -63,3 +65,30 @@ def test_owner_can_read_daily_values_without_the_chart_in_either_direction(owner
             owner, options={"runOnly": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"], "resultTypes": ["violations"]}
         )
         assert not review.response["violations"], review.generate_report()
+
+
+def test_live_counts_preserve_an_open_disclosure_and_keyboard_focus(
+    owner: Page, service: ControlService, base_url: str
+) -> None:
+    owner.goto(base_url + "/#/overview")
+    ready(owner, "overview")
+    other = owner.locator(".overview-other")
+    other.locator("summary").click()
+    disabled = other.locator('a[href="#/people?status=disabled"]')
+    disabled.focus()
+    service.update_user("Luma", UserUpdate(status="disabled"))
+    owner.locator("#view").evaluate("view => view.meridianLiveStop.refresh(true)")
+    expect(disabled.locator("[data-attention-count]")).to_contain_text("2")
+    expect(disabled).to_be_focused()
+
+    owner.goto(base_url + "/#/servers")
+    ready(owner, "servers")
+    tip = owner.locator('[data-server="de"] [data-server-facts] .tip-button').first
+    tip.click()
+    expect(tip).to_be_focused()
+    prior = tip.get_attribute("aria-controls")
+    assert prior
+    owner.locator("#view").evaluate("view => view.meridianLiveStop.refresh(true)")
+    expect(tip).not_to_have_attribute("aria-controls", prior)
+    expect(tip).to_be_focused()
+    expect(tip).to_have_attribute("aria-expanded", "true")

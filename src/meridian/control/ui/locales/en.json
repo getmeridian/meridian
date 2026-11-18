@@ -52,6 +52,7 @@
   "overview.health_all": "All {count} servers are online",
   "overview.health_one": "The server is online",
   "overview.health_attention_one": "{count} server needs attention",
+  "overview.health_attention_few": "{count} servers need attention",
   "overview.health_attention": "{count} servers need attention",
   "overview.no_servers": "No servers yet",
   "overview.people": "People",

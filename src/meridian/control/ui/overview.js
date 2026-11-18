@@ -65,12 +65,19 @@
       var key = JSON.stringify([urgent, other]);
       if (key !== attentionKey) {
         attentionKey = key;
-        var disclosure = attentionBody.querySelector("details");
+        var disclosure = attentionBody.querySelector("details"), focused = document.activeElement;
+        var restore = attentionBody.contains(focused), href = restore && focused.closest("a") && focused.closest("a").getAttribute("href");
         M.mount(attentionBody, [
           urgent.length ? attentionList(urgent) : h("div", { "data-overview-empty": "" }, M.emptyState(M.t("overview.attention_empty"), "", true)),
           other.length ? h("details", { class: "overview-other", open: disclosure && disclosure.open },
             h("summary", { text: M.t("overview.other_states") }), attentionList(other)) : null,
         ]);
+        if (restore) {
+          var next = href ? Array.from(attentionBody.querySelectorAll("a")).find(function (link) { return link.getAttribute("href") === href; })
+            : attentionBody.querySelector("summary");
+          if (!next) { next = attentionSlot.querySelector("h2"); next.tabIndex = -1; }
+          next.focus({ preventScroll: true });
+        }
       }
       drawTraffic(traffic);
       if (data.recent) {
@@ -88,8 +95,10 @@
 
     function drawFleet(data, active, total, needsAttention, trafficState) {
       var serverCount = (data.fleet.servers || []).length;
+      var forms = { one: "overview.health_attention_one", few: "overview.health_attention_few" };
+      var form = new Intl.PluralRules(M.i18n.locale()).select(needsAttention);
       var healthKey = !serverCount ? "overview.no_servers" : needsAttention
-        ? needsAttention === 1 ? "overview.health_attention_one" : "overview.health_attention"
+        ? M.has(forms, form) ? forms[form] : "overview.health_attention"
         : serverCount === 1 ? "overview.health_one" : "overview.health_all";
       var healthKind = needsAttention ? "warn" : serverCount ? "success" : "neutral";
       var traffic = trafficState.data;
@@ -200,9 +209,11 @@
   function serverReason(server) {
     if (!server.live) return "overview.server_offline";
     if (!server.runtime_available) return "overview.server_unavailable";
-    if (!server.in_sync) return "overview.server_behind";
     var health = server.runtime && server.runtime.health;
-    if (!health || health.status !== "healthy" || (server.failed || []).length ||
+    if (health && health.status === "unhealthy") return "servers.health_unhealthy";
+    if ((server.failed || []).length) return "servers.failed_badge";
+    if (!server.in_sync) return "overview.server_behind";
+    if (!health || health.status !== "healthy" ||
         (health.checks || []).some(function (check) { return check.status !== "pass"; })) return "overview.server_attention";
     return null;
   }
@@ -221,8 +232,9 @@
     var rows = [];
     (fleet.servers || []).forEach(function (server) {
       var reason = serverReason(server);
-      if (reason) rows.push({ href: "#/servers/" + encodeURIComponent(server.node_id), kind: server.live ? "warn" : "danger",
-        label: M.t(reason, { name: "\u2068" + server.node_id + "\u2069" }) });
+      if (reason) rows.push({ href: "#/servers/" + encodeURIComponent(server.node_id), kind: !server.live || reason.indexOf("servers.") === 0 ? "danger" : "warn",
+        label: reason.indexOf("servers.") === 0 ? "\u2068" + server.node_id + "\u2069 · " + M.t(reason)
+          : M.t(reason, { name: "\u2068" + server.node_id + "\u2069" }) });
     });
     (fleet.server_attention || []).forEach(function (finding) {
       var usage = (fleet.server_usage || []).find(function (item) { return item.server_ref === finding.server_ref; });

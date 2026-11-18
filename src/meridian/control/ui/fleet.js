@@ -43,8 +43,10 @@
       load: function (passive) { return M.api("GET", "ui/api/fleet", undefined, { passive: passive }); },
       draw: function (fleet) {
         var active = document.activeElement;
-        var focusedCard = active && active.closest("[data-server]"), focusedSection = active && active.closest("[data-mode-section]");
-        var restoreCard = focusedCard && (active === focusedCard || (active.tagName === "SUMMARY" && active.parentElement === focusedSection));
+        var focusedCard = active && active.closest("[data-server]");
+        var summary = active && active.tagName === "SUMMARY" && active.parentElement;
+        var reading = active && active.getAttribute("data-reading"), restart = active && active.hasAttribute("data-node-restart");
+        var tip = active && active.closest(".tip-button"), tipOpen = tip && tip.getAttribute("aria-expanded") === "true";
         var focusRef = active && (active.dataset.billingEdit || (active === document.body && pendingBillingFocus));
         pendingBillingFocus = null;
         M.state.fleet = fleet;
@@ -98,14 +100,25 @@
           });
           if (trigger) trigger.focus({ preventScroll: true });
         }
-        if (restoreCard) {
+        if (focusedCard && (active === focusedCard || summary || tip || reading || restart)) {
           var replacement = all.find(function (card) { return card.dataset.server === focusedCard.dataset.server; });
-          if (replacement && focusedSection) {
-            var section = Array.from(replacement.querySelectorAll("[data-mode-section]")).find(function (item) {
-              return item.dataset.modeSection === focusedSection.dataset.modeSection;
+          if (replacement && summary) {
+            var detail = Array.from(replacement.querySelectorAll("details")).find(function (item) {
+              return summary.dataset.modeSection ? item.dataset.modeSection === summary.dataset.modeSection
+                : item.className === summary.className;
             });
-            replacement = section && section.querySelector("summary");
+            replacement = detail && detail.querySelector("summary");
+          } else if (replacement && tip) {
+            replacement = Array.from(replacement.querySelectorAll(".tip-button")).find(function (button) {
+              return button.getAttribute("aria-label") === tip.getAttribute("aria-label");
+            });
+            if (replacement && tipOpen) replacement.click();
           }
+          if (replacement && reading) {
+            replacement = Array.from(replacement.querySelectorAll("[data-reading]")).find(function (bar) {
+              return bar.dataset.reading === reading;
+            }) || replacement.querySelector(".capacity-history summary");
+          } else if (replacement && restart) replacement = replacement.querySelector("[data-node-restart]");
           if (replacement) replacement.focus({ preventScroll: true });
         }
         firstDraw = false;
@@ -191,7 +204,7 @@
       h("details", { class: "secondary-actions" }, h("summary", { text: M.t("action.more") }),
         hostFacts,
         h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
-          onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart")))));
+          "data-node-restart": "", onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart")))));
     placeHostFacts(card);
     return card;
   }

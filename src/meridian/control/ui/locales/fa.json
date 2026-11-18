@@ -52,6 +52,7 @@
   "overview.health_all": "هر {count} سرور آنلاین هستند",
   "overview.health_one": "سرور آنلاین است",
   "overview.health_attention_one": "{count} سرور نیاز به بررسی دارد",
+  "overview.health_attention_few": "{count} سرور نیاز به بررسی دارند",
   "overview.health_attention": "{count} سرور نیاز به بررسی دارند",
   "overview.no_servers": "هنوز سروری وجود ندارد",
   "overview.people": "کاربران",

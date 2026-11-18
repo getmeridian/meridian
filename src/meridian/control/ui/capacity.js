@@ -23,6 +23,8 @@
     var status = M.has(states, data.status) ? data.status : "unavailable";
     var values = data.values;
     var sample = data.sample;
+    var current = status === "current" && values && sample;
+    var hasReadings = current || (data.last_day && data.last_day.samples);
     var help = {
       stale: "capacity.stale_help", unavailable: "capacity.unavailable_help", not_reported: "capacity.not_reported_help",
     };
@@ -31,7 +33,7 @@
         M.pill(status === "current" ? "ok" : status === "stale" ? "warn" : "muted", M.t(states[status]))),
       status !== "current" ? h("p", { class: "muted small", text: M.t(help[status]) }) : null,
       data.received_at ? h("p", { class: "muted small", text: M.t("capacity.received", { when: M.ago(data.received_at) }) }) : null,
-      status === "current" && values && sample ? h("dl", { class: "facts capacity-now" },
+      current ? h("dl", { class: "facts capacity-now" },
         fact("capacity.cpus", number(values.cpu_count)),
         fact("capacity.cpu_load", load(values.load_per_cpu_milli)),
         fact("capacity.memory", values.memory_used_bytes != null && values.memory_total_bytes != null
@@ -40,8 +42,8 @@
         fact("capacity.tx_now", rate(values.tx_bytes_per_second)),
         fact("capacity.xray_memory", bytes(values.xray_memory_resident_bytes)),
         fact("capacity.xray_uptime", values.xray_uptime_seconds == null ? missing() : M.uptime(values.xray_uptime_seconds))) : null,
-      status === "current" ? h("p", { class: "muted small", text: M.t("capacity.cpu_load_hint") }) : null,
-      status === "current" ? h("p", { class: "muted small", text: M.t("capacity.host_traffic") }) : null,
+      hasReadings ? h("p", { class: "muted small", text: M.t("capacity.cpu_load_hint") }) : null,
+      hasReadings ? h("p", { class: "muted small", text: M.t("capacity.host_traffic") }) : null,
       history(data));
   };
 
@@ -97,7 +99,7 @@
         var size = Math.max(1, value * 64 / maximum);
         var label = M.t("capacity.point", { hour: hour, series: item.label, mean: format(value), peak: format(peak) });
         marks.push(h("rect", { class: "capacity-bar capacity-" + item.color, x: x, y: 72 - size,
-          width: width - 1, height: size, rx: 1, "data-value": value, role: "img", tabindex: "0", "aria-label": label },
+          width: width - 1, height: size, rx: 1, "data-value": value, "data-reading": row.starts_at + ":" + item.key, role: "img", tabindex: "0", "aria-label": label },
           h("title", { text: label })));
         if (peak != null) marks.push(h("line", { class: "capacity-peak", x1: x, x2: x + width - 1,
           y1: 72 - peak * 64 / maximum, y2: 72 - peak * 64 / maximum, "aria-hidden": "true" }));

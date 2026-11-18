@@ -106,7 +106,7 @@
       var fleetTitle = M.state.fleet && M.state.fleet.profile_title || "Meridian";
       title.textContent = fleetTitle;
       title.title = fleetTitle;
-      var shortTitle = fleetTitle.replace(/^Meridian\s+[·|–—-]\s+/i, "");
+      var shortTitle = fleetTitle.replace(/^Meridian\s*[·:|–—-]\s*/i, "").trim();
       compact.textContent = shortTitle;
       compact.hidden = shortTitle === fleetTitle || !shortTitle;
       title.classList.toggle("has-short-title", !compact.hidden);

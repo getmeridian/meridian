@@ -131,6 +131,28 @@ def test_server_attention_links_open_the_server_and_payment_reminders() -> None:
     assert "2" in result["fleetHealth"] and result["healthKind"] == "warn"
 
 
+def test_unhealthy_runtime_precedes_pending_configuration_even_on_a_live_node() -> None:
+    result = run_console(
+        "overview-attention",
+        data={
+            "fleet": {
+                "servers": [
+                    {"node_id": "pending", "live": True, "runtime_available": True, "in_sync": False},
+                    {
+                        "node_id": "broken",
+                        "live": True,
+                        "runtime_available": True,
+                        "in_sync": False,
+                        "runtime": {"health": {"status": "unhealthy"}},
+                    },
+                ]
+            }
+        },
+    )
+    assert list(result["attention"]) == ["#/servers/broken", "#/servers/pending"]
+    assert "Runtime unhealthy" in result["text"]
+
+
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 @pytest.mark.parametrize("mode", ["simple", "detailed"])
 @pytest.mark.parametrize("node_id", ["main", None], ids=["node", "unmeasured-relay"])

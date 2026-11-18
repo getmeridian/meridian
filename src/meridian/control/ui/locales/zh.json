@@ -52,6 +52,7 @@
   "overview.health_all": "全部 {count} 台服务器均在线",
   "overview.health_one": "服务器在线",
   "overview.health_attention_one": "{count} 台服务器需要处理",
+  "overview.health_attention_few": "{count} 台服务器需要处理",
   "overview.health_attention": "{count} 台服务器需要处理",
   "overview.no_servers": "尚未添加服务器",
   "overview.people": "用户",
