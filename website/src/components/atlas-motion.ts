@@ -12,7 +12,9 @@ export function mountAtlas(figure: HTMLElement) {
   const motion = figure.querySelector<HTMLButtonElement>('[data-atlas-motion]')!;
   const hint = figure.querySelector<HTMLElement>('.hero__gesture')!;
   const stage = canvas.parentElement!, poster = stage.querySelector('img')!;
-  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+  // Read once: polling the same live query from Chromium’s frame loop can swallow its change event.
+  let reduced = motionPreference.matches;
   if (!('PointerEvent' in window && 'IntersectionObserver' in window && 'ResizeObserver' in window)) return;
 
   let painter: Painter | undefined, loading = false, failed = false, visible = false, away = false, manual = false;
@@ -22,7 +24,7 @@ export function mountAtlas(figure: HTMLElement) {
   let frame = 0, last = 0, lastPaint = -Infinity, suppressClick = false;
   let pointer: { id: number; x: number; y: number; lastX: number; lastY: number; at: number; radius: number; moved: boolean } | undefined;
   const awake = () => visible && !document.hidden && !away;
-  const allowed = () => !reduce.matches || manual;
+  const allowed = () => !reduced || manual;
   function state(value: State) {
     if (figure.dataset.state === value) return;
     figure.dataset.state = value;
@@ -71,7 +73,7 @@ export function mountAtlas(figure: HTMLElement) {
   }
   function trace(destination: number) {
     resetPose();
-    if (reduce.matches) { yaw = destination; pitch = home; state('settled'); }
+    if (reduced) { yaw = destination; pitch = home; state('settled'); }
     else {
       const delta = wrap(destination - yaw);
       story = { from: yaw, delta, lat: pitch, far: Math.abs(delta) > 45*rad || Math.abs(pitch-home) > 20*rad, time: 0 };
@@ -101,7 +103,7 @@ export function mountAtlas(figure: HTMLElement) {
       return;
     }
     grab.hidden = hint.hidden = false;
-    motion.hidden = !painter || reduce.matches;
+    motion.hidden = !painter || reduced;
     if (!allowed()) return;
     if (!painter) { if (!loading) void prepare(); return; }
     if (painter.size(stage.clientWidth)) dirty = true;
@@ -150,7 +152,7 @@ export function mountAtlas(figure: HTMLElement) {
   grab.addEventListener('pointerup', e => {
     const p = pointer;
     if (!p || p.id !== e.pointerId) return;
-    const flick = p.moved && !reduce.matches && e.timeStamp - p.at < 90 && Math.hypot(vx,vy) > .00035;
+    const flick = p.moved && !reduced && e.timeStamp - p.at < 90 && Math.hypot(vx,vy) > .00035;
     dropPointer();
     if (flick) { coasting = true; state('coasting'); schedule(); }
   });
@@ -159,7 +161,7 @@ export function mountAtlas(figure: HTMLElement) {
   }
   grab.addEventListener('click', e => {
     if (e.detail && suppressClick) { suppressClick = false; return; }
-    deliberate(); trace(reduce.matches ? 0 : 16 * rad); sync();
+    deliberate(); trace(reduced ? 0 : 16 * rad); sync();
   });
   grab.addEventListener('keydown', e => {
     if (e.altKey || e.metaKey || e.ctrlKey || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(e.key)) return;
@@ -181,7 +183,8 @@ export function mountAtlas(figure: HTMLElement) {
   observer.observe(stage);
   new ResizeObserver(sync).observe(stage);
   document.addEventListener('visibilitychange', sync);
-  reduce.addEventListener('change', () => {
+  motionPreference.addEventListener('change', event => {
+    reduced = event.matches;
     cancelFrame(); dropPointer(); resetPose(); manual = false; yaw = 0; pitch = home;
     figure.removeAttribute('data-painted'); state('still'); sync();
   });
