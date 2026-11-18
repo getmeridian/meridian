@@ -75,9 +75,11 @@ def _run_inventory(*, operation: OperationContext) -> None:
     except LocalStateError as exc:
         fail(exc)
     try:
+        panel = fleet_panel(cluster, topology)
         result = collect_fleet_inventory(
             topology,
-            fleet_panel(cluster, topology),
+            panel,
+            read_server_usage=panel.server_usage,
             classify_error=_classify_panel_error,
         )
     except MeridianError as exc:

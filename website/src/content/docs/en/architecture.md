@@ -17,6 +17,8 @@ description: System architecture, traffic flow, and service topology.
 
 The first reviewed deployment seeds the subscription title, refresh interval, public owner contact and server billing from the fleet configuration. After that the panel and CLI edit these values in the control service. Each save checks the version it was reviewed against. Saving these settings works even if an exit is offline. A later topology apply preserves the edits; the deployer still owns network configuration and access rules.
 
+Read the current version with `GET /api/settings/presentation` (`fleet.read`). Send only the edited fields with `PATCH /api/settings/presentation` (`settings.presentation`) and `expected_version`. A stale review returns HTTP 409. The change event records the field names without their values.
+
 ## Service topology
 
 ### Single server (`meridian deploy IP`)

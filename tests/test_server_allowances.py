@@ -305,12 +305,28 @@ def test_server_list_and_fleet_export_keep_metadata_keyed_to_saved_names(tmp_hom
         allowance_bytes=100, provider="Example provider", pay_on=date(2026, 11, 15), pay_every="month"
     )
     intent = single_exit_intent(server_metadata={"srv-exit": metadata})
-    with deployed(tmp_home, intent):
+    with deployed(tmp_home, intent) as client:
+        # Simulate a newer browser edit; all CLI reads must display that value, not the local seed.
+        from meridian.core.presentation import PresentationPatch
+
+        live = client.patch_presentation(
+            PresentationPatch.model_validate(
+                {
+                    "expected_version": client.presentation().version,
+                    "servers": {"srv-exit": {"provider": "Changed on the phone"}},
+                }
+            )
+        ).servers["srv-exit"]
         listed = CliRunner().invoke(app, ["server", "list", "--json"])
+        inventory = CliRunner().invoke(app, ["fleet", "inventory", "--json"])
+        assert inventory.exit_code == 0, inventory.output
+        server = next(row for row in json.loads(inventory.stdout)["data"]["servers"] if row["id"] == "srv-exit")
+        assert server["metadata"] == live.model_dump(mode="json")
+
     assert listed.exit_code == 0, listed.output
     schema_model("server-list-envelope").model_validate_json(listed.stdout)
     edge = next(item for item in json.loads(listed.stdout)["data"]["servers"] if item["name"] == "edge")
-    assert edge["declared"] and edge["metadata"] == metadata.model_dump(mode="json")
+    assert edge["declared"] and edge["metadata"] == live.model_dump(mode="json")
     exported = CliRunner().invoke(app, ["fleet", "export", "--json"])
     assert exported.exit_code == 0, exported.output
     document = json.loads(exported.stdout)["data"]["document"]

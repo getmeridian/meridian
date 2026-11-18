@@ -401,8 +401,9 @@ def node_protocols(node: TopologyNode) -> list[str]:
     return protocols
 
 
-def build_server_inventory(topology: FleetTopology) -> list[ServerInventory]:
+def build_server_inventory(topology: FleetTopology, usage: Sequence[ServerUsage] = ()) -> list[ServerInventory]:
     """Build a role-oriented server list for graph/UI clients."""
+    billing = {row.server_ref: row.metadata for row in usage}
     if topology.servers:
         return [
             ServerInventory(
@@ -413,7 +414,7 @@ def build_server_inventory(topology: FleetTopology) -> list[ServerInventory]:
                 ssh_user=server.ssh_user,
                 ssh_port=server.ssh_port,
                 relay_hops=server.relay_hops,
-                metadata=server.metadata,
+                metadata=billing.get(server.id),
             )
             for server in topology.servers
         ]
@@ -430,6 +431,7 @@ def build_server_inventory(topology: FleetTopology) -> list[ServerInventory]:
             return
         by_ip[ip] = ServerInventory(
             id=ip,
+            metadata=billing.get(ip),
             ip=ip,
             name=name,
             roles=roles,
@@ -524,7 +526,6 @@ def build_fleet_status(
     else:
         health = "healthy"
     allowance_usage = server_usage.servers if server_usage is not None else []
-    current_billing = {server.server_ref: server.metadata for server in allowance_usage}
     server_attention = (
         derive_server_attention(allowance_usage, AttentionThresholds(), server_usage.observed_at)
         if server_usage
@@ -557,9 +558,7 @@ def build_fleet_status(
         panel=PanelStatus(url=topology.panel_url, healthy=panel_healthy),
         summary=summary,
         sources=sources,
-        servers=[
-            row.model_copy(update={"metadata": current_billing.get(row.id)}) for row in build_server_inventory(topology)
-        ],
+        servers=build_server_inventory(topology, allowance_usage),
         nodes=nodes,
         relays=relays,
     )
@@ -571,6 +570,7 @@ def build_fleet_inventory(
     panel_healthy: bool,
     api_nodes: Sequence[ApiNodeLike] | None = None,
     sources: FleetSources | None = None,
+    server_usage: ServerUsageList | None = None,
 ) -> FleetInventory:
     """Build a redacted fleet inventory from local state plus panel status."""
     api_by_uuid = {node.uuid: node for node in api_nodes or []}
@@ -643,7 +643,7 @@ def build_fleet_inventory(
         panel=panel,
         summary=summary,
         sources=sources,
-        servers=build_server_inventory(topology),
+        servers=build_server_inventory(topology, server_usage.servers if server_usage else []),
         nodes=nodes,
         relays=relays,
     )

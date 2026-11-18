@@ -383,6 +383,7 @@ class TestFleetInventory:
             "nodes": "available",
             "panel": "available",
             "relays": "not_requested",
+            "server_usage": "available",
             "users": "not_requested",
         }
         assert data["servers"][0]["roles"] == ["panel", "exit"]

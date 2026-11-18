@@ -17,6 +17,8 @@ description: 系统架构、流量流向和服务拓扑。
 
 首次应用经审阅的配置时，控制服务会保存订阅名称、刷新间隔、公开联系方式和服务器账单信息。此后可在面板或命令行直接修改这些值，即使出口离线也可保存。每次保存都会检查预览时的版本；再次应用拓扑不会覆盖这些更改。网络配置和访问规则仍由部署端管理。
 
+通过 `GET /api/settings/presentation`（需 `fleet.read`）读取当前版本。用 `PATCH /api/settings/presentation`（需 `settings.presentation`）只提交已修改的字段及 `expected_version`。版本过期时返回 HTTP 409。事件只记录字段名称，不记录内容。
+
 ## 服务拓扑
 
 ### 单服务器（`meridian deploy IP`）

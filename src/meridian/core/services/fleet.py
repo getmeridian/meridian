@@ -187,6 +187,7 @@ def collect_fleet_inventory(
     panel_client: FleetPanelClient,
     *,
     classify_error: PanelErrorClassifier,
+    read_server_usage: Callable[[], ServerUsageList] | None = None,
 ) -> FleetInventoryServiceResult:
     """Collect redacted fleet inventory with live panel node observations."""
     panel = _observe_panel(
@@ -195,10 +196,15 @@ def collect_fleet_inventory(
         sources=FleetSources(panel="unknown", nodes="not_requested", users="not_requested", relays="not_requested"),
         unreachable="Cannot reach panel API; live inventory status is unavailable",
         with_users=False,
+        read_server_usage=read_server_usage,
     )
     return FleetInventoryServiceResult(
         inventory=build_fleet_inventory(
-            topology, panel_healthy=panel.healthy, api_nodes=panel.nodes, sources=panel.sources
+            topology,
+            panel_healthy=panel.healthy,
+            api_nodes=panel.nodes,
+            sources=panel.sources,
+            server_usage=panel.server_usage,
         ),
         warnings=panel.warnings,
     )
