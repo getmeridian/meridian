@@ -20,7 +20,7 @@ pytestmark = needs_console_dom
 # changing a binding or adding another call cannot silently inherit an opaque-ID exception.
 REVIEWED = {
     "fleet.js": {
-        "sha256": "8fc47f1db1096d548fdaa4e631555136667788b3aa76a668378b9e30c43cf6c5",
+        "sha256": "e6667523a6dfe183de41b1ec878f372558e37b4046f37963ea9747ca3e3cfe90",
         "paths": {
             'GET "api/revisions/" + number': ["api/revisions/{id}"],
             'GET "api/revisions/" + chosen': ["api/revisions/{id}"],
@@ -88,6 +88,7 @@ def test_every_console_route_is_emulated_or_deliberately_unavailable_in_the_demo
     scripts = {path.name: path.read_text() for path in UI_DIR.glob("*.js")}
     requests = console_requests(scripts)
     assert ("GET", "api/people") in requests
+    assert ("PATCH", "api/settings/presentation") in requests
     assert ("PUT", "api/users/{id}/delivery-policy") in requests
     assert ("POST", "auth/passkeys/login/begin") in requests
     assert not missing_requests(scripts), "Demo misses console requests: " + str(sorted(missing_requests(scripts)))

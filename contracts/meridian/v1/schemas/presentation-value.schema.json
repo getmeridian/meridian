@@ -1,0 +1,32 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "dry_run": {
+      "default": false,
+      "title": "Dry Run",
+      "type": "boolean"
+    },
+    "value": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        }
+      ],
+      "title": "Value"
+    },
+    "version": {
+      "minimum": 0,
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "value",
+    "version"
+  ],
+  "title": "PresentationValueResult",
+  "type": "object"
+}

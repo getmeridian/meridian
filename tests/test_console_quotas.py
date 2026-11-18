@@ -25,7 +25,7 @@ def test_console_and_cli_send_the_same_bytes(amount: str, unit: str) -> None:
     result = run_console("quota", data={"amount": amount, "unit": unit, "mode": "limited"})
     assert result["error"] == ""
     assert result["change"]["traffic_limit_bytes"] == parse_traffic_limit(amount + unit)
-    assert result["units"] == ["GiB", "TiB"]
+    assert result["units"] == ["GB", "TB"]
 
 
 @needs_console_dom
@@ -53,4 +53,4 @@ def test_api_quota_models_refuse_a_value_above_sqlite_int64(model) -> None:
 
 
 def test_cli_traffic_labels_match_binary_console_units() -> None:
-    assert format_traffic(1024, 1024**3) == "1 KiB / 1 GiB"
+    assert format_traffic(1024, 1024**3) == "1 KB / 1 GB"

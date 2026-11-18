@@ -10,31 +10,34 @@ export const en = {
   'page.title': 'Meridian — Self-Hosted VPN, Deployed Right',
   'page.description':
     'One command deploys a hardened VLESS+Reality VPN server with a built-in web panel and a link to share. Open source.',
-  'page.ogAlt': 'Meridian: share secure internet with the people you care about',
+  'page.ogAlt': 'Meridian: Your own VPN. A link to share.',
 
   // Hero
-  'hero.kicker': 'Open-source self-hosted VPN',
-  'hero.title': 'Share <em>secure internet</em> with the people you&nbsp;care&nbsp;about',
-  'hero.sub':
-    'One command turns a fresh VPS into a hardened VPN server that blends in with ordinary HTTPS, with a built-in web panel for you and a one-tap connection page for each person.',
-  'hero.cta': 'Get started',
+  'hero.title': 'Your own VPN. <em>A link to share.</em>',
+  'hero.sub': 'Meridian sets up a VPN on your server that can blend in with ordinary web traffic. Each person you invite gets a private connection link.',
+  'hero.cta': 'Set up Meridian',
+  'hero.demo': 'Try the demos',
   'hero.docs': 'Read the docs',
-  'hero.previewAlt': 'Connection page — what each person receives',
-  'hero.caption': 'What each person receives — <a href="/demo/">try the connection page</a> · <a href="/demo/console/">try the web panel</a>',
+  'hero.grab': 'Spin globe or trace connections',
+  'hero.keys': 'Use the arrow keys to rotate, Home to reset, or Enter to trace the connections.',
+  'hero.pause': 'Pause globe animation',
+  'hero.resume': 'Resume globe animation',
+  'hero.mapAlt': 'An illustrated globe with example city routes, including Omsk via Moscow to Amsterdam.',
+
+  // Server requirements and project license
+  'spec.server': 'Server OS',
+  'spec.serverValue': 'Debian or Ubuntu',
+  'spec.protocols': 'Connections',
+  'spec.license': 'License',
+  'spec.licenseValue': 'Open source (MIT)',
 
   // How it works
-  'setup.label': 'How it works',
-  'setup.title': 'Two commands to a working VPN',
-  'setup.desc':
-    'You need a Debian or Ubuntu VPS (a $5/month one is enough) and a terminal on your computer. Meridian sets up the rest.',
-  'setup.step1.label': 'Step 1 — Install',
-  'setup.step2.label': 'Step 2 — Set up',
-  'setup.then': 'then',
-  'setup.hint':
-    'The wizard asks a few plain questions, shows a review, then sets up your server. For one server with no questions, run <code>meridian deploy IP</code> — see the <a href="{base}/cli-reference/">CLI reference</a>.',
-  'setup.terminalAlt': 'Meridian deploy output in a terminal',
-  'setup.video':
-    'A full <code>meridian setup</code>, start to finish: 3½ minutes. <a href="/video/meridian-setup.mp4" download>Download the video</a>',
+  'setup.title': 'Set up your server',
+  'setup.desc': 'You need SSH access to a fresh Debian or Ubuntu VPS. Run both commands on your own computer.',
+  'setup.step1.label': 'Install the CLI',
+  'setup.step2.label': 'Start the wizard',
+  'setup.hint': 'The wizard shows you the plan before it changes your server. <a href="{base}/getting-started/">Read the setup guide</a>.',
+  'setup.video': 'Setup walkthrough (3:24)',
   'setup.videoLabel': 'Video: setting up a personal VPN with Meridian',
   'setup.details': 'What happens behind the scenes',
   'setup.idempotent':
@@ -56,8 +59,8 @@ export const en = {
   'step.6.text': ' and a connection page once real traffic has passed through the new subscription',
 
   // Command builder section
-  'builder.label': 'Command builder',
   'builder.title': 'Build your command',
+  'builder.manual': 'Read the CLI reference: commands, options, and examples',
   'builder.desc':
     'Pick options and copy the full command. Covers deploy, relays, checks, camouflage scans, diagnostics, and teardown.',
 
@@ -148,10 +151,8 @@ export const en = {
   'builder.status.teardownOk': 'In a fleet, remove a server’s role with meridian node remove first.',
 
   // How it avoids detection
-  'tech.label': 'Technology',
-  'tech.title': 'How it avoids detection',
-  'tech.desc':
-    'OpenVPN and WireGuard have recognizable traffic signatures. A VLESS+Reality connection is hard to tell apart from ordinary HTTPS to a real website.',
+  'tech.title': 'How the VPN works',
+  'tech.group': 'What the network sees',
   'tech.dpi': 'Deep Packet Inspection (DPI)',
   'tech.dpi.body':
     '<p>DPI inspects traffic patterns to identify VPN and proxy protocols. OpenVPN and WireGuard have handshakes that are easy to recognize and block.</p><p><strong>VLESS+Reality</strong> runs inside a standard TLS 1.3 connection on port 443, so DPI sees what looks like ordinary HTTPS to the camouflage site. Every server also offers XHTTP and Hysteria2, so a block on one method leaves the others working.</p>',
@@ -163,34 +164,23 @@ export const en = {
     '<p>Every TLS client sends a unique "Client Hello" fingerprint. Censors flag connections where the fingerprint doesn\'t match the claimed application.</p><p>Client apps use <strong>uTLS</strong> to send the same Client Hello as Chrome. Meridian also publishes a Firefox copy of each Reality and XHTTP entry, so if censors flag one fingerprint, the other keeps working.</p>',
 
   // Showcase
-  'showcase.label': 'See it',
-  'showcase.title': 'What you and your people get',
-  'showcase.desc': 'Every deployment includes a connection page for each person and a web panel for you. Both demos run in your browser on invented data: click around, nothing is real and nothing is sent anywhere.',
+  'showcase.title': 'Demos',
   'showcase.page.title': 'Connection page',
-  'showcase.page.text': 'Each person opens their subscription link in a browser: they pick their platform and app, import with one tap or a QR code, check their traffic and expiry, and read notices and plain help in four languages.',
-  'showcase.page.try': 'Try the connection page',
-  'showcase.page.alt': 'A person\'s connection page on a phone: choose an app, add the connection with one tap, then connect',
-  'showcase.console.title': 'Web panel',
-  'showcase.console.text': 'Run meridian panel to open your management panel (owner console). Add people, share links and QR codes, set expiry dates, traffic limits, and device caps, keep private notes and tags, post a notice for everyone, and issue scoped API tokens.',
-  'showcase.console.try': 'Try the web panel',
-  'showcase.console.alt': 'The web panel\'s People list: each person\'s expiry, last time online, status, and traffic against their limit',
-  'showcase.person': 'One person: links and QR codes, traffic limit, expiry, device cap, private notes and tags, reissue, or session cut-off.',
-  'showcase.servers': 'Servers: live health, Xray version, traffic, monthly allowances, and payment reminders.',
-  'showcase.settings': 'Privacy: client IPs are never logged, and device limits and daily history start off with clear disclosures.',
+  'showcase.page.text': 'Each person gets a private link to add the VPN to their app, check usage, and see when access expires.',
+  'showcase.console.title': 'Owner console',
+  'showcase.console.text': 'Manage servers and people, share QR codes, and set expiry dates or traffic limits.',
 
   // Connect
-  'connect.label': 'Connect',
-  'connect.title': 'Scan and go',
-  'connect.desc':
-    'After deploying, each person gets a connection page with QR codes and one-tap import. Send them the link — they tap once and connect.',
+  'connect.title': 'Which apps can I use?',
   'connect.apps.more':
-    'Connection pages list these apps first and link others for each platform. <a href="/demo/">See the demo</a>.',
+    'Connection pages list these apps first and link others for each platform. <a href="/demo/?lang=en">See the demo</a>.',
   'connect.clock':
     'Turn on automatic date and time on every device. Connections can fail when the device clock is wrong.',
 
   // Architecture
-  'arch.label': 'Architecture',
-  'arch.title': 'Under the hood',
+  'arch.title': 'Server configurations',
+  'arch.figure': 'View the server diagram',
+  'arch.docs': 'Read the architecture guide',
   'arch.alt':
     'Meridian architecture: nginx routes TCP 443 by SNI to Xray Reality, XHTTP, and the connection pages; Hysteria2 listens on UDP 443',
   'arch.standalone': 'Standalone mode (no domain)',
@@ -202,12 +192,6 @@ export const en = {
   'arch.relay': 'Relay mode (domestic entry point)',
   'arch.relay.body':
     '<p>A <strong>Realm</strong> TCP forwarder on a server inside your country passes connections to your exit abroad. Relays carry Reality only; XHTTP, WSS, and Hysteria2 still connect to the exit directly. Encryption runs end to end between the app and the exit, so the relay never sees plaintext.</p><p>Add one with <code>meridian relay add RELAY_IP --exit EXIT</code>. Subscriptions and connection pages pick up the relay entries automatically.</p>',
-
-  // Closing call to action
-  'cta.title': 'Ready to get started?',
-  'cta.desc':
-    'Install Meridian, deploy your VPN server, and share access with the people who need it. A deploy usually takes 3 to 10 minutes.',
-  'cta.install': 'Install Meridian',
 } as const;
 
 export type LandingKey = keyof typeof en;

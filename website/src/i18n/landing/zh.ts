@@ -5,31 +5,34 @@ export const zh: LandingStrings = {
   'page.title': 'Meridian — 自托管 VPN，一键正确部署',
   'page.description':
     '一条命令即可部署加固后的 VLESS+Reality VPN 服务器，自带网页面板与可分享的连接页面。开源。',
-  'page.ogAlt': 'Meridian：与你关心的人分享安全的互联网',
+  'page.ogAlt': 'Meridian：自建 VPN，一人一条链接。',
 
   // Hero
-  'hero.kicker': '开源自托管 VPN',
-  'hero.title': '与你关心的人分享<em>安全的互联网</em>',
-  'hero.sub':
-    '一条命令即可将全新 VPS 部署为难以与普通 HTTPS 区分的加固 VPN 服务器，为你提供内置网页面板，并为每个人生成一键连接页面。',
-  'hero.cta': '开始使用',
+  'hero.title': '自建 VPN，<em>一人一条链接。</em>',
+  'hero.sub': 'Meridian 在你的服务器上搭建 VPN，Reality 连接看起来像普通的 HTTPS 流量。你邀请的每个人都有自己的专属链接。',
+  'hero.cta': '开始搭建',
+  'hero.demo': '体验演示',
   'hero.docs': '阅读文档',
-  'hero.previewAlt': '连接页面——每个人收到的内容',
-  'hero.caption': '每个人收到的页面——<a href="/demo/">试用连接页面</a> · <a href="/demo/console/">试用网页面板</a>',
+  'hero.grab': '旋转地球或查看连接路线',
+  'hero.keys': '用方向键旋转，按 Home 复位，按 Enter 查看连接路线。',
+  'hero.pause': '暂停地球动画',
+  'hero.resume': '继续播放地球动画',
+  'hero.mapAlt': '地球仪展示了几条示例路线，包括从鄂木斯克经莫斯科到阿姆斯特丹。',
+
+  // Server requirements and project license
+  'spec.server': '服务器系统',
+  'spec.serverValue': 'Debian 或 Ubuntu',
+  'spec.protocols': '连接协议',
+  'spec.license': '许可证',
+  'spec.licenseValue': '开源 (MIT)',
 
   // How it works
-  'setup.label': '工作原理',
-  'setup.title': '两条命令，搭建可用的 VPN',
-  'setup.desc':
-    '你需要一台 Debian 或 Ubuntu 的 VPS（每月 5 美元的就够用）和电脑上的终端。其余由 Meridian 完成。',
-  'setup.step1.label': '第 1 步——安装',
-  'setup.step2.label': '第 2 步——设置',
-  'setup.then': '然后',
-  'setup.hint':
-    '向导会问几个简单的问题，展示一份摘要供你确认，然后设置你的服务器。若只有一台服务器且不想回答问题，运行 <code>meridian deploy IP</code> 即可，详见 <a href="{base}/cli-reference/">CLI 参考</a>。',
-  'setup.terminalAlt': '终端中的 Meridian 部署输出',
-  'setup.video':
-    '用 <code>meridian setup</code> 完成设置的全过程：3.5 分钟，英文讲解并附字幕。<a href="/video/meridian-setup.mp4" download>下载视频</a>',
+  'setup.title': '设置服务器',
+  'setup.desc': '准备一台全新安装 Debian 或 Ubuntu 的 VPS，并确认可以通过 SSH 登录。在自己电脑的终端运行以下两条命令。',
+  'setup.step1.label': '安装命令行工具',
+  'setup.step2.label': '启动设置向导',
+  'setup.hint': '向导会在修改服务器之前展示计划。<a href="{base}/getting-started/">阅读设置指南</a>。',
+  'setup.video': '设置演示（英语，3:24）',
   'setup.videoLabel': '视频：用 Meridian 搭建个人 VPN',
   'setup.details': '幕后发生了什么',
   'setup.idempotent':
@@ -51,8 +54,8 @@ export const zh: LandingStrings = {
   'step.6.text': '和连接页面，在真实流量通过新订阅之后生成',
 
   // Command builder section
-  'builder.label': '命令生成器',
   'builder.title': '生成你的命令',
+  'builder.manual': '查看命令行参考：命令、选项与示例',
   'builder.desc':
     '选择选项并复制完整命令。涵盖部署、中继、检查、伪装站点扫描、诊断和卸载。',
 
@@ -143,10 +146,8 @@ export const zh: LandingStrings = {
   'builder.status.teardownOk': '在多服务器集群中，请先用 meridian node remove 移除该服务器的角色。',
 
   // How it avoids detection
-  'tech.label': '技术',
-  'tech.title': '它如何避免被检测',
-  'tech.desc':
-    'OpenVPN 和 WireGuard 的流量有可识别的特征。VLESS+Reality 连接与访问真实网站的普通 HTTPS 很难区分。',
+  'tech.title': 'VPN 的工作原理',
+  'tech.group': '网络观察者能看到什么',
   'tech.dpi': '深度包检测（DPI）',
   'tech.dpi.body':
     '<p>DPI 通过分析流量模式来识别 VPN 和代理协议。OpenVPN 和 WireGuard 的握手很容易被识别和封锁。</p><p><strong>VLESS+Reality</strong> 运行在 443 端口上的标准 TLS 1.3 连接之内，因此 DPI 看到的是指向伪装站点的普通 HTTPS。每台服务器还提供 XHTTP 和 Hysteria2，所以一种方式被封锁时，其他方式仍可使用。</p>',
@@ -158,34 +159,23 @@ export const zh: LandingStrings = {
     '<p>每个 TLS 客户端都会发送独特的“Client Hello”指纹。如果指纹与其声称的应用不符，审查者就会将该连接标记出来。</p><p>客户端应用使用 <strong>uTLS</strong>，发送与 Chrome 相同的 Client Hello。Meridian 还会为每个 Reality 和 XHTTP 条目发布一份 Firefox 指纹的副本，因此一种指纹被标记时，另一种仍可使用。</p>',
 
   // Showcase
-  'showcase.label': '看看效果',
-  'showcase.title': '你和你的用户会得到什么',
-  'showcase.desc': '每次部署都会为每个人生成专属连接页面，并为你配备内置网页面板。两个演示都在你的浏览器中运行，使用虚构数据：随意点击，一切都不会发送到任何地方。',
+  'showcase.title': '在线演示',
   'showcase.page.title': '连接页面',
-  'showcase.page.text': '每个人在浏览器中打开自己的订阅链接：选择平台与应用，一键或扫码导入连接，查看流量与到期时间，并阅读四种语言的简明帮助。',
-  'showcase.page.try': '试用连接页面',
-  'showcase.page.alt': '手机上的个人连接页面：选择应用，一键添加连接，然后连接',
-  'showcase.console.title': '网页面板',
-  'showcase.console.text': '运行 meridian panel 打开你的管理面板（管理控制台）。在任何浏览器中添加用户、分享链接和二维码、设置到期时间、流量限额与设备上限、记录私有备注与标签、发布全员通知，以及签发限定权限的 API 令牌。',
-  'showcase.console.try': '试用网页面板',
-  'showcase.console.alt': '网页面板的用户列表：每个人的到期时间、最近在线时间、状态，以及相对于限额的流量',
-  'showcase.person': '单个用户：链接与二维码、流量限额、到期时间、设备上限、私有备注与标签、重发链接或立即切断会话。',
-  'showcase.servers': '服务器：实时健康状况、Xray 版本、流量、每月流量额度与续费提醒。',
-  'showcase.settings': '隐私：从不记录客户端 IP，设备限制与每日用量历史默认关闭，并清楚说明存储内容。',
+  'showcase.page.text': '受邀用户通过专属链接将 VPN 添加到应用，还可查看流量用量和到期时间。',
+  'showcase.console.title': '管理控制台',
+  'showcase.console.text': '管理服务器和用户、分享二维码，并设置到期时间或流量上限。',
 
   // Connect
-  'connect.label': '连接',
-  'connect.title': '扫码即连',
-  'connect.desc':
-    '部署完成后，每个人都会得到一个带二维码和一键导入按钮的连接页面。把链接发给需要的人，点一下即可连接。',
+  'connect.title': '可以用哪些应用连接？',
   'connect.apps.more':
-    '连接页面会优先列出这些应用，并为每个平台提供其他应用的链接。<a href="/demo/">查看演示</a>。',
+    '连接页面会优先列出这些应用，并为每个平台提供其他应用的链接。<a href="/demo/?lang=zh">查看演示</a>。',
   'connect.clock':
     '请在每台设备上开启自动设置日期和时间。设备时钟不准时，连接可能会失败。',
 
   // Architecture
-  'arch.label': '架构',
-  'arch.title': '内部结构',
+  'arch.title': '服务器配置',
+  'arch.figure': '查看服务器架构图',
+  'arch.docs': '阅读架构指南',
   'arch.alt':
     'Meridian 架构：nginx 按 SNI 将 TCP 443 路由到 Xray Reality、XHTTP 和连接页面；Hysteria2 监听 UDP 443',
   'arch.standalone': '独立模式（无域名）',
@@ -197,10 +187,4 @@ export const zh: LandingStrings = {
   'arch.relay': '中继模式（境内入口）',
   'arch.relay.body':
     '<p>境内服务器上的 <strong>Realm</strong> TCP 转发器会把连接转交给你位于境外的出口服务器。中继只承载 Reality；XHTTP、WSS 和 Hysteria2 仍直接连接出口服务器。加密在应用与出口服务器之间端到端进行，因此中继看不到明文。</p><p>用 <code>meridian relay add RELAY_IP --exit EXIT</code> 添加中继。订阅和连接页面会自动包含中继条目。</p>',
-
-  // Closing call to action
-  'cta.title': '准备好开始了吗？',
-  'cta.desc':
-    '安装 Meridian，部署你的 VPN 服务器，并与需要的人分享访问权限。一次部署通常需要 3 到 10 分钟。',
-  'cta.install': '安装 Meridian',
 };

@@ -15,6 +15,10 @@ description: 系统架构、流量流向和服务拓扑。
 - **Realm** — 中继服务器上的 TCP 转发器。
 - **uTLS** — 客户端连接复制浏览器的 TLS Client Hello（以 Chrome 为主，另有 Firefox 副本作为备用条目），所以看起来像普通浏览器流量。
 
+首次应用经审阅的配置时，控制服务会保存订阅名称、刷新间隔、公开联系方式和服务器账单信息。此后可在面板或命令行直接修改这些值，即使出口离线也可保存。每次保存都会检查预览时的版本；再次应用拓扑不会覆盖这些更改。网络配置和访问规则仍由部署端管理。 升级时会保留控制服务已保存的值。如果所有者在首次应用配置前编辑某个字段，该修改会保留，其他字段仍会获得初始值。
+
+通过 `GET /api/settings/presentation`（需 `fleet.read`）读取当前版本。用 `PATCH /api/settings/presentation`（需 `settings.presentation`）只提交已修改的字段及 `expected_version`。版本过期时返回 HTTP 409。事件只记录字段名称，不记录内容。
+
 ## 服务拓扑
 
 ### 单服务器（`meridian deploy IP`）

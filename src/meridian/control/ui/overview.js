@@ -11,6 +11,7 @@
       disabled: "overview.event_disabled", reissued: "overview.event_reissued", credentials_rotated: "overview.event_rotated",
       removed: "overview.event_removed", traffic_reset: "overview.event_reset", expired: "overview.event_expired",
       limited: "overview.event_limited", restored: "overview.event_restored", flow_blocking: "overview.event_blocking" },
+    presentation: { changed: "overview.event_presentation" },
     privacy: { changed: "overview.event_privacy" }, notice: { changed: "overview.event_notice" }, language: { changed: "overview.event_language" },
     token: { created: "overview.event_token_created", revoked: "overview.event_token_revoked" },
     command: { issued: "overview.event_command_issued", result: "overview.event_command_result" },
@@ -29,7 +30,7 @@
     var trafficSlot = h("section", { class: "card overview-traffic", "data-detailed-only": "", hidden: M.mode() !== "detailed" });
     var recentSlot = h("section", { class: "card overview-recent", "data-detailed-only": "", hidden: M.mode() !== "detailed" });
     var cache = null, stop, events = [], revisions = [], eventCursor = 0, recentError = null;
-    var attentionKey = null, lastTraffic = null;
+    var attentionKey = null, lastTraffic = null, chartKey = null;
     var actions = h("div", { class: "row-actions overview-actions", role: "group", "aria-label": M.t("overview.quick_actions") },
       h("button", { class: "btn btn-primary", type: "button", "data-overview-add": "", onclick: M.addPerson },
         M.icon("plus"), M.t("people.add")),
@@ -37,9 +38,9 @@
         M.icon("link"), M.t("overview.share")));
     M.mount(view, h("div", { class: "overview-page" },
       h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.overview") }),
-        h("p", { class: "muted small", text: M.t("overview.lede") })), actions),
-      status,
-      h("div", { class: "overview-grid" }, fleetSlot, attentionSlot, trafficSlot, recentSlot)));
+        status), actions),
+      fleetSlot, h("div", { class: "overview-grid" }, attentionSlot,
+        h("div", { class: "overview-aside", "data-detailed-only": "", hidden: M.mode() !== "detailed" }, trafficSlot, recentSlot))));
 
     function draw(data) {
       cache = data;
@@ -52,23 +53,31 @@
       else if (data.traffic.error && data.traffic.error.code === "history_off") lastTraffic = null;
       var traffic = { data: lastTraffic, error: data.traffic.error, stale: !!lastTraffic && !!data.traffic.error };
       drawFleet(data, active, total, healthCount, traffic);
-      var rows = [
+      var urgent = findings.concat([
+        { href: "#/people?status=limited", label: M.t("overview.limited"), count: data.people.facets.status.limited || 0, kind: "danger" },
         { href: "#/people?expires=7", label: M.t("overview.expiring", { days: number(7) }), count: data.expiring.total, kind: "warn" },
         { href: "#/people?quota=90", label: M.t("overview.quota", { percent: M.percent(90) }), count: data.quota.total, kind: "warn" },
-        { href: "#/people?status=limited", label: M.t("overview.limited"), count: data.people.facets.status.limited || 0, kind: "danger" },
-        { href: "#/people?status=disabled", label: M.t("status.disabled"), count: data.people.facets.status.disabled || 0, kind: "neutral" },
-      ];
-      if (M.mode() === "detailed") rows.push({ href: "#/people?never=1", label: M.t("overview.never"), count: data.people.facets.never || 0, kind: "neutral" });
-      rows = rows.filter(function (row) { return row.count > 0; }).concat(findings);
-      var key = JSON.stringify(rows);
+      ].filter(function (row) { return row.count > 0; }));
+      urgent.sort(function (a, b) { return Number(b.kind === "danger") - Number(a.kind === "danger"); });
+      var other = [{ href: "#/people?status=disabled", label: M.t("status.disabled"), count: data.people.facets.status.disabled, kind: "neutral" }];
+      if (M.mode() === "detailed") other.push({ href: "#/people?never=1", label: M.t("overview.never"), count: data.people.facets.never, kind: "neutral" });
+      other = other.filter(function (row) { return row.count > 0; });
+      var key = JSON.stringify([urgent, other]);
       if (key !== attentionKey) {
         attentionKey = key;
-        M.mount(attentionBody, rows.length ? h("div", { class: "attention-list" },
-          rows.map(function (row) {
-            return h("a", { class: "attention-row", href: row.href },
-              h("span", { class: "attention-label", text: row.label }),
-              row.count != null ? h("span", { "data-attention-count": "" }, M.statusChip(row.kind, number(row.count))) : M.icon("back"));
-          })) : h("div", { "data-overview-empty": "" }, M.emptyState(M.t("overview.attention_empty"), "", true)));
+        var disclosure = attentionBody.querySelector("details"), focused = document.activeElement;
+        var restore = attentionBody.contains(focused), href = restore && focused.closest("a") && focused.closest("a").getAttribute("href");
+        M.mount(attentionBody, [
+          urgent.length ? attentionList(urgent) : h("div", { "data-overview-empty": "" }, M.emptyState(M.t("overview.attention_empty"), "", true)),
+          other.length ? h("details", { class: "overview-other", open: disclosure && disclosure.open },
+            h("summary", { text: M.t("overview.other_states") }), attentionList(other)) : null,
+        ]);
+        if (restore) {
+          var next = href ? Array.from(attentionBody.querySelectorAll("a")).find(function (link) { return link.getAttribute("href") === href; })
+            : attentionBody.querySelector("summary");
+          if (!next) { next = attentionSlot.querySelector("h2"); next.tabIndex = -1; }
+          next.focus({ preventScroll: true });
+        }
       }
       drawTraffic(traffic);
       if (data.recent) {
@@ -86,18 +95,23 @@
 
     function drawFleet(data, active, total, needsAttention, trafficState) {
       var serverCount = (data.fleet.servers || []).length;
+      var forms = { one: "overview.health_attention_one", few: "overview.health_attention_few" };
+      var form = new Intl.PluralRules(M.i18n.locale()).select(needsAttention);
       var healthKey = !serverCount ? "overview.no_servers" : needsAttention
-        ? needsAttention === 1 ? "overview.health_attention_one" : "overview.health_attention"
+        ? M.has(forms, form) ? forms[form] : "overview.health_attention"
         : serverCount === 1 ? "overview.health_one" : "overview.health_all";
       var healthKind = needsAttention ? "warn" : serverCount ? "success" : "neutral";
       var traffic = trafficState.data;
       var used = traffic ? traffic.daily.reduce(function (sum, day) { return sum + day.bytes; }, 0) : null;
       var historyOff = trafficState.error && trafficState.error.code === "history_off";
       M.mount(fleetSlot, [
-        h("h2", { text: M.t("overview.fleet") }),
-        h("p", { class: "overview-health", "data-overview-health": "", "data-health-kind": healthKind },
+        h("div", { class: "fleet-summary" },
+          h("svg", { class: "fleet-meridians", viewBox: "0 0 240 180", "aria-hidden": "true", focusable: "false" },
+            h("path", { d: "M-35 157 Q105 15 270 47 M-30 181 Q115 39 270 71 M-25 205 Q125 63 270 95 M30 -32 Q112 65 105 200 M81 -32 Q171 63 153 200 M134 -32 Q226 63 201 200" })),
+          h("h2", { text: M.t("overview.fleet") }),
+          h("p", { class: "overview-health", "data-overview-health": "", "data-health-kind": healthKind },
           h("span", { class: "dot " + (healthKind === "success" ? "dot-ok" : healthKind === "warn" ? "dot-warn" : "dot-neutral"), "aria-hidden": "true" }),
-          M.t(healthKey, { count: number(needsAttention || serverCount) })),
+          M.t(healthKey, { count: number(needsAttention || serverCount) }))),
         h("dl", { class: "overview-facts" },
           M.keyValue(M.t("overview.people"), h("div", { class: "stack-sm" },
             h("span", { class: "overview-number" }, h("span", { class: "overview-ratio", dir: document.documentElement.dir },
@@ -118,10 +132,18 @@
 
     function drawTraffic(result) {
       var rows = result.data && result.data.daily;
+      var key = JSON.stringify([rows, result.stale, result.error && result.error.code]);
+      if (key === chartKey) return;
+      chartKey = key;
+      var prior = trafficSlot.querySelector(".usage-data"), restoreFocus = prior && prior.contains(document.activeElement);
       M.mount(trafficSlot, [h("h2", { text: M.t("overview.traffic_title") }), rows
         ? sparkline(rows) : h("p", { class: "muted small", text: M.t(result.error && result.error.code === "history_off" ? "overview.history_off" : "overview.history_unavailable") }),
+        rows && rows.length ? h("details", { class: "usage-data", open: prior && prior.open },
+          h("summary", { text: M.t("usage.show_table") }), M.usageTable(rows, false)) : null,
         result.stale ? h("p", { class: "muted small", text: M.t("overview.history_stale") }) : null,
         result.error && result.error.code === "history_off" ? h("a", { href: "#/settings/privacy", text: M.t("privacy.title") }) : null]);
+      var summary = restoreFocus && trafficSlot.querySelector(".usage-data summary");
+      if (summary) summary.focus({ preventScroll: true });
     }
 
     function drawRecent() {
@@ -132,6 +154,12 @@
       }).concat(events.filter(function (event) { return eventLabel(event.kind); }).map(function (event) {
         var family = event.kind.split(".")[0];
         var href = "#/settings" + (["privacy", "notice", "language"].indexOf(family) >= 0 ? "/" + family : "");
+        if (event.kind === "presentation.changed") {
+          var fields = event.detail.fields;
+          return { kind: event.kind, time: event.time,
+            href: fields.length === 1 && fields[0] === "servers" ? "#/servers" : "#/settings/general",
+            label: M.t(eventLabel(event.kind)), subject: fields.map(function (field) { return M.t("events.field." + field); }).join(" · ") };
+        }
         if (event.kind.indexOf("user.") === 0) href = "#/people?q=" + encodeURIComponent(event.subject);
         else if (event.kind === "people.bulk") href = "#/people";
         else if (event.kind.indexOf("token.") === 0) href = "#/tokens";
@@ -169,6 +197,7 @@
         return data.traffic.error && data.traffic.error.code !== "history_off" ? data.traffic.error
           : M.mode() === "detailed" && data.recent ? data.recent.events.error || data.recent.revisions.error : null;
       }, empty: function () {
+        attentionKey = chartKey = null;
         [fleetSlot, attentionBody, trafficSlot, recentSlot].forEach(function (slot) {
           M.mount(slot, h("p", { class: "muted small", text: M.t("overview.unavailable") }));
         });
@@ -180,46 +209,62 @@
   function serverReason(server) {
     if (!server.live) return "overview.server_offline";
     if (!server.runtime_available) return "overview.server_unavailable";
-    if (!server.in_sync) return "overview.server_behind";
     var health = server.runtime && server.runtime.health;
-    if (!health || health.status !== "healthy" || (server.failed || []).length ||
+    if (health && health.status === "unhealthy") return "servers.health_unhealthy";
+    if ((server.failed || []).length) return "servers.failed_badge";
+    if (!server.in_sync) return "overview.server_behind";
+    if (!health || health.status !== "healthy" ||
         (health.checks || []).some(function (check) { return check.status !== "pass"; })) return "overview.server_attention";
     return null;
   }
 
+  function attentionList(rows) {
+    return h("div", { class: "attention-list" }, rows.map(function (row) {
+      return h("a", { class: "attention-row", href: row.href },
+        h("span", { class: "attention-mark mark-" + row.kind, "aria-hidden": "true" }),
+        h("span", { class: "attention-label", text: row.label }),
+        row.count != null ? h("span", { "data-attention-count": "" }, M.statusChip(row.kind, number(row.count))) : null,
+        M.icon("back"));
+    }));
+  }
+
   function serverFindings(fleet) {
-    var rows = new Map();
-    function add(id, label) {
-      var href = "#/servers/" + encodeURIComponent(id) + "/allowance", previous = rows.get(href);
-      rows.set(href, { href: href, label: previous ? previous.label + " · " + label : label });
-    }
+    var rows = [];
     (fleet.servers || []).forEach(function (server) {
       var reason = serverReason(server);
-      if (reason) add(server.node_id, M.t(reason, { name: "\u2068" + server.node_id + "\u2069" }));
+      if (reason) rows.push({ href: "#/servers/" + encodeURIComponent(server.node_id), kind: !server.live || reason.indexOf("servers.") === 0 ? "danger" : "warn",
+        label: reason.indexOf("servers.") === 0 ? "\u2068" + server.node_id + "\u2069 · " + M.t(reason)
+          : M.t(reason, { name: "\u2068" + server.node_id + "\u2069" }) });
     });
     (fleet.server_attention || []).forEach(function (finding) {
       var usage = (fleet.server_usage || []).find(function (item) { return item.server_ref === finding.server_ref; });
       var id = usage && usage.node_id || finding.server_ref;
-      (finding.reasons || []).forEach(function (reason) {
-        if (reason === "payment_due" || reason === "payment_overdue") add(id, M.t(reason === "payment_due" ? "overview.payment_due" : "overview.payment_overdue",
-          { name: "\u2068" + finding.server_ref + "\u2069", days: number(7) }));
-      });
+      var labels = { payment_due: "server_allowance.payment_due", payment_overdue: "server_allowance.payment_overdue",
+        allowance_near: "server_allowance.allowance_near", allowance_exceeded: "server_allowance.allowance_exceeded" };
+      var reasons = (finding.reasons || []).filter(function (reason) { return M.has(labels, reason); });
+      if (reasons.length) rows.push({ href: "#/servers/" + encodeURIComponent(id) + "/allowance",
+        kind: reasons.some(function (reason) { return reason === "payment_overdue" || reason === "allowance_exceeded"; }) ? "danger" : "warn",
+        label: "\u2068" + finding.server_ref + "\u2069 · " + reasons.map(function (reason) { return M.t(labels[reason]); }).join(" · ") });
     });
-    return Array.from(rows.values());
+    return rows;
   }
 
   function sparkline(rows) {
     if (!rows.length) return M.emptyState(M.t("usage.empty"));
     var peak = rows.reduce(function (maximum, row) { return Math.max(maximum, row.bytes); }, 0);
-    var points = rows.map(function (row, index) {
-      return [(rows.length > 1 ? index * 600 / (rows.length - 1) : 300), 80 - (peak ? row.bytes * 72 / peak : 0)];
-    });
+    // A column belongs to a UTC day. A missing day is a gap; an observed zero gets a baseline tick.
+    function time(day) { return Date.parse(day + "T00:00:00Z"); }
+    var start = time(rows[0].day), span = (time(rows[rows.length - 1].day) - start) / 86400000 + 1, slot = 600 / span;
     return h("div", { class: "stack-sm", dir: "ltr" },
-      h("svg", { class: "traffic-sparkline", viewBox: "0 0 600 88", role: "img", "aria-label": M.t("overview.traffic_chart") },
+      h("svg", { class: "traffic-sparkline", viewBox: "0 0 600 118", role: "img", "aria-label": M.t("overview.traffic_chart") },
         h("title", { text: M.t("overview.traffic_chart") }),
-        h("line", { class: "usage-grid", x1: "0", x2: "600", y1: "80", y2: "80" }),
-        points.length === 1 ? h("circle", { class: "sparkline-point", cx: "300", cy: points[0][1], r: "4" })
-          : h("polyline", { class: "sparkline-line", points: points.map(function (point) { return point.join(","); }).join(" ") })),
+        [10, 61, 112].map(function (y) { return h("line", { class: "usage-grid", x1: 0, x2: 600, y1: y, y2: y }); }),
+        rows.map(function (row) {
+          var height = peak && row.bytes ? Math.max(2, row.bytes * 102 / peak) : 2;
+          var x = (time(row.day) - start) / 86400000 * slot, width = Math.min(26, slot * .74);
+          return h("rect", { class: row.bytes ? "spark-bar" : "spark-zero", x: x + (slot - width) / 2,
+            y: 112 - height, width: width, height: height, rx: 1.5 }, h("title", { text: row.day + " · " + M.bytes(row.bytes) }));
+        })),
       h("p", { class: "muted small", dir: "auto", text: M.t("usage.peak", { bytes: M.bytes(peak) }) }),
       h("div", { class: "usage-dates muted small" }, h("bdi", { text: rows[0].day }), h("bdi", { text: rows[rows.length - 1].day })));
   }

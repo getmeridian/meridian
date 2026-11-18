@@ -151,12 +151,11 @@ meridian fleet import fleet.yml
 Import shows each change before anything happens:
 
 ```
-  + client carol
   ~ exit-2 sni www.example.com -> www.example.org
   → Apply? [y/N]
 ```
 
-The file names servers by their saved names and holds no keys, credentials, links, or transport paths, so it is safe to keep in a repository. Servers it names must be saved first (`meridian server add`). See [`fleet import`](/en/cli-reference/#meridian-fleet) for what it refuses.
+The file uses saved server names and omits private keys, credentials, personal connection links, and transport paths. Servers it names must be saved first (`meridian server add`). See [`fleet import`](/en/cli-reference/#meridian-fleet) for what it refuses.
 
 ## Pre-flight check
 

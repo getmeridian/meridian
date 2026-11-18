@@ -26,17 +26,29 @@
 
   M.renderServers = function (view, selectedServer, selectedSection) {
     var disclosureState = new Map(), firstDraw = true;
+    var pendingBillingFocus = null;
+    function billingChanged(ref) {
+      pendingBillingFocus = ref;
+      if (view.meridianLiveStop) view.meridianLiveStop.refresh(false);
+    }
     var status = h("div", { class: "live-status" });
     var cards = h("div", { class: "live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
     M.mount(view, [
         h("div", { class: "page-head" }, h("div", {}, M.titled("h1", M.t("nav.servers"), M.t("tip.servers")),
           h("p", { class: "muted", text: M.t("servers.lede") }))),
-        M.cliHint(), status, cards, M.fleetHistory(),
+        status, cards, M.cliHint(), M.fleetHistory(),
     ]);
     return M.liveView(view, {
       status: status, interval: 10000,
       load: function (passive) { return M.api("GET", "ui/api/fleet", undefined, { passive: passive }); },
       draw: function (fleet) {
+        var active = document.activeElement;
+        var focusedCard = active && active.closest("[data-server]");
+        var summary = active && active.tagName === "SUMMARY" && active.parentElement;
+        var reading = active && active.getAttribute("data-reading"), restart = active && active.hasAttribute("data-node-restart");
+        var tip = active && active.closest(".tip-button"), tipOpen = tip && tip.getAttribute("aria-expanded") === "true";
+        var focusRef = active && (active.dataset.billingEdit || (active === document.body && pendingBillingFocus));
+        pendingBillingFocus = null;
         M.state.fleet = fleet;
         if (M.updateFleetTitle) M.updateFleetTitle();
         cards.querySelectorAll("[data-server]").forEach(function (card) {
@@ -55,11 +67,11 @@
         }
         var all = servers.map(function (server) {
           var item = usage.find(function (row) { return row.node_id === server.node_id; });
-          return serverCard(server, item, item ? reasons(item) : []);
+          return serverCard(server, item, item ? reasons(item) : [], billingChanged);
         });
         usage.filter(function (item) {
           return !item.node_id || !servers.some(function (server) { return server.node_id === item.node_id; });
-        }).forEach(function (item) { all.push(billingCard(item, reasons(item))); });
+        }).forEach(function (item) { all.push(billingCard(item, reasons(item), billingChanged)); });
         all.forEach(function (card) {
           var states = disclosureState.get(card.dataset.server);
           if (states) card.querySelectorAll("[data-mode-section], .capacity-history, .secondary-actions").forEach(function (detail) {
@@ -82,6 +94,33 @@
         });
         M.mount(cards, all.length ? h("div", { class: "cards" }, all)
           : h("div", { class: "empty" }, h("p", { text: M.t("servers.empty") })));
+        if (focusRef) {
+          var trigger = Array.from(cards.querySelectorAll("[data-billing-edit]")).find(function (b) {
+            return b.dataset.billingEdit === focusRef;
+          });
+          if (trigger) trigger.focus({ preventScroll: true });
+        }
+        if (focusedCard && (active === focusedCard || summary || tip || reading || restart)) {
+          var replacement = all.find(function (card) { return card.dataset.server === focusedCard.dataset.server; });
+          if (replacement && summary) {
+            var detail = Array.from(replacement.querySelectorAll("details")).find(function (item) {
+              return summary.dataset.modeSection ? item.dataset.modeSection === summary.dataset.modeSection
+                : item.className === summary.className;
+            });
+            replacement = detail && detail.querySelector("summary");
+          } else if (replacement && tip) {
+            replacement = Array.from(replacement.querySelectorAll(".tip-button")).find(function (button) {
+              return button.getAttribute("aria-label") === tip.getAttribute("aria-label");
+            });
+            if (replacement && tipOpen) replacement.click();
+          }
+          if (replacement && reading) {
+            replacement = Array.from(replacement.querySelectorAll("[data-reading]")).find(function (bar) {
+              return bar.dataset.reading === reading;
+            }) || replacement.querySelector(".capacity-history summary");
+          } else if (replacement && restart) replacement = replacement.querySelector("[data-node-restart]");
+          if (replacement) replacement.focus({ preventScroll: true });
+        }
         firstDraw = false;
       },
       empty: function () { M.clear(cards); },
@@ -102,7 +141,7 @@
     root.querySelectorAll(".server").forEach(placeHostFacts);
   };
 
-  function serverCard(server, usage, attention) {
+  function serverCard(server, usage, attention, billingChanged) {
     var sync = !server.runtime_available ? M.pill("muted", M.t("servers.convergence_unavailable"))
       : server.failed && server.failed.length ? M.pill("err", M.t("servers.failed_badge")) : server.in_sync
       ? M.pill("ok", M.t("servers.in_sync"))
@@ -139,15 +178,6 @@
         M.pill(server.live ? "ok" : "muted", M.t(server.live ? "servers.online" : "servers.offline")),
         M.pill({ healthy: "ok", degraded: "warn", unhealthy: "err", unavailable: "muted" }[healthStatus],
           M.t("servers.health_" + healthStatus)), sync),
-      h("dl", { class: "facts", "data-server-facts": "" },
-        server.region ? [h("dt", { text: M.t("servers.country") }), h("dd", { text: country(server.region) })] : null,
-        h("dt", { text: M.t("servers.agent") }),
-        h("dd", {}, M.t(server.live ? "servers.online" : "servers.offline"), " · ",
-          M.t("servers.seen", { when: M.ago(server.last_seen_at) })),
-        term(M.t("servers.revision"), M.t("tip.server_revision")),
-        h("dd", {}, M.t("servers.revisions", {
-          applied: M.count(server.applied_revision), current: M.count(server.revision) })),
-        term(M.t("servers.traffic"), M.t("tip.server_traffic")), h("dd", { text: M.bytes(server.traffic_bytes) })),
       !runtime ? h("p", { class: "notice notice-warn small", text: M.t("servers.health_unavailable") }) : null,
       faults.length ? h("ul", { class: "notice notice-warn health-checks" }, faults.map(function (check) {
         return h("li", {}, h("strong", { text: check.name === "stats" ? M.t("servers.stats_stalled") + " (stats)" : check.name }),
@@ -159,26 +189,35 @@
           return h("li", { class: "mono small", text: line });
         })))
         : null,
+      h("dl", { class: "facts", "data-server-facts": "" },
+        server.region ? [h("dt", { text: M.t("servers.country") }), h("dd", { text: country(server.region) })] : null,
+        h("dt", { text: M.t("servers.agent") }),
+        h("dd", {}, M.t(server.live ? "servers.online" : "servers.offline"), " · ",
+          M.t("servers.seen", { when: M.ago(server.last_seen_at) })),
+        term(M.t("servers.revision"), M.t("tip.server_revision")),
+        h("dd", {}, M.t("servers.revisions", {
+          applied: M.count(server.applied_revision), current: M.count(server.revision) })),
+        term(M.t("servers.traffic"), M.t("tip.server_traffic")), h("dd", { text: M.bytes(server.traffic_bytes) })),
       M.detailedSection(M.t("capacity.title"), M.serverCapacity(server.capacity), "capacity"),
-      usage ? M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention), "allowance")
+      usage ? M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention, billingChanged), "allowance")
         : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
       h("details", { class: "secondary-actions" }, h("summary", { text: M.t("action.more") }),
         hostFacts,
         h("div", { class: "row-actions" }, h("button", { class: "btn btn-ghost btn-sm", type: "button",
-          onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart")))));
+          "data-node-restart": "", onclick: function () { M.restartNode(server.node_id); } }, M.t("commands.restart")))));
     placeHostFacts(card);
     return card;
   }
 
   function billingDate(value) { return "\u2066" + String(value || "").slice(0, 10) + "\u2069"; }
 
-  function billingCard(usage, attention) {
+  function billingCard(usage, attention, billingChanged) {
     return h("section", { class: "card server", "data-server": usage.server_ref },
       h("div", { class: "card-head" }, h("h2", { class: "mono", text: usage.server_ref })),
-      M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention), "allowance"));
+      M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention, billingChanged), "allowance"));
   }
 
-  function allowanceDetails(usage, attention) {
+  function allowanceDetails(usage, attention, billingChanged) {
     var metadata = usage.metadata || {};
     var measured = usage.measurement === "accepted_user_traffic";
     var repeats = { month: "server_allowance.month", year: "server_allowance.year", none: "server_allowance.one_off" };
@@ -187,7 +226,7 @@
       payment_due: "server_allowance.payment_due", payment_overdue: "server_allowance.payment_overdue",
     };
     return h("div", { class: "stack" },
-      M.titled("h3", M.t("server_allowance.title"), M.t("tip.allowance")),
+      h("p", { class: "muted small", text: M.t("tip.allowance") }),
       h("dl", { class: "facts" },
         metadata.provider ? [h("dt", { text: M.t("server_allowance.provider") }),
           h("dd", { text: metadata.provider })] : null,
@@ -215,8 +254,12 @@
           (reason === "allowance_exceeded" || reason === "payment_overdue" ? "notice-err" : "notice-warn"),
           text: M.t(labels[reason]) }) : null;
       }),
-      h("p", { class: "muted small", text: M.t("server_allowance.edit_hint") }),
-      M.command("meridian server set " + usage.server_ref));
+      h("div", { class: "row-actions" }, h("button", { type: "button", class: "btn btn-ghost btn-sm", "data-billing-edit": usage.server_ref,
+        onclick: function () {
+          M.editPresentation(usage.server_ref).then(function (result) {
+            if (result && typeof result === "object") billingChanged(usage.server_ref);
+          });
+        } }, M.t("presentation.billing_edit"))));
   }
 
   // -- revisions --------------------------------------------------------------------------------

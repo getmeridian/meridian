@@ -27,7 +27,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 10));
 await settle();
 const panel = () => w.document.getElementById('account-panel');
 const report = { text: panel().textContent, metrics: [...panel().querySelectorAll('dl > div')].map(el => el.textContent) };
-report.saved = JSON.parse(w.localStorage.getItem('meridian-account:/sub/sample/info'));
+report.saved = Object.fromEntries(Object.entries(w.localStorage));
 if (mode === 'account-slots-refresh') {
   body = data.next;
   panel().querySelector('button').click();

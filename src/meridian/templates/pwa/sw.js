@@ -31,11 +31,45 @@ self.addEventListener('activate', function(event) {
   }));
 });
 
+/* Only a failed document navigation gets a reconnect message. An HTTP refusal/revocation
+   still reaches the browser unchanged. Neither the request nor its response is cached. */
+function reconnectPage() {
+  var messages = {
+    en: ['Connection page unavailable', 'Reconnect to the internet, then reload this page to see your connection details.'],
+    ru: ['Страница подключения недоступна', 'Подключитесь к интернету и обновите страницу, чтобы увидеть данные для подключения.'],
+    fa: ['صفحهٔ اتصال در دسترس نیست', 'به اینترنت وصل شوید و این صفحه را دوباره بارگذاری کنید تا اطلاعات اتصال را ببینید.'],
+    zh: ['无法打开连接页面', '请连接互联网，然后刷新此页面查看连接信息。']
+  };
+  var lang = (self.navigator.language || 'en').toLowerCase().split('-')[0];
+  if (!Object.prototype.hasOwnProperty.call(messages, lang)) lang = 'en';
+  var copy = messages[lang];
+  // This static stylesheet is authorized by its exact hash below, so offline needs no asset request.
+  var style = 'html{color-scheme:light dark;font:100%/1.55 system-ui,sans-serif}' +
+    'body{max-width:34rem;margin:clamp(3rem,12vh,8rem) auto;padding:0 1.5rem}' +
+    'small{font-weight:650;color:#525963}h1{font-size:clamp(1.7rem,5vw,2.4rem);line-height:1.18;margin:.6rem 0}' +
+    'p{margin:.8rem 0}@media(prefers-color-scheme:dark){small{color:#b6bdc6}}';
+  var html = '<!doctype html><html lang="' + lang + '" dir="' + (lang === 'fa' ? 'rtl' : 'ltr') +
+    '"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' +
+    copy[0] + '</title><style>' + style + '</style><main><small>Meridian</small><h1>' + copy[0] + '</h1><p>' + copy[1] + '</p></main></html>';
+  return new Response(html, { status: 503, headers: {
+    'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
+    'Content-Security-Policy': "default-src 'none'; style-src 'sha256-0YdGyZvqf26tNxFCKGHAi7uHuI/IxLE+6ga07uaWr60='; base-uri 'none'; frame-ancestors 'none'",
+    'X-Robots-Tag': 'noindex, nofollow, noarchive'
+  } });
+}
+
 self.addEventListener('fetch', function(event) {
   var request = event.request;
   var url = new URL(request.url);
-  if (LEGACY || request.method !== 'GET' || request.cache === 'no-store' ||
-      url.origin !== ASSET_BASE.origin || url.pathname.indexOf(ASSET_BASE.pathname) !== 0 ||
+  if (LEGACY || request.method !== 'GET' || url.origin !== ASSET_BASE.origin) return;
+  if (request.mode === 'navigate' && request.destination === 'document') {
+    var scopePath = new URL(self.registration.scope).pathname;
+    if (url.pathname.indexOf(scopePath) === 0 && /^[A-Za-z0-9_-]{16,64}(?:\/index\.html|\/)?$/.test(url.pathname.slice(scopePath.length))) {
+      event.respondWith(fetch(request).catch(reconnectPage));
+    }
+    return;
+  }
+  if (request.cache === 'no-store' || url.search || url.pathname.indexOf(ASSET_BASE.pathname) !== 0 ||
       url.pathname.endsWith('/probe.bin') || url.pathname.endsWith('/support.html')) return;
   event.respondWith(caches.match(request).then(function(cached) {
     if (cached) return cached;

@@ -76,10 +76,21 @@ def previous_published_version(checkout: str, releases: Sequence[Version], overr
     return str(previous)
 
 
-def build_intent(server_ref: str, ip: str) -> str:
-    """Single exit on the bare IP, default camouflage SNI and privacy settings."""
+class VerificationError(Exception):
+    def __init__(self, message: str, *, exit_code: int = 1) -> None:
+        super().__init__(message)
+        self.exit_code = exit_code
+
+
+def build_intent(server_ref: str, ip: str, *, legacy: bool = False, display_name: str = "") -> str:
+    """Serialize a fleet for the release that will deploy it (b12 requires access.users)."""
     ipaddress.IPv4Address(ip)
-    return single_server_intent(None, server_ref=server_ref, address=ip).model_dump_json(indent=2)
+    fields = single_server_intent(None, server_ref=server_ref, address=ip).to_data()
+    if legacy:
+        fields["access"]["users"] = ["default"]
+        if display_name:
+            fields["access"]["display_names"] = {"default": display_name}
+    return json.dumps(fields, indent=2)
 
 
 def confirmation_input(help_text: str, *, required: Sequence[str] = ()) -> tuple[list[str], str | None]:
@@ -102,10 +113,15 @@ def command_data(output: str) -> dict[str, Any]:
     raise ValueError("The command did not return a JSON envelope with object data.")
 
 
-def client_detail(data: Mapping[str, Any]) -> ClientDetail:
+def client_detail(data: Mapping[str, Any], *, published: bool = False) -> ClientDetail:
     """Validate the shared client contract without displaying handoff links."""
     try:
-        return ClientDetail.model_validate(data["client"])
+        record = data["client"]
+        # Through b12 this was a CLI ownership flag, not account data. The
+        # handover intentionally retires it. Keep every other field strict.
+        if published and isinstance(record, dict) and isinstance(record.get("declared"), bool):
+            record = {k: v for k, v in record.items() if k != "declared"}
+        return ClientDetail.model_validate(record)
     except (ValueError, KeyError, TypeError):
         raise ValueError("Client show did not return valid client metadata.") from None
 

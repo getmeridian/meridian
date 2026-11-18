@@ -35,6 +35,7 @@ var T = {
     'store.ru': 'Russia',
     'platform.choice': 'Platform',
     'sub.label': 'Subscription URL',
+    'setup.change': 'Change app or device',
     'app.choice': 'App',
     'platform.ios': 'iOS',
     'platform.android': 'Android',
@@ -49,7 +50,7 @@ var T = {
     'connect.permission': 'Allow VPN permission if your device asks.',
     'connect.profile': 'Select the imported profile, then choose a server.',
     'connect.start': 'Tap the connect or power button.',
-    'apps.none': 'No apps for this platform. Choose another platform above.',
+    'apps.none': 'No apps for this platform. Choose another platform.',
     'copy.error': 'Could not copy automatically. Select the text below and copy it.',
     'copy.text': 'Text to copy',
     'apps.desktop': 'Desktop',
@@ -78,6 +79,7 @@ var T = {
     'arch.intel': 'Intel',
     'store.ru': 'Россия',
     'platform.choice': 'Платформа',
+    'setup.change': 'Сменить приложение или устройство',
     'app.choice': 'Приложение',
     'platform.ios': 'iOS',
     'platform.android': 'Android',
@@ -92,7 +94,7 @@ var T = {
     'connect.permission': 'Разрешите добавление конфигурации VPN, если устройство об этом спросит.',
     'connect.profile': 'Выберите добавленный профиль и нужный сервер.',
     'connect.start': 'Нажмите кнопку подключения.',
-    'apps.none': 'Для этой платформы нет приложений. Выберите другую платформу выше.',
+    'apps.none': 'Для этой платформы нет приложений. Выберите другую платформу.',
     'copy.error': 'Не удалось скопировать автоматически. Выделите текст ниже и скопируйте его вручную.',
     'copy.text': 'Текст для копирования',
     'apps.desktop': 'Компьютер',
@@ -106,11 +108,11 @@ var T = {
     ping: 'Не подключается?',
     'ping.desc': 'Проверьте, включена ли на устройстве автоматическая настройка даты и времени, а затем попробуйте другой вариант подключения из списка выше.',
     'ping.link': 'Попросите владельца сервера выполнить команду meridian test.',
-    'install.title': 'Сохранить страницу как приложение',
-    'install.btn': 'Установить',
+    'install.title': 'Ярлык страницы настройки',
+    'install.btn': 'Добавить ярлык',
     'sub.label': 'Ссылка на подписку',
     'import.add': 'Добавить в {name}',
-    'install.offline': 'Чтобы страница открывалась даже без интернета',
+    'install.shortcut': 'Сохраните ярлык, чтобы вернуться к этой странице.',
     'apps.all': 'Все платформы',
     'apps.other': 'Другие приложения',
     'apps.update': 'Вовремя обновляйте приложение',
@@ -133,14 +135,14 @@ var T = {
     'error.retry': 'Повторить',
     'error.slow': 'Загрузка идёт дольше обычного\u2026',
     'hero.title': 'Ваше подключение',
-    'hero.for': 'Настроено для: {name}',
-    'hero.sub': 'Три простых шага — около минуты.',
+    'hero.for': 'Подключение: {name}',
+    'hero.sub': 'Настройте VPN на этом устройстве.',
     'step.install': 'Установите приложение',
     'app.get': 'Скачать',
     'step.add': 'Добавьте подключение',
-    'step.add.desc': 'Одно нажатие добавит все серверы, а приложение будет само обновлять их список.',
+    'step.add.desc': 'По этой подписке приложение загрузит список серверов.',
     'qr.title': 'Подключаете телефон?',
-    'qr.desc': 'Откройте приложение на телефоне, выберите добавление подписки по QR-коду и наведите камеру сюда.',
+    'qr.desc': 'Нажмите «Показать QR-код» и отсканируйте его в VPN-приложении на телефоне.',
     conns: 'Отдельные подключения',
     'conns.desc': 'Они уже входят в подписку выше. Используйте их по отдельности, только если подписка не подошла.',
     'proto.reality': 'Основной — самый быстрый',
@@ -169,6 +171,7 @@ var T = {
     'arch.intel': 'اینتل',
     'store.ru': 'روسیه',
     'platform.choice': 'پلتفرم',
+    'setup.change': 'تغییر برنامه یا دستگاه',
     'app.choice': 'برنامه',
     'platform.ios': 'iOS',
     'platform.android': 'اندروید',
@@ -183,7 +186,7 @@ var T = {
     'connect.permission': 'اگر دستگاه اجازهٔ VPN خواست، آن را تأیید کنید.',
     'connect.profile': 'پروفایل اضافه‌شده و سپس یک سرور را انتخاب کنید.',
     'connect.start': 'دکمهٔ اتصال یا روشن‌کردن را بزنید.',
-    'apps.none': 'برای این پلتفرم برنامه‌ای نیست. از بالا پلتفرم دیگری را انتخاب کنید.',
+    'apps.none': 'برای این پلتفرم برنامه‌ای نیست. پلتفرم دیگری را انتخاب کنید.',
     'copy.error': 'کپی خودکار ممکن نشد. متن زیر را انتخاب و کپی کنید.',
     'copy.text': 'متن برای کپی',
     'apps.desktop': 'رایانه',
@@ -197,11 +200,11 @@ var T = {
     ping: '\u0645\u062A\u0635\u0644 \u0646\u0645\u06CC\u200C\u0634\u0648\u06CC\u062F\u061F',
     'ping.desc': 'همگام‌سازی خودکار ساعت را بررسی کنید و یکی از گزینه‌های اتصال بالا را امتحان کنید.',
     'ping.link': 'از صاحب سرور بخواهید meridian test را اجرا کند.',
-    'install.title': 'برنامه را نصب کنید',
-    'install.btn': 'نصب',
-    'sub.label': 'اشتراک (به‌روزرسانی خودکار)',
+    'install.title': 'میان‌بر صفحهٔ راه‌اندازی',
+    'install.btn': 'افزودن میان‌بر',
+    'sub.label': 'پیوند اشتراک',
     'import.add': 'افزودن به {name}',
-    'install.offline': 'دسترسی آفلاین به اتصال',
+    'install.shortcut': 'برای باز کردن دوبارهٔ این صفحه یک میان‌بر اضافه کنید.',
     'apps.all': 'همهٔ پلتفرم\u200Cها',
     'apps.other': 'برنامه‌های دیگر',
     'apps.update': 'برنامه را به‌روز نگه دارید',
@@ -224,14 +227,14 @@ var T = {
     'error.retry': '\u062A\u0644\u0627\u0634 \u0645\u062C\u062F\u062F',
     'error.slow': '\u0628\u0627\u0631\u06AF\u0630\u0627\u0631\u06CC \u0628\u06CC\u0634 \u0627\u0632 \u062D\u062F \u0645\u0639\u0645\u0648\u0644 \u0637\u0648\u0644 \u0645\u06CC\u200C\u06A9\u0634\u062F\u2026',
     'hero.title': 'اتصال شما',
-    'hero.for': 'تنظیم‌شده برای {name}',
-    'hero.sub': 'سه مرحله، حدود یک دقیقه.',
+    'hero.for': 'اتصال {name}',
+    'hero.sub': 'VPN را روی این دستگاه راه‌اندازی کنید.',
     'step.install': 'یک برنامه نصب کنید',
     'app.get': 'دریافت',
     'step.add': 'اتصال خود را اضافه کنید',
-    'step.add.desc': 'با یک ضربه همهٔ سرورها اضافه می‌شوند و برنامه آن‌ها را به‌روز نگه می‌دارد.',
+    'step.add.desc': 'برنامه فهرست سرورها را از این اشتراک می‌گیرد.',
     'qr.title': 'گوشی را تنظیم می‌کنید؟',
-    'qr.desc': 'در برنامهٔ گوشی، افزودن اشتراک با کد QR را بزنید و این کد را اسکن کنید.',
+    'qr.desc': 'اسکنر کد QR را در برنامهٔ VPN گوشی باز کنید. سپس کد را اینجا نمایش دهید و آن را اسکن کنید.',
     conns: 'همهٔ اتصال‌ها',
     'conns.desc': 'این‌ها از قبل در برنامهٔ شما هستند. فقط در صورت نیاز از یکی از آن‌ها جداگانه استفاده کنید.',
     'proto.reality': 'سریع‌ترین — اول این را امتحان کنید',
@@ -260,6 +263,7 @@ var T = {
     'arch.intel': 'Intel',
     'store.ru': '俄罗斯',
     'platform.choice': '平台',
+    'setup.change': '更换应用或设备',
     'app.choice': '应用',
     'platform.ios': 'iOS',
     'platform.android': 'Android',
@@ -274,7 +278,7 @@ var T = {
     'connect.permission': '如果设备请求 VPN 权限，请允许。',
     'connect.profile': '选择导入的配置，再选择一个服务器。',
     'connect.start': '点击连接或电源按钮。',
-    'apps.none': '此平台暂无应用，请在上方选择其他平台。',
+    'apps.none': '此平台暂无应用，请选择其他平台。',
     'copy.error': '无法自动复制。请选择下方文本并手动复制。',
     'copy.text': '待复制文本',
     'apps.desktop': '电脑',
@@ -288,11 +292,11 @@ var T = {
     ping: '无法连接？',
     'ping.desc': '请确认设备已开启自动校时，然后尝试上面的其他连接方式。',
     'ping.link': '请让服务器所有者运行 meridian test。',
-    'install.title': '安装应用',
-    'install.btn': '安装',
-    'sub.label': '订阅（自动更新）',
+    'install.title': '保存设置页面',
+    'install.btn': '添加快捷方式',
+    'sub.label': '订阅链接',
     'import.add': '添加到 {name}',
-    'install.offline': '离线访问连接',
+    'install.shortcut': '添加快捷方式，方便下次打开此页面。',
     'apps.all': '全平台',
     'apps.other': '更多应用',
     'apps.update': '保持应用为最新版本',
@@ -315,14 +319,14 @@ var T = {
     'error.retry': '重试',
     'error.slow': '加载时间比预期更长\u2026',
     'hero.title': '您的连接',
-    'hero.for': '已为 {name} 设置好',
-    'hero.sub': '只需三步，大约一分钟。',
+    'hero.for': '{name} 的连接',
+    'hero.sub': '在此设备上设置 VPN。',
     'step.install': '安装应用',
     'app.get': '获取',
     'step.add': '添加您的连接',
-    'step.add.desc': '轻点一下即可添加所有服务器，应用会自动保持更新。',
+    'step.add.desc': '应用会通过这个订阅获取服务器列表。',
     'qr.title': '要设置手机吗？',
-    'qr.desc': '在手机应用中选择通过二维码添加订阅，然后扫描这个二维码。',
+    'qr.desc': '打开手机 VPN 应用的扫码功能，然后在这里显示二维码，用手机扫描。',
     conns: '所有连接',
     'conns.desc': '它们已经在您的应用里了。只有需要时才单独使用某一个。',
     'proto.reality': '最快 — 请先试这个',
@@ -675,37 +679,6 @@ var ICON_SHARE = svg('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path
 var ICON_CHEVRON = svg('<path d="m9 18 6-6-6-6"/>', 16);
 
 /* -----------------------------------------------------------------------
- * Color palettes — curated presets with dark + light mode variants
- * ----------------------------------------------------------------------- */
-var PALETTES = {
-  ocean:    { dark: '#5b9cf5', light: '#2b7de9' },
-  sunset:   { dark: '#e57c4e', light: '#c4602a' },
-  forest:   { dark: '#4CD68A', light: '#1E8C52' },
-  lavender: { dark: '#9b8cf5', light: '#6b5de9' },
-  rose:     { dark: '#f56b8a', light: '#d94468' },
-  slate:    { dark: '#8B8FA2', light: '#646880' }
-};
-
-function applyPalette(paletteName) {
-  var p = PALETTES[paletteName];
-  if (!p) return;
-  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var accent = isDark ? p.dark : p.light;
-  var root = document.documentElement;
-  root.style.setProperty('--accent', accent);
-  root.style.setProperty('--accent-bg', accent + (isDark ? '1f' : '14'));
-  root.style.setProperty('--accent-br', accent + '38');
-}
-
-/* Listen for system theme changes to swap palette variant */
-var _activePalette = '';
-try {
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-    if (_activePalette) applyPalette(_activePalette);
-  });
-} catch(e) { /* old browsers */ }
-
-/* -----------------------------------------------------------------------
  * Page rendering from config.json
  * ----------------------------------------------------------------------- */
 function renderPage(config) {
@@ -715,12 +688,10 @@ function renderPage(config) {
   iosButtonIndex = 0;
   var html = '';
 
-  if (config.color && PALETTES[config.color]) {
-    _activePalette = config.color;
-    applyPalette(config.color);
-  }
+  if (['ocean', 'sunset', 'forest', 'lavender', 'rose', 'slate'].indexOf(config.color) !== -1)
+    document.documentElement.setAttribute('data-palette', config.color);
 
-  html += renderTopBar();
+  html += '<div class="masthead">' + renderHero(config) + renderTopBar() + '</div>';
 
   if (checkClockSkew(config.generated_at) === 'bad') {
     html += '<div class="notice notice-bad">';
@@ -729,15 +700,10 @@ function renderPage(config) {
     html += '</div>';
   }
 
-  html += renderHero(config);
+  html += '<div class="account-overview" id="account-overview" hidden><a class="account-jump" href="#account-panel">' +
+    '<span id="account-jump-label"></span>' + ICON_CHEVRON + '</a><span id="account-signal" role="status"></span>' +
+    '<p id="account-warning" hidden></p></div>';
   html += '<section class="notice owner-notice" id="owner-notice" aria-live="polite" hidden></section>';
-  html += '<section class="card account" id="account-panel" aria-live="polite" hidden></section>';
-
-  html += '<div class="install-banner" id="install-banner">';
-  html += '<div class="install-banner-text"><strong data-t="install.title">Install this app</strong><span data-t="install.offline">Access your connection offline</span></div>';
-  html += '<button class="btn btn-primary btn-sm" data-action="install" data-t="install.btn">Install</button>';
-  html += '<button class="install-dismiss" data-action="dismiss" data-t-aria="close" aria-label="Close">&times;</button>';
-  html += '</div>';
 
   /* iOS "Open" falls back to the first recommended iOS app */
   var iosApps = appsFor(config.apps, 'iOS', false).rec;
@@ -746,6 +712,7 @@ function renderPage(config) {
   var subUrl = config.subscription_url || '';
   html += renderSetup(config.apps, platform, subUrl, config.server_name || 'Meridian', config.subscription_qr_b64);
 
+  html += '<section class="card account" id="account-panel" tabindex="-1" aria-labelledby="account-heading" hidden></section>';
   html += '<div class="panels">';
   html += renderConnections(config, platform, !subUrl);
   html += renderTrouble();
@@ -756,6 +723,12 @@ function renderPage(config) {
   html += '<span data-t="router.desc">Connect your whole home network: setup guide</span></span>';
   html += '<span class="panel-chevron">' + ICON_CHEVRON + '</span>';
   html += '</a>';
+  html += '</div>';
+
+  html += '<div class="install-banner' + (deferredInstallPrompt ? ' show' : '') + '" id="install-banner">';
+  html += '<div class="install-banner-text"><strong data-t="install.title">Keep this setup page</strong><span data-t="install.shortcut">Add a shortcut to open this page again.</span></div>';
+  html += '<button class="btn btn-primary btn-sm" data-action="install" data-t="install.btn">Add shortcut</button>';
+  html += '<button class="install-dismiss" data-action="dismiss" data-t-aria="close" aria-label="Close">&times;</button>';
   html += '</div>';
 
   if (navigator.share) {
@@ -807,9 +780,9 @@ function renderHero(config) {
     if (codes.length) html += '<p class="hero-place" data-countries="' + codes.join(',') + '"></p>';
   }
   if (isPersonalName(config.client_name)) {
-    html += '<p data-t="hero.for">Set up for ' + escapeHtml(capitalize(config.client_name)) + '</p>';
+    html += '<p data-t="hero.for">Connection for ' + escapeHtml(capitalize(config.client_name)) + '</p>';
   } else {
-    html += '<p data-t="hero.sub">Three steps, about a minute.</p>';
+    html += '<p data-t="hero.sub">Set up your VPN on this device.</p>';
   }
   return html + '</div></header>';
 }
@@ -853,16 +826,12 @@ function renderAppMark(a, size) {
   return '<span class="app-mark app-mark-letter">' + escapeHtml(a.name.charAt(0)) + '</span>';
 }
 
-function renderAppRow(a, key) {
+function renderAppRow(a, platform) {
+  var key = PLATFORM_KEYS[platform] || 'Linux';
   var html = '<a class="app-row" data-ui-key="install-' + escapeHtml(a.name + '-' + key) + '" href="' + escapeHtml(appUrl(a, key)) + '" target="_blank" rel="noopener">';
   html += renderAppMark(a, 40);
   html += '<span class="app-row-text"><strong>' + escapeHtml(a.name) + '</strong>';
-  var labels = { 'All platforms': 'apps.all', 'Desktop': 'apps.desktop',
-    'iOS': 'platform.ios', 'Android': 'platform.android', 'Windows': 'platform.windows',
-    'macOS': 'platform.macos', 'Linux': 'platform.linux',
-    'Android, desktop': 'apps.android.desktop', 'iOS, Android': 'apps.ios.android',
-    'iOS, Android, macOS': 'apps.ios.android.macos' };
-  html += '<span>' + escapeHtml(labels[a.platform] ? text(labels[a.platform], a.platform) : a.platform) + '</span></span>';
+  html += '<span>' + escapeHtml(text('platform.' + platform, key)) + '</span></span>';
   var kind = 'app.get';
   var host = new URL(appUrl(a, key)).hostname;
   if (host === 'play.google.com') kind = 'install.play';
@@ -905,7 +874,7 @@ function renderImportButton(a, subUrl, serverName, primary) {
 }
 
 function renderDisclosure(label, body, key, cls) {
-  return '<details class="disclose' + (cls ? ' ' + cls : '') + '"' + (key ? ' data-disclosure="' + key + '"' : '') + '><summary>' + label + ICON_CHEVRON + '</summary>' +
+  return '<details class="disclose' + (cls ? ' ' + cls : '') + '"' + (key ? ' data-disclosure="' + key + '"' : '') + '><summary' + (key ? ' data-ui-key="summary-' + key + '"' : '') + '>' + label + ICON_CHEVRON + '</summary>' +
     '<div class="disclose-body">' + body + '</div></details>';
 }
 
@@ -985,15 +954,18 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
   var aside = hasQr && !mobile;
   var html = '<section id="setup-card" class="card setup' + (aside ? ' setup-wide' : '') + '"><div class="setup-steps">';
   html += '<div class="step"><span class="step-num">1</span><div class="step-body">';
-  html += '<h2 data-t="step.install">Install an app</h2>' + renderPickers(apps, platform, chosen);
-  html += chosen ? '<div class="app-list">' + renderAppRow(chosen, key) + '</div>' :
-    '<p class="muted" data-t="apps.none">No apps for this platform. Choose another platform above.</p>';
-  if (chosen) html += renderInstallAlternatives(chosen, key);
+  html += '<h2 data-t="step.install">Install an app</h2>';
+  html += chosen ? '<div class="app-list">' + renderAppRow(chosen, platform) + '</div>' :
+    '<p class="muted" data-t="apps.none">No apps for this platform. Choose another platform.</p>';
+  var pickers = renderPickers(apps, platform, chosen);
+  html += chosen ? '<div class="setup-options">' +
+    renderDisclosure('<span data-t="setup.change">Change app or device</span>', pickers, 'app-choices') +
+    renderInstallAlternatives(chosen, key) + '</div>' : pickers;
   html += '</div></div>';
   if (subUrl) {
     html += '<div class="step"><span class="step-num">2</span><div class="step-body">';
     html += '<h2 data-t="step.add">Add your connection</h2>';
-    html += '<p class="muted" data-t="step.add.desc">One tap adds every server, and the app keeps them up to date.</p>';
+    html += '<p class="muted" data-t="step.add.desc">Your app uses this subscription to load the server list.</p>';
     html += '<p class="muted import-status" id="import-status" role="status" hidden></p>';
     var button = chosen && chosen.deeplink ? renderImportButton(chosen, subUrl, serverName, true) : '';
     html += '<div class="import-actions">' + button + renderManualImport(chosen, subUrl, !button) + '</div>';
@@ -1003,9 +975,10 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
   }
   html += '</div>';
   if (aside) {
-    html += '<aside class="setup-qr">' + renderQr(subQrB64, 'qr-aside');
+    html += '<aside class="setup-qr"><span class="transfer-mark" aria-hidden="true">' + ICON_QR + '</span>';
     html += '<strong data-t="qr.title">Setting up a phone?</strong>';
-    html += '<span data-t="qr.desc">In the app on your phone, add a subscription from a QR code and scan this one.</span></aside>';
+    html += '<span data-t="qr.desc">Open the QR scanner in your phone’s VPN app, then show the code here and scan it.</span>';
+    html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-aside'), 'desktop-qr') + '</aside>';
   }
   return html + '</section>';
 }
@@ -1152,6 +1125,7 @@ var currentLang = null;
 
 function switchLang(lang) {
   if (lang !== 'en' && !T[lang]) return;
+  var wasFocused = document.activeElement && document.activeElement.getAttribute('data-lang');
   currentLang = lang;
   setDocumentLanguage();
   try { localStorage.setItem('meridian-lang', lang); } catch (e) {}
@@ -1159,6 +1133,8 @@ function switchLang(lang) {
      so we can't just swap data-t values; we need a full rebuild. */
   if (window._meridianConfig) {
     renderPage(window._meridianConfig);
+    var choice = wasFocused && document.querySelector('[data-lang="' + lang + '"]');
+    if (choice) choice.focus();
   } else {
     init();
   }
@@ -1249,7 +1225,7 @@ function capitalize(s) {
 }
 
 /* -----------------------------------------------------------------------
- * Service Worker + Persistent storage
+ * Service worker
  * ----------------------------------------------------------------------- */
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
@@ -1274,11 +1250,7 @@ function loadAccountPanel() {
   document.body.appendChild(script);
 }
 
-function requestPersistentStorage() {
-  if (navigator.storage && navigator.storage.persist) {
-    navigator.storage.persist().catch(function() {});
-  }
-}
+
 
 /* -----------------------------------------------------------------------
  * Event delegation — replaces all inline onclick handlers
@@ -1352,7 +1324,6 @@ var CATALOG_TIMEOUT_MS = 5000;
 function init() {
   var id = ++initId;
   registerSW();
-  requestPersistentStorage();
 
   var app = document.getElementById('app');
   var slowTimer = setTimeout(function() {

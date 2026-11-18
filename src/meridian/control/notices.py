@@ -16,10 +16,10 @@ _NOTICE_KEY = "operator_notice"
 
 
 def usage_text(size: int) -> str:
-    """Short binary units with no markup or locale-dependent formatting syntax."""
+    """Use the same 1024-byte scale and unit labels as the traffic quota input."""
     value = float(size)
-    for unit in ("B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"):
-        if value < 1024 or unit == "EiB":
+    for unit in ("B", "KB", "MB", "GB", "TB", "PB", "EB"):
+        if value < 1024 or unit == "EB":
             return f"{value:g} {unit}"
         value /= 1024
     raise AssertionError("unreachable")

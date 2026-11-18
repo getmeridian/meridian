@@ -140,7 +140,7 @@ if (scenario === 'settings-routes' || scenario === 'settings-layout') {
     const nav = view()?.querySelector('.settings-sections'), layout = view()?.querySelector('.settings-layout');
     const style = nav ? w.getComputedStyle(nav) : {};
     report.orientation = nav?.getAttribute('aria-orientation'); report.layout = layout ? w.getComputedStyle(layout).display : null;
-    report.navDirection = style.flexDirection; report.overflow = style.overflowX; report.wrap = style.flexWrap;
+    report.navDirection = style.flexDirection; report.navDisplay = style.display; report.navColumns = style.gridTemplateColumns;
     report.targets = tabs.map(node => { const css = w.getComputedStyle(node); return Math.max(parseFloat(css.minHeight) || 0, parseFloat(css.minBlockSize) || 0); });
     report.tabs = visibleTabs();
   }
@@ -233,7 +233,8 @@ if (['settings-lowering', 'settings-save', 'settings-clear'].includes(scenario))
 }
 if (scenario === 'settings-disclosures') {
   const general = active();
-  report.generalEditable = general?.querySelectorAll('input,select,textarea,form').length;
+  report.inlineFields = general?.querySelectorAll('input,select,textarea,form').length;
+  report.hasEditor = [...general.querySelectorAll('button')].some(b => b.textContent === M.t('presentation.edit'));
   report.commands = [...(general?.querySelectorAll('.settings-facts .cmd code') || [])].map(node => node.textContent);
   report.contactIsText = !!general?.textContent.includes('<img src=x onerror="window.pwned=1">');
   await M.navigate('#/settings/security'); await settle();

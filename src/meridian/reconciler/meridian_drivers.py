@@ -580,7 +580,7 @@ class ControlUserDriver:
 
 
 class ServiceSettingsDriver:
-    """Keep the subscription title and the public base its links use (from the bootstrap, not the plan)."""
+    """Reconcile public address, policies and membership, seeding owner settings on first apply."""
 
     def __init__(self, context: MeridianDriverContext) -> None:
         self.context = context
@@ -588,7 +588,19 @@ class ServiceSettingsDriver:
     def observe(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceObservation:
         with self.context.client() as client:
             current = client.settings()
-        return _observation(action, exists=current == self._settings(action), connected=False, remote_id="settings")
+            equal = self._topology(current) == self._topology(self._settings(action))
+            if equal:
+                try:
+                    equal = client.presentation().seeded
+                except ControlServiceNotFound:
+                    # An older service cannot have handed presentation over yet.
+                    equal = False
+        return _observation(
+            action,
+            exists=equal,
+            connected=False,
+            remote_id="settings",
+        )
 
     @_uncertain_writes_are_unknown
     def apply(self, action: ResourceAction, binding: ManagedResourceBinding | None) -> ResourceApplyReceipt:
@@ -604,16 +616,37 @@ class ServiceSettingsDriver:
             if self.context.access_review_hash is None:
                 client.put_settings(
                     settings,
+                    adopt_presentation=True,
                     expected_profile_declarations_hash=(
                         settings.access_profile_declarations_hash or profile_declarations_hash([])
                     ),
                 )
             else:
-                client.put_settings(settings, expected_access_hash=self.context.access_review_hash)
+                client.put_settings(
+                    settings, expected_access_hash=self.context.access_review_hash, adopt_presentation=True
+                )
         return ResourceApplyReceipt(remote_id="settings")
+
+    @staticmethod
+    def _topology(settings: ServiceSettings) -> dict[str, object]:
+        data = settings.model_dump(exclude={"profile_title", "update_interval_hours", "owner_contact", "servers"})
+        data["servers"] = {ref: spec.node_id for ref, spec in settings.servers.items()}
+        return data
 
     def _settings(self, action: ResourceAction) -> ServiceSettings:
         payload = payload_of(action, ServiceSettingsPayload)
+        # apply persists the reviewed intent before creating drivers. These values seed the service once;
+        # the service atomically ignores every later seed, including stale panel clients' local copies.
+        intent = self.context.cluster.topology_intent
+        delivery = intent.delivery if intent is not None else payload
+        servers = (
+            {
+                ref: spec.model_copy(update={"metadata": intent.server_metadata.get(ref, spec.metadata)})
+                for ref, spec in payload.servers.items()
+            }
+            if intent is not None
+            else payload.servers
+        )
         return ServiceSettings(
             access_profiles=payload.access_profiles,
             access_profile_declarations_hash=(
@@ -624,11 +657,11 @@ class ServiceSettingsDriver:
                     else None
                 )
             ),
-            owner_contact=payload.owner_contact,
-            profile_title=payload.profile_title,
-            servers=payload.servers,
+            owner_contact=delivery.owner_contact,
+            profile_title=delivery.profile_title,
+            servers=servers,
             public_url=self.context.cluster.panel.public_base_url(),
-            update_interval_hours=payload.update_interval_hours,
+            update_interval_hours=delivery.update_interval_hours,
             client_routing=payload.client_routing,
             delivery_policies=payload.delivery_policies,
             default_policy=payload.default_policy,

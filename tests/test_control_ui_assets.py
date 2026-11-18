@@ -13,6 +13,7 @@ from meridian.control.models import USERNAME_PATTERN, LimitStrategy, RevisionSta
 from meridian.control.server import ALL_ROUTES, OWNER_ROUTES
 from meridian.control.ui_models import PasskeyState, ServerView
 from meridian.control.ui_routes import UI_DIR
+from meridian.core.fleet_events import FleetEventKind
 from meridian.core.token_models import TOKEN_CAPABILITIES
 
 SRC = Path(__file__).resolve().parents[1] / "src" / "meridian" / "control"
@@ -116,7 +117,9 @@ def test_every_literal_key_the_scripts_use_exists() -> None:
         if literal.split(".", 1)[0] in namespaces
     }
     literal_translations = {key for source in JS.values() for key in re.findall(r'M\.t\("([^"]+)"', source)}
-    used -= set(TOKEN_CAPABILITIES) - literal_translations
+    # Wire identifiers may share a locale namespace. Direct M.t(...) uses must still resolve.
+    wire_ids = set(TOKEN_CAPABILITIES) | set(typing.get_args(FleetEventKind))
+    used -= wire_ids - literal_translations
     assert used and sorted(used - set(ENGLISH)) == []
 
 

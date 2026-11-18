@@ -15,6 +15,7 @@ const i18n = defineCollection({
     extend: z.object({
       'meridian.nav.blog': z.string(),
       'meridian.nav.demo': z.string(),
+      'meridian.page.tools': z.string(),
       'meridian.page.copy': z.string(),
       'meridian.page.copied': z.string(),
       'meridian.page.view': z.string(),

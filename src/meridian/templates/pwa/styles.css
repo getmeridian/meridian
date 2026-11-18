@@ -1,6 +1,6 @@
 /* Meridian PWA — Connection page
  * One setup card (install → add), quiet secondary panels, system fonts.
- * Accent comes from the deployer's palette (app.js applyPalette). */
+ * Accent comes from the deployer's palette (data-palette). */
 
 /* ===================================================================
  * DESIGN TOKENS
@@ -8,7 +8,7 @@
 :root {
   --bg: #0E1014; --sf: #16191F; --sf2: #1D2129; --sf3: #252A33;
   --br: #262A33; --br2: #343A46;
-  --tx: #ECEDF1; --tx2: #A0A5B2; --tx3: #6E7482;
+  --tx: #ECEDF1; --tx2: #A0A5B2; --tx3: #9097A5;
   --accent: #5b9cf5; --accent-bg: #5b9cf51f; --accent-br: #5b9cf538;
   --on-accent: #0B0D12;
   --amber: #E5A44E; --green: #4CD68A; --red: #F06060;
@@ -20,10 +20,10 @@
 @media (prefers-color-scheme: light) { :root {
   --bg: #F3F4F6; --sf: #FFFFFF; --sf2: #F5F6F8; --sf3: #ECEEF2;
   --br: #E4E6EB; --br2: #D3D6DD;
-  --tx: #12141A; --tx2: #5A606E; --tx3: #8B909C;
-  --accent: #2b7de9; --accent-bg: #2b7de914; --accent-br: #2b7de938;
+  --tx: #12141A; --tx2: #5A606E; --tx3: #646A77;
+  --accent: #185fba; --accent-bg: #185fba14; --accent-br: #185fba38;
   --on-accent: #FFFFFF;
-  --amber: #B7791F; --green: #1E8C52; --red: #C93B3B;
+  --amber: #925E13; --green: #177343; --red: #C93B3B;
   --shadow: 0 1px 2px rgba(18,20,26,.04), 0 8px 24px rgba(18,20,26,.06);
   --qr-shadow: 0 0 0 1px var(--br);
   color-scheme: light;
@@ -32,6 +32,20 @@
 /* ===================================================================
  * BASE
  * =================================================================== */
+/* Palette changes stay in stylesheets under the page's strict CSP. */
+:root[data-palette="sunset"]{--accent:#e57c4e;--accent-bg:#e57c4e1f;--accent-br:#e57c4e38}
+:root[data-palette="forest"]{--accent:#4cd68a;--accent-bg:#4cd68a1f;--accent-br:#4cd68a38}
+:root[data-palette="lavender"]{--accent:#9b8cf5;--accent-bg:#9b8cf51f;--accent-br:#9b8cf538}
+:root[data-palette="rose"]{--accent:#f56b8a;--accent-bg:#f56b8a1f;--accent-br:#f56b8a38}
+:root[data-palette="slate"]{--accent:#9398ac;--accent-bg:#9398ac1f;--accent-br:#9398ac38}
+@media (prefers-color-scheme: light){
+  :root[data-palette="sunset"]{--accent:#a4491b;--accent-bg:#a4491b14;--accent-br:#a4491b38}
+  :root[data-palette="forest"]{--accent:#177343;--accent-bg:#17734314;--accent-br:#17734338}
+  :root[data-palette="lavender"]{--accent:#5c4dca;--accent-bg:#5c4dca14;--accent-br:#5c4dca38}
+  :root[data-palette="rose"]{--accent:#b23053;--accent-bg:#b2305314;--accent-br:#b2305338}
+  :root[data-palette="slate"]{--accent:#596077;--accent-bg:#59607714;--accent-br:#59607738}
+}
+
 *{margin:0;padding:0;box-sizing:border-box}
 [hidden]{display:none !important}
 body{
@@ -54,19 +68,20 @@ svg{flex-shrink:0}
 /* ===================================================================
  * TOP BAR + HERO
  * =================================================================== */
-.topbar{display:flex;justify-content:flex-end;margin-bottom:8px}
+.masthead{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:8px 0 14px}
+.topbar{display:flex;flex:none;margin-inline-start:auto}
 .lang-bar{display:inline-flex;gap:2px;padding:3px;border-radius:99px;background:var(--sf);border:1px solid var(--br)}
 .lang-btn{
   background:none;border:0;color:var(--tx3);cursor:pointer;
   font-size:.72rem;font-weight:600;letter-spacing:.02em;
-  padding:4px 10px;border-radius:99px;transition:color .12s,background .12s;
+  min-width:32px;min-height:32px;padding:4px 7px;border-radius:99px;transition:color .12s,background .12s;
 }
 .lang-btn:hover{color:var(--tx)}
 .lang-btn.active{background:var(--sf3);color:var(--tx)}
 
-.hero{display:flex;align-items:center;gap:14px;padding:12px 2px 20px}
+.hero{display:flex;align-items:center;min-width:0;max-width:100%;gap:10px}
 .hero-mark{
-  width:56px;height:56px;border-radius:16px;flex-shrink:0;
+  width:44px;height:44px;border-radius:12px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;overflow:hidden;
   background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-br);
 }
@@ -85,6 +100,8 @@ svg{flex-shrink:0}
   border-radius:var(--r2);font-size:.86rem;color:var(--tx2);
 }
 .notice strong{color:var(--tx)}
+.owner-notice{background:var(--sf2);border-inline-start:3px solid var(--br2);border-radius:0 var(--r) var(--r) 0}
+[dir="rtl"] .owner-notice{border-radius:var(--r) 0 0 var(--r)}
 .notice-bad{background:color-mix(in srgb,var(--red) 12%,transparent);border:1px solid color-mix(in srgb,var(--red) 30%,transparent)}
 .notice-bad strong{color:var(--red)}
 
@@ -126,16 +143,17 @@ svg{flex-shrink:0}
   background:var(--sf);border:1px solid var(--br);border-radius:var(--r3);
   box-shadow:var(--shadow);
 }
-.setup{padding:20px 18px;margin-bottom:16px}
-.setup-steps{display:flex;flex-direction:column;gap:24px}
+.setup{padding:20px 18px;margin-bottom:16px;overflow-wrap:anywhere}
+.setup-steps{display:flex;flex-direction:column;gap:18px}
 .step{display:flex;gap:12px}
+.step + .step{padding-top:18px;border-top:1px solid var(--br)}
 .step-num{
   width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:1px;
   display:flex;align-items:center;justify-content:center;
-  font-size:.8rem;font-weight:700;background:var(--accent);color:var(--on-accent);
+  font-size:.8rem;font-weight:700;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-br);
 }
 .step-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
-.step-body h2{font-size:1.06rem;font-weight:650;letter-spacing:-.01em;line-height:26px}
+.step-body h2{font-size:1.13rem;font-weight:680;letter-spacing:-.015em;line-height:26px}
 .muted{font-size:.86rem;color:var(--tx2);line-height:1.45}
 
 .app-list{display:flex;flex-direction:column;gap:6px}
@@ -193,7 +211,14 @@ svg{flex-shrink:0}
 /* QR codes */
 .qr img{display:block;width:200px;height:200px;border-radius:var(--r2);background:#fff;padding:10px;box-shadow:var(--qr-shadow)}
 .qr-inline img{margin:4px auto 0}
-.setup-qr{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+.setup-qr{min-width:0;display:flex;flex-direction:column;align-items:start;gap:8px}
+.transfer-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;color:var(--accent);background:var(--accent-bg)}
+.transfer-mark svg{width:24px;height:24px}
+.setup-qr .disclose > summary{min-height:42px;padding-inline:12px;border:1px solid var(--br2);border-radius:var(--r);background:var(--sf);color:var(--tx)}
+.setup-qr img{max-width:100%;height:auto}
+.setup-options{display:flex;flex-direction:column;align-items:stretch}
+.setup-options .disclose > summary{min-height:36px}
+.setup-options .disclose-body{padding:6px 0 12px}
 .setup-qr strong{font-size:.92rem;margin-top:8px}
 .setup-qr span{font-size:.8rem;color:var(--tx2);max-width:220px;line-height:1.4}
 
@@ -322,13 +347,12 @@ svg{flex-shrink:0}
  * =================================================================== */
 @media (min-width: 760px) {
   .wrap{max-width:860px;padding:32px 32px 64px}
-  .hero{padding:16px 2px 28px}
+  .masthead{padding:4px 0 20px}.hero{gap:14px}
   .hero h1{font-size:1.9rem}
-  .hero-mark{width:64px;height:64px;border-radius:18px}
+  .hero-mark{width:52px;height:52px;border-radius:15px}
   .setup{padding:28px}
   .setup-wide{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:32px;align-items:start}
-  .setup-wide .setup-qr{padding:4px 0 0 28px;border-inline-start:1px solid var(--br)}
-  [dir="rtl"] .setup-wide .setup-qr{padding:4px 28px 0 0}
+  .setup-wide .setup-qr{padding:18px;background:var(--sf2);border:1px solid var(--br);border-radius:var(--r2)}
   .setup:not(.setup-wide) .app-list,.setup:not(.setup-wide) .import-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .setup-wide .import-list .btn{justify-content:flex-start}
   .panel > summary,.panel-link{padding:16px 20px}
@@ -349,8 +373,19 @@ svg{flex-shrink:0}
 }
 
 /* Account information */
-.account{padding:18px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px}
+.account-overview{display:flex;align-items:center;flex-wrap:wrap;column-gap:12px;row-gap:2px;border-top:1px solid var(--br);margin-bottom:10px;min-height:40px}
+.account-jump{display:inline-flex;align-items:center;min-height:40px;gap:3px;font-size:.86rem;font-weight:600;color:var(--tx);text-decoration:none}
+.account-jump:hover{text-decoration:underline}
+.account-jump svg{width:14px;height:14px;transform:rotate(90deg)}
+.account-signal,.account-pending{font-size:.8rem;color:var(--tx2)}
+.account-signal{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.account-signal:before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.account-signal.is-active{color:var(--green)}
+.account-signal:not(.is-active),#account-warning{color:var(--amber)}
+#account-warning{width:100%;font-size:.88rem;line-height:1.5;margin:0 0 8px}
+.account{scroll-margin-top:12px;padding:18px;margin-bottom:16px;display:flex;flex-direction:column;gap:8px}
 .account-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.account-heading [aria-disabled="true"]{color:var(--tx2);cursor:wait}
 .account-heading h2{font-size:1.06rem;font-weight:650}
 .account-status{font-size:.88rem;color:var(--green)}
 .account-status.is-disabled,.account-status.is-expired,.account-status.is-limited{color:var(--amber)}
@@ -390,6 +425,10 @@ svg{flex-shrink:0}
 .manual-import[open],.manual-direct{grid-column:1/-1}
 .manual-direct{display:flex;flex-direction:column;gap:10px}
 .manual-path{font-size:.84rem;line-height:1.5;overflow-wrap:anywhere;color:var(--tx2)}
+.manual-setup{padding:20px}
+.manual-brand{font-size:.82rem;font-weight:650;color:var(--tx2);margin-bottom:12px}
+.manual-setup h1{font-size:1.5rem;line-height:1.2}
+.manual-setup h1 + p{margin:8px 0 16px;color:var(--tx2)}
 .manual-url{
   width:100%;padding:10px 12px;resize:vertical;min-height:64px;border-radius:var(--r);border:1px solid var(--br);
   font:.76rem/1.5 ui-monospace,'SF Mono',monospace;background:var(--sf2);color:var(--tx2);direction:ltr;
@@ -410,3 +449,6 @@ svg{flex-shrink:0}
 .initial-text{display:none}
 html[lang="en"] .initial-en,html[lang="ru"] .initial-ru,
 html[lang="fa"] .initial-fa,html[lang="zh"] .initial-zh{display:inline}
+
+/* A no-script visitor can select the subscription directly, without the loading placeholder. */
+@media (scripting: none) { .skeleton {display:none} }

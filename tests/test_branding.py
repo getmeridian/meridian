@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import base64
 import io
+import re
 import socket
 import urllib.error
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -31,11 +33,10 @@ class TestPalette:
             validate_optional_palette_value(invalid)
 
     def test_page_palettes_match_the_page(self) -> None:
-        from pathlib import Path
-
-        app_js = Path("src/meridian/templates/pwa/app.js").read_text()
-        for palette in PAGE_PALETTES:
-            assert f"  {palette}:" in app_js
+        stylesheet = Path("src/meridian/templates/pwa/styles.css").read_text()
+        # Ocean is the base theme. Every other accepted name needs an actual CSS palette.
+        overrides = set(re.findall(r'\[data-palette="([^"]+)"\]', stylesheet))
+        assert overrides == set(PAGE_PALETTES) - {"ocean"}
 
 
 class TestNormalizeIcon:

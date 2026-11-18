@@ -11,6 +11,7 @@ import pytest
 
 from meridian.control.formats.browser import subscription_info
 from meridian.control.formats.entries import SubscriptionUser
+from meridian.core.inputs import PAGE_PALETTES
 from meridian.render import render_apps_catalog, render_config_json
 
 NODE = shutil.which("node")
@@ -50,6 +51,11 @@ def run_case(name: str, data: dict[str, object]) -> None:
     assert result.returncode == 0, result.stderr or result.stdout
 
 
+def test_every_deployer_palette_reaches_the_stylesheet(page_data: dict[str, object]) -> None:
+    page_data["palettes"] = PAGE_PALETTES
+    run_case("test_every_deployer_palette_reaches_the_stylesheet", page_data)
+
+
 def test_legacy_service_worker_releases_old_pages(page_data: dict[str, object]) -> None:
     run_case("test_legacy_service_worker_releases_old_pages", page_data)
 
@@ -76,8 +82,8 @@ def test_suspended_account_explains_and_dims_imports(page_data: dict[str, object
     run_case("test_suspended_account_explains_and_dims_imports", page_data)
 
 
-def test_account_failure_keeps_only_account_snapshot_and_marks_it_unverified(page_data: dict[str, object]) -> None:
-    run_case("test_account_failure_keeps_only_account_snapshot_and_marks_it_unverified", page_data)
+def test_failed_refresh_keeps_unverified_facts_only_until_reload(page_data: dict[str, object]) -> None:
+    run_case("test_failed_refresh_keeps_unverified_facts_only_until_reload", page_data)
 
 
 def test_account_unlimited_and_no_expiry_are_not_zero_or_a_sentinel_date(page_data: dict[str, object]) -> None:
@@ -200,6 +206,7 @@ def test_suspended_account_also_dims_individual_imports(page_data: dict[str, obj
         "test_preferred_store_route_names_its_destination",
         "test_error_document_title_uses_the_saved_language",
         "test_account_formats_persian_numbers_and_calendar",
+        "test_account_keeps_binary_quotas_and_uses_familiar_local_units",
         "test_account_not_found_is_verified_and_disables_import",
     ],
 )

@@ -507,6 +507,11 @@
       "pattern": "^[^\\r\\n\\t]+$",
       "title": "Server Ref",
       "type": "string"
+    },
+    "version": {
+      "default": 0,
+      "title": "Version",
+      "type": "integer"
     }
   },
   "required": [

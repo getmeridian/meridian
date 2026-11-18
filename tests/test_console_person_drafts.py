@@ -102,7 +102,7 @@ def test_person_refresh_updates_status_usage_and_preserves_edited_inputs_and_foc
     assert result["sameNote"] is True and result["sameTime"] is True and result["focusKept"] is True
     assert result["note"] == "Private draft" and result["time"] == "12:34:56"
     catalog = json.loads((UI_DIR / "locales/en.json").read_text())
-    assert result["status"] == catalog["status.limited"] and "1 GiB" in result["usage"]
+    assert result["status"] == catalog["status.limited"] and "1 GB" in result["usage"]
     assert result["passive"] == [False, True]
     assert result["readsWhileHidden"] == 0 and result["readsAfterStop"] == 0
     assert result["stored"] == []

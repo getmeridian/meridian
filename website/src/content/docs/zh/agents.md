@@ -32,7 +32,7 @@ meridian help agents
 ## 文档为智能体提供什么
 
 - **每个页面都有 Markdown 版本。** 在页面地址后加 `.md`，例如 [/zh/relay.md](/zh/relay.md)。每个页面的 `<head>` 中也链接了它的 Markdown 版本。
-- **“复制页面”和“在其中打开”按钮。** 在每个页面标题下，可将页面复制为 Markdown，或在 ChatGPT、Claude 中打开。
+- **“复制页面”和“页面工具”。** 在标题下可一键复制指南的 Markdown 文本，也可展开“页面工具”查看 Markdown，或在 ChatGPT、Claude 中打开指南。
 - **llms.txt。** [/llms.txt](/llms.txt) 为语言模型索引了全部文档，[/llms-full.txt](/llms-full.txt) 则把所有文档合并在一个文件中。
 
 ## 不要把机密带进聊天

@@ -74,6 +74,7 @@ class FakeControl:
         # Each node() call pops the next scripted status; the last one repeats.
         self.reports: list[dict[str, Any]] = []
         self.current_settings = ServiceSettings(profile_title="Meridian")
+        self.seeded = False
 
     def __enter__(self) -> FakeControl:
         return self
@@ -110,12 +111,22 @@ class FakeControl:
         self.endpoints[endpoint_id] = endpoint
         return endpoint
 
+    def presentation(self):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(seeded=self.seeded)
+
     def settings(self) -> ServiceSettings:
         return self.current_settings
 
     def put_settings(
-        self, settings: ServiceSettings, *, expected_profile_declarations_hash: str | None = None
+        self,
+        settings: ServiceSettings,
+        *,
+        expected_profile_declarations_hash: str | None = None,
+        adopt_presentation: bool = False,
     ) -> ServiceSettings:
+        self.seeded = adopt_presentation
         self.current_settings = settings
         return settings
 
@@ -337,6 +348,23 @@ def test_settings_carry_the_public_base_of_pages_and_subscriptions(plan: Resourc
 
     assert control.current_settings.public_url == "https://198.51.100.10/pages"
     assert observation_converges(action, drivers["service_settings"].observe(action, None))
+
+
+def test_matching_topology_on_a_service_without_the_handover_endpoint_still_needs_apply(
+    plan: ResourcePlan, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meridian.control.client import ControlServiceNotFound
+
+    drivers, control, _cluster = _setup(plan)
+    driver = drivers["service_settings"]
+    action = _action(plan, "settings:service")
+    driver.apply(action, None)
+
+    def old_service():
+        raise ControlServiceNotFound("Unknown route")
+
+    monkeypatch.setattr(control, "presentation", old_service)
+    assert not observation_converges(action, driver.observe(action, None))
 
 
 def test_fingerprint_copies_reach_the_service_flagged(plan: ResourcePlan) -> None:

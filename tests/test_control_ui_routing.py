@@ -17,7 +17,7 @@ pytestmark = needs_console_dom
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 @pytest.mark.parametrize("policy", ["absent", "ru-split", "full"])
-def test_settings_shows_the_policy_with_an_explanation_and_a_command_but_no_controls(locale: str, policy: str) -> None:
+def test_routing_remains_read_only_in_general_settings(locale: str, policy: str) -> None:
     response = subprocess.run(
         ["node", str(ROOT / "tests/control_ui_routing.mjs"), str(UI_DIR), locale, policy],
         cwd=ROOT,

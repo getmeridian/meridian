@@ -104,6 +104,7 @@ class ServerSetRequest(CoreModel):
 class ServerSetResult(CoreModel):
     server_ref: ServerReferenceValue
     metadata: ServerMetadata
+    version: int = 0
     dry_run: bool = False
     review: CompiledApplyPreview | None = None
     applied: CompiledApplyResult | None = None
@@ -121,7 +122,7 @@ class ServerAllowanceSpec(CoreModel):
     """Settings for a declared server; agent identity is separate from signed node documents."""
 
     node_id: NodeId | None = None
-    metadata: ServerMetadata
+    metadata: ServerMetadata = Field(default_factory=ServerMetadata)
 
 
 class ServerUsage(CoreModel):

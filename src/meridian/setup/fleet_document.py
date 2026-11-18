@@ -49,6 +49,10 @@ def server_labels(registry: ServerRegistry, server_refs: Iterable[str]) -> dict[
 def fleet_document(intent: SetupIntent, registry: ServerRegistry) -> dict[str, Any]:
     """The secret-free, editable document for a fleet's intent."""
     data = intent.model_dump(mode="json")
+    if intent.control.backend == "meridian":
+        for key in ("profile_title", "update_interval_hours", "owner_contact"):
+            data["delivery"].pop(key, None)
+        data.pop("server_metadata", None)
     labels = server_labels(registry, intent_server_refs(intent))
     map_server_refs(data, lambda ref: labels.get(ref, ref))
     for path in document_paths(data):
@@ -107,9 +111,20 @@ def intent_from_document(document: dict[str, Any], current: SetupIntent, registr
             hint="Save each one first with `meridian server add IP --name NAME`, or use a name from "
             "`meridian server list`.",
         )
+    # Real topology is validated once, including its restored transport paths; use its own
+    # declared-server calculation when preserving historical bootstrap seeds.
+    if current.control.backend == "meridian" and isinstance(data.setdefault("delivery", {}), dict):
+        for key in ("profile_title", "update_interval_hours", "owner_contact"):
+            data["delivery"].setdefault(key, getattr(current.delivery, key))
     _carry_transport_paths(data, current)
     try:
-        return SetupIntent.model_validate(data)
+        intent = SetupIntent.model_validate(data)
+        if current.control.backend == "meridian" and not data.get("server_metadata"):
+            existing = {
+                ref: value for ref, value in current.server_metadata.items() if ref in intent.declared_server_refs()
+            }
+            return intent.model_copy(update={"server_metadata": existing})
+        return intent
     except ValidationError as exc:
         raise wrap_validation_error("The fleet file does not describe a valid fleet", exc) from exc
 

@@ -380,6 +380,19 @@ COMMAND_OUTPUTS: dict[str, CommandOutput | None] = {
         outcomes=[_ok("the fleet document was exported"), *_FAILURES],
         stability="preview",
     ),
+    **{
+        f"fleet.{key}": CommandOutput(
+            data_schema="presentation-value",
+            outcomes=[
+                _ok("the setting was read or previewed"),
+                _ok("the setting is unchanged", status="no_changes"),
+                _ok("the reviewed setting was saved", status="changed"),
+                *_FAILURES,
+            ],
+            stability="preview",
+        )
+        for key in ("title", "refresh")
+    },
     "fleet.contact": CommandOutput(
         data_schema="fleet-contact",
         outcomes=[

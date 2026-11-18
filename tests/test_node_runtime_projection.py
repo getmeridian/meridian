@@ -91,6 +91,7 @@ def test_fleet_status_judges_fresh_runtime_evidence(
         patch.object(ControlClient, "node", return_value=status),
         patch.object(ControlClient, "health"),
         patch.object(ControlClient, "list_users", return_value=[]),
+        patch.object(ControlClient, "server_usage", side_effect=service.server_usage),
         patch.object(fleet, "load_topology_cluster", return_value=ClusterConfig()),
         patch.object(fleet, "topology_from_local_cluster", return_value=topology),
         patch.object(

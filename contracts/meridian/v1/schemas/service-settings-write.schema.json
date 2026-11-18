@@ -867,9 +867,6 @@
           "title": "Node Id"
         }
       },
-      "required": [
-        "metadata"
-      ],
       "title": "ServerAllowanceSpec",
       "type": "object"
     },
@@ -973,6 +970,11 @@
       "title": "Access Profiles",
       "type": "object"
     },
+    "adopt_presentation": {
+      "default": false,
+      "title": "Adopt Presentation",
+      "type": "boolean"
+    },
     "client_routing": {
       "default": "ru-split",
       "enum": [
@@ -1043,6 +1045,19 @@
       "default": null,
       "title": "Expected Access Hash"
     },
+    "expected_presentation_version": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Presentation Version"
+    },
     "expected_profile_declarations_hash": {
       "anyOf": [
         {
@@ -1079,6 +1094,7 @@
       "type": "object"
     },
     "profile_title": {
+      "default": "Meridian",
       "maxLength": 100,
       "minLength": 1,
       "title": "Profile Title",
@@ -1133,9 +1149,6 @@
       "type": "integer"
     }
   },
-  "required": [
-    "profile_title"
-  ],
   "title": "ServiceSettingsWrite",
   "type": "object"
 }

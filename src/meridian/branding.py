@@ -1,7 +1,7 @@
 """Server branding — palettes, icon processing, validation.
 
 Handles emoji detection and image download/resize; palettes live in
-``meridian.core.inputs.PAGE_PALETTES`` (colors in the page's app.js).
+``meridian.core.inputs.PAGE_PALETTES`` (colors in the page’s styles.css).
 UX philosophy: never reject input when we can fix it.
 """
 

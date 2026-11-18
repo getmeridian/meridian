@@ -254,7 +254,7 @@ if (mode === 'quota') {
   report.error = fields.gb.validationMessage || '';
   report.invalid = fields.gb.getAttribute('aria-invalid') === 'true';
   report.disabled = fields.gb.disabled;
-  report.units = fields.unit ? [...fields.unit.options].map(option => option.value) : [];
+  report.units = fields.unit ? [...fields.unit.options].map(option => option.textContent) : [];
 }
 
 if (mode.startsWith('expiry-')) {

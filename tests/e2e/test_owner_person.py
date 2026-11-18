@@ -18,7 +18,7 @@ def test_console_invitee_receives_the_reviewed_expiry_and_allowance_in_page_and_
     url = share_url(owner)
     connected(visitor, url, "E2E_visitor")
     expect(visitor.locator("#account-panel")).to_contain_text(re.compile(r"2027-02-15T12:00:00(?:\.000)?Z UTC"))
-    expect(visitor.locator(".account-metric").filter(has_text="Traffic this period")).to_contain_text("0 B / 12 GiB")
+    expect(visitor.locator(".account-metric").filter(has_text="Traffic this period")).to_contain_text("0 B / 12 GB")
     connections(app, url)
     reply = app.get(url)
     assert f"total={12 * 1024**3}" in reply.headers["subscription-userinfo"]
@@ -63,11 +63,11 @@ def test_extended_access_and_inline_allowance_survive_reload_but_reset_waits_for
     traffic.get_by_role("button", name="Save", exact=True).click()
     expect(traffic).not_to_be_visible()
     owner.reload()
-    expect(owner.locator('[data-person-field="traffic"]')).to_contain_text("125 GiB")
+    expect(owner.locator('[data-person-field="traffic"]')).to_contain_text("125 GB")
     visitor.reload()
     expect(visitor.locator("#account-panel")).to_have_attribute("aria-busy", "false")
     expect(visitor.locator("#account-panel")).to_contain_text(re.compile(r"2027-03-14T12:00:00(?:\.000)?Z UTC"))
-    expect(visitor.locator(".account-metric").filter(has_text="Traffic this period")).to_contain_text("125 GiB")
+    expect(visitor.locator(".account-metric").filter(has_text="Traffic this period")).to_contain_text("125 GB")
     assert f"total={125 * 1024**3}" in app.get(url).headers["subscription-userinfo"]
     owner.get_by_role("tab", name="Usage", exact=True).click()
     before = service.get_user("Luma")
@@ -85,7 +85,7 @@ def test_extended_access_and_inline_allowance_survive_reload_but_reset_waits_for
     assert after is not None and after.used_traffic_bytes == 0
     assert after.lifetime_traffic_bytes == before.lifetime_traffic_bytes
     visitor.reload()
-    expect(visitor.locator(".account-metric").filter(has_text="Traffic this period")).to_contain_text("0 B / 125 GiB")
+    expect(visitor.locator(".account-metric").filter(has_text="Traffic this period")).to_contain_text("0 B / 125 GB")
 
 
 @pytest.mark.parametrize("cut_off", [False, True], ids=["let-sessions-end", "end-open-sessions"])

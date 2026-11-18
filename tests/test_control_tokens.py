@@ -78,6 +78,8 @@ ROUTE_SAMPLES = {
     "person_access": ("/api/users/alice/access", None),
     "openapi": ("/api/openapi.json", None),
     "health": ("/api/health", None),
+    "get_presentation": ("/api/settings/presentation", None),
+    "patch_presentation": ("/api/settings/presentation", {"expected_version": 0, "profile_title": "Fleet"}),
     "get_settings": ("/api/settings", None),
     "put_settings": ("/api/settings", {"profile_title": "Fleet"}),
     "get_privacy": ("/api/privacy", None),

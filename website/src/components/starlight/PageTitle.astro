@@ -18,37 +18,48 @@ const assistants = [
 
 <Default />
 <div class="page-actions not-content">
-  <button type="button" class="page-action" data-copy-markdown={markdownPath} data-copied={t('meridian.page.copied')}>
+  <button hidden type="button" class="page-action" data-copy-markdown={markdownPath} data-copied={t('meridian.page.copied')}>
     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
       ><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg
     >
-    <span>{t('meridian.page.copy')}</span>
+    <span aria-live="polite">{t('meridian.page.copy')}</span>
   </button>
-  <a class="page-action" href={markdownPath}>{t('meridian.page.view')}</a>
-  {
-    assistants.map(({ label, href }) => (
-      <a class="page-action" href={href} target="_blank" rel="noopener noreferrer">
-        {t('meridian.page.open', { assistant: label })}
-      </a>
-    ))
-  }
+  <details class="page-tools">
+    <summary class="page-action">
+      {t('meridian.page.tools')}
+      <svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="m4 6 4 4 4-4" />
+      </svg>
+    </summary>
+    <div class="page-tools__links">
+      <a href={markdownPath}>{t('meridian.page.view')}</a>
+      {assistants.map(({ label, href }) => (
+        <a href={href} target="_blank" rel="noopener noreferrer">{t('meridian.page.open', { assistant: label })}</a>
+      ))}
+    </div>
+  </details>
 </div>
 
 <script>
+  import { copyText } from '../copy';
+
   document.querySelectorAll<HTMLButtonElement>('[data-copy-markdown]').forEach((button) => {
+    const label = button.querySelector('span');
+    const path = button.dataset.copyMarkdown;
+    if (!label || !path) return;
+    const original = label.textContent;
+    let reset: ReturnType<typeof setTimeout>;
+    button.hidden = false;
     button.addEventListener('click', async () => {
-      const label = button.querySelector('span');
-      if (!label) return;
-      const original = label.textContent;
       try {
-        const response = await fetch(button.dataset.copyMarkdown!);
-        await navigator.clipboard.writeText(await response.text());
+        const response = await fetch(path);
+        if (!response.ok || !await copyText(await response.text())) throw new Error();
+        clearTimeout(reset);
         label.textContent = button.dataset.copied ?? original;
+        reset = setTimeout(() => (label.textContent = original), 2000);
       } catch {
-        window.location.href = button.dataset.copyMarkdown!;
-        return;
+        window.location.href = path;
       }
-      setTimeout(() => (label.textContent = original), 2000);
     });
   });
 </script>
@@ -57,26 +68,39 @@ const assistants = [
   .page-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
+    align-items: start;
+    gap: .25rem .5rem;
+    margin-top: .625rem;
   }
   .page-action {
     display: inline-flex;
     align-items: center;
-    gap: 0.375rem;
-    padding: 0.25rem 0.625rem;
+    justify-content: center;
+    gap: .375rem;
+    min-height: 2.25rem;
+    padding: .25rem .625rem;
     border: 1px solid var(--sl-color-gray-5);
-    border-radius: 999px;
+    border-radius: .375rem;
     background: transparent;
     color: var(--sl-color-gray-2);
     font: inherit;
     font-size: var(--sl-text-xs);
     line-height: 1.5;
-    text-decoration: none;
     cursor: pointer;
   }
-  .page-action:hover {
-    border-color: var(--sl-color-accent);
-    color: var(--sl-color-white);
+  .page-action[hidden] { display: none; }
+  .page-action:hover { border-color: var(--sl-color-accent); color: var(--sl-color-white); }
+  .page-tools { max-width: 100%; }
+  .page-tools summary { list-style: none; }
+  .page-tools summary::-webkit-details-marker { display: none; }
+  .page-tools[open] summary svg { transform: rotate(180deg); }
+  .page-tools__links {
+    display: grid;
+    justify-items: start;
+    margin-top: .375rem;
+    padding-inline-start: .625rem;
+    border-inline-start: 1px solid var(--sl-color-gray-5);
+    font-size: var(--sl-text-sm);
   }
+  .page-tools__links a { display: inline-block; padding-block: .375rem; }
 </style>

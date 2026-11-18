@@ -12,6 +12,28 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b17
+
+- Overview links each server warning to the right place and separates routine
+  account states from problems. On phones, People filters fold away and every
+  Settings section is visible. The personal page puts app installation and
+  import first, with account details still one tap away.
+- The public tour shows the current panel and connection page in four languages.
+  The globe turns slowly through example VPN routes, including Omsk via Moscow
+  to Amsterdam. Drag to turn it or tap to follow a route through its relay.
+  Arrow keys rotate it too; pause and reduced motion keep the view still.
+  CLI help now works offline and lists the owner panel under Get started.
+- Traffic and quotas use familiar labels such as MB and GB in the panel,
+  connection page and CLI. Existing limits keep exactly the same byte values.
+- The owner can edit the subscription title, refresh interval and public contact in
+  Settings, and the provider, traffic allowance and payment dates under Servers.
+  The panel shows what will change, asks for identity confirmation when the public
+  contact changes, and protects newer edits from an older tab. Applying the
+  topology again preserves these settings (#139).
+- A personal connection page now offers a link to copy into a VPN app even when
+  JavaScript is disabled. Offline, it shows how to reconnect; Meridian keeps
+  personal links and account details out of its offline cache (#94).
+
 ### Since 4.0.0b16
 
 #### Added

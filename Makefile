@@ -20,7 +20,7 @@ hooks: ## Install git pre-push hook
 test: ## Run Python tests
 	uv run pytest tests/ -v --tb=short
 
-e2e: ## Run real-browser journeys (install Chromium first; tests/e2e/README.md)
+e2e: ## Run real-browser journeys (install Chromium and WebKit first; tests/e2e/README.md)
 	uv run --group e2e pytest tests/e2e
 
 lint: ## Run ruff linter

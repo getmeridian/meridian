@@ -35,7 +35,7 @@ def test_people_loads_and_polls_users_when_the_fleet_request_fails(cached: bool)
     assert result["names"] == ["Saved person" if cached else "sample"]
     if cached:
         assert result["fleet"] == fleet
-    assert "1 KiB" in result["initial"] and "2 KiB" in result["afterPoll"]
+    assert "1 KB" in result["initial"] and "2 KB" in result["afterPoll"]
     assert result["afterUserFailure"] == result["afterPoll"]
     assert result["stale"] is True and result["retryVisible"] is True
 

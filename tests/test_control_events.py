@@ -442,20 +442,45 @@ def test_event_human_views_translate_the_kinds_and_changed_fields(
     from meridian.cluster import ClusterConfig, PanelConfig
     from meridian.commands import fleet_events
     from meridian.console import set_json_mode
+    from meridian.control.models import ServiceSettings
     from meridian.core.fleet_events import FleetEventKind
+    from meridian.core.presentation import PresentationPatch
 
+    monkeypatch.setattr(fleet_events.err_console, "width", 320)
     monkeypatch.setattr(i18n, "_requested", None)
     monkeypatch.setattr(i18n, "_current", "en")
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as admin:
         admin.put_user("alice")
         admin.update_user("alice", UserUpdate(traffic_limit_bytes=100))
+        admin.put_settings(
+            ServiceSettings.model_validate({"profile_title": "Old title", "servers": {"edge": {"metadata": {}}}})
+        )
+        admin.patch_presentation(
+            PresentationPatch.model_validate(
+                {
+                    "expected_version": admin.presentation().version,
+                    "profile_title": "Secret test title",
+                    "update_interval_hours": 12,
+                    "owner_contact": {"text": "Contact only for the connection page"},
+                    "servers": {"edge": {"provider": "Never print this bill"}},
+                }
+            )
+        )
         cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN))
         monkeypatch.setattr(fleet_events, "load_topology_cluster", lambda **_: cluster)
         try:
             result = CliRunner().invoke(app, ["--lang", locale, "fleet", "events"])
             assert result.exit_code == 0, result.output
             assert i18n.t("events.title") in result.output and "alice" in result.output
-            assert "traffic_limit_bytes" not in result.output
+            labels = i18n.catalog(locale)
+            assert labels["events.kind.presentation.changed"] in result.output
+            for field in ("profile_title", "update_interval_hours", "owner_contact", "servers"):
+                assert labels["events.field." + field] in result.output
+            assert "traffic_limit_bytes" not in result.output and "Secret test title" not in result.output
+            assert (
+                "Contact only for the connection page" not in result.output
+                and "Never print this bill" not in result.output
+            )
             assert all(i18n.t(f"events.kind.{kind}") for kind in get_args(FleetEventKind))
         finally:
             set_json_mode(False)

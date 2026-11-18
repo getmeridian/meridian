@@ -204,7 +204,7 @@
         if (errors[name]) text(errors[name], "");
       }
       changed(false);
-      (name === "q" ? search : filterSummaries[name]).focus();
+      (name === "q" ? search : phone && phone.matches && !expanded ? filterToggle : filterSummaries[name]).focus();
     }
     function drawChips() {
       var names = ["q"].concat(FILTER_ORDER).filter(function (name) {
@@ -238,12 +238,28 @@
     var fields = { status: statusField, expires: expiresField, quota: quotaField, tag: tagField, profile: profileField,
       never: neverField, attention: attentionField, lifecycle: lifecycleField, sort: [sortField, orderField] };
     var filters = h("div", { class: "people-filter-chips", "aria-label": M.t("people.filters") }, FILTER_ORDER.map(function (name) { return filterChip(name, fields[name]); }));
+    // Keep every filter directly available on a large screen; small screens can unfold the same controls.
+    var phone = window.matchMedia && window.matchMedia("(max-width: 640px)"), expanded = false;
+    filters.id = "people-filter-options";
+    var filterToggle = h("button", { type: "button", class: "btn btn-ghost people-filter-toggle",
+      "aria-controls": filters.id, "aria-expanded": "false", onclick: function () {
+        expanded = !expanded; filterVisibility();
+      } }, M.icon("settings"), M.t("people.filters"));
+    function filterVisibility() {
+      var small = !!(phone && phone.matches);
+      filterToggle.hidden = !small;
+      filters.hidden = small && !expanded;
+      filterToggle.setAttribute("aria-expanded", String(!filters.hidden));
+      if (filters.hidden) closeMenus();
+    }
+    filterVisibility();
+    if (phone && phone.addEventListener) phone.addEventListener("change", filterVisibility);
     var previousButton = h("button", { class: "btn btn-ghost btn-sm", type: "button", disabled: true, text: M.t("people.previous"), onclick: function () { cursor = previous.pop(); stop.refresh(false); } });
     var nextButton = h("button", { class: "btn btn-ghost btn-sm", type: "button", disabled: true, text: M.t("people.next"), onclick: function () { previous.push(cursor); cursor = page.next_cursor; stop.refresh(false); } });
     var pageRoot = h("div", { class: "people-page" },
       h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.people") }), h("p", { class: "muted", text: M.t("people.lede") })),
         h("button", { class: "btn btn-primary", type: "button", onclick: M.addPerson }, M.icon("plus"), M.t("people.add"))),
-      h("div", { class: "people-toolbar", role: "search", "aria-label": M.t("people.search") }, search, filters), activeChips,
+      h("div", { class: "people-toolbar", role: "search", "aria-label": M.t("people.search") }, search, filterToggle, filters), activeChips,
       h("div", { class: "people-list-header" }, h("div", { class: "people-list-meta" }, count, status), h("div", { class: "row-actions" }, selectToggle, pageSelection, bulk.receipt)),
       bulk.nodes, list,
       h("div", { class: "actions people-pager" }, previousButton, nextButton),
@@ -377,6 +393,7 @@
     window.addEventListener("meridian:mode", modeChanged);
     return function () {
       clearTimeout(searchTimer); stop();
+      if (phone && phone.removeEventListener) phone.removeEventListener("change", filterVisibility);
       document.removeEventListener("click", outside);
       window.removeEventListener("meridian:mode", modeChanged);
     };

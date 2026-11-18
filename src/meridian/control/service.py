@@ -66,6 +66,7 @@ from meridian.control.period_usage import reset_period
 from meridian.control.person_connections import read_connections
 from meridian.control.person_delivery_policy import DeliveryPolicyLedger
 from meridian.control.person_names import assign_person_username
+from meridian.control.presentation import patch_presentation, read_presentation
 from meridian.control.privacy import PrivacyLedger, read_privacy
 from meridian.control.response_rule_testing import test_response_rules
 from meridian.control.revisions import RevisionLedger
@@ -95,6 +96,7 @@ from meridian.core.attention import AttentionList, AttentionThresholds
 from meridian.core.client_devices import DevicesRemoved
 from meridian.core.client_sessions import CredentialRotationRequest, UserFlowBlocks
 from meridian.core.clients import ClientConnections
+from meridian.core.presentation import PresentationPatch, PresentationState
 from meridian.core.response_rule_test import ResponseRuleDecision, ResponseRuleTestRequest
 from meridian.core.server_allowances import ServerUsageList
 from meridian.core.subscription_preview import SubscriptionPreview, SubscriptionPreviewRequest
@@ -202,16 +204,26 @@ class ControlService:
         """Checks every transaction in the block runs before its write (`Store.conditions`)."""
         return self._store.conditions(*checks)
 
+    def presentation(self) -> PresentationState:
+        return read_presentation(self._store)
+
+    def update_presentation(self, patch: PresentationPatch) -> PresentationState:
+        return patch_presentation(self._store, self.events, patch, now=self.now)
+
     def put_settings(
         self,
         settings: ServiceSettings,
         *,
+        adopt_presentation: bool = False,
+        expected_presentation_version: int | None = None,
         expected_access_hash: str | None = None,
         expected_profile_declarations_hash: str | None = None,
     ) -> ServiceSettings:
         return save_settings(
             self._store,
             settings,
+            adopt_presentation=adopt_presentation,
+            expected_presentation_version=expected_presentation_version,
             compose=self._compose_all,
             now=self.now,
             expected_access_hash=expected_access_hash,

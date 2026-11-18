@@ -103,6 +103,8 @@
       !peak ? h("p", { class: "muted small", text: M.t("usage.empty") }) : null);
   };
 
+  M.usageTable = table;
+
   function table(rows, person) {
     return h("div", { class: "usage-table-scroll" }, h("table", { class: "usage-table" },
       h("thead", {}, h("tr", {}, h("th", { scope: "col", text: M.t("usage.day") }),

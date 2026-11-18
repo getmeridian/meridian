@@ -23,7 +23,7 @@ const current = Astro.url.pathname;
 const links = [
   { href: docsHref, key: 'nav.docs' as const, docs: true, active: false },
   { href: '/blog/', key: 'nav.blog' as const, docs: false, active: current.startsWith('/blog/') },
-  { href: '/demo/', key: 'nav.demo' as const, docs: false, active: false },
+  { href: localized ? `/demo/?lang=${locale}` : '/demo/', key: 'nav.demo' as const, docs: false, active: false },
 ];
 const github = 'https://github.com/getmeridian/meridian';
 ---
@@ -75,6 +75,12 @@ const github = 'https://github.com/getmeridian/meridian';
   (function () {
     var menu = document.querySelector('.nav__menu');
     if (!menu) return;
+    menu.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && menu.open) {
+        menu.open = false;
+        menu.querySelector('summary').focus();
+      }
+    });
     document.addEventListener('click', function (e) {
       if (menu.open && (!menu.contains(e.target) || (e.target instanceof Element && e.target.closest('.nav__panel a')))) menu.open = false;
     });

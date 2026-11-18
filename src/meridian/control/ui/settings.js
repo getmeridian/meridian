@@ -46,29 +46,44 @@
   }
 
   function generalCard(read) {
-    // Reviewed topology owns all four values; this screen never submits them.
-    var title = h("bdi", { class: "settings-fact-value" }), publicUrl = h("bdi", { class: "link-text", dir: "ltr" });
-    var contactText = h("bdi", { class: "settings-fact-value", dir: "auto" });
-    var contactLink = h("bdi", { class: "link-text", dir: "ltr" });
+    var title = h("bdi", { class: "settings-fact-value", dir: "auto" }), interval = h("bdi", {});
+    var publicUrl = h("bdi", { class: "link-text", dir: "ltr" });
+    var contactText = h("bdi", { dir: "auto" }), contactLink = h("bdi", { class: "link-text", dir: "ltr" });
     var routing = h("bdi", { class: "settings-fact-value mono", dir: "ltr" });
-    var routingExplanation = h("p"), routingCommand = h("span");
-    var error = h("p", { class: "form-error", role: "alert" });
-    read.then(function (settings) {
-      title.textContent = settings.profile_title;
-      publicUrl.textContent = settings.public_url || M.t("settings.no_public_url");
-      var contact = settings.owner_contact || {}, facts = routingFacts(settings);
-      contactText.textContent = contact.text || M.t("settings.contact_none");
+    var explanation = h("p"), command = h("span"), error = h("p", { class: "form-error", role: "alert" });
+    function show(state) {
+      title.textContent = state.profile_title;
+      // GET api/settings omits the documented six-hour default.
+      interval.textContent = M.count(state.update_interval_hours == null ? 6 : state.update_interval_hours);
+      var contact = state.owner_contact || {};
+      contactText.textContent = contact.text || (contact.link ? "" : M.t("settings.contact_none"));
+      contactText.hidden = !contactText.textContent;
       contactLink.textContent = contact.link || ""; contactLink.hidden = !contact.link;
-      routing.textContent = facts.policy; routingExplanation.textContent = facts.explanation;
-      M.mount(routingCommand, M.command(facts.command));
+    }
+    var edit = h("button", { type: "button", class: "btn btn-ghost btn-sm", onclick: function () {
+      M.editPresentation().then(function (state) {
+        if (!state || typeof state !== "object") return;
+        show(state);
+        if (M.state.fleet) M.state.fleet.profile_title = state.profile_title;
+        if (M.updateFleetTitle && M.state.fleet) M.updateFleetTitle();
+        else document.title = state.profile_title;
+      });
+    } }, M.t("presentation.edit"));
+    read.then(function (settings) {
+      show(settings); publicUrl.textContent = settings.public_url || M.t("settings.no_public_url");
+      var facts = routingFacts(settings);
+      routing.textContent = facts.policy; explanation.textContent = facts.explanation;
+      M.mount(command, M.command(facts.command));
     }, function (e) { error.textContent = M.errorText(e); });
-    return h("section", { class: "card" }, h("h2", { text: M.t("settings.general") }), error,
+    return h("section", { class: "card" },
+      h("div", { class: "card-head" }, h("h2", { text: M.t("settings.general") }), edit), error,
       h("dl", { class: "settings-facts" },
-        fact(M.t("settings.title"), title, M.t("settings.title_caption"), M.command("meridian setup")),
+        M.keyValue(M.t("settings.title"), title),
+        M.keyValue(M.t("presentation.interval"), interval),
+        M.keyValue(M.t("settings.owner_contact"), h("div", { class: "stack-sm" }, contactText, contactLink), M.t("tip.owner_contact")),
         fact(M.t("settings.public_url"), publicUrl, M.t("settings.address_caption"), M.command("meridian setup"), M.t("tip.public_url")),
-        fact(M.t("settings.owner_contact"), [contactText, contactLink], M.t("settings.contact_hint"), M.command("meridian fleet contact"), M.t("tip.owner_contact")),
-        fact(M.t("settings.client_routing"), routing, M.t("settings.routing_hint"), routingCommand, M.t("tip.client_routing"))),
-      M.learnMore([h("p", { text: M.t("settings.title_hint") }), h("p", { text: M.t("settings.public_url_hint") }), routingExplanation]));
+        fact(M.t("settings.client_routing"), routing, M.t("settings.routing_hint"), command, M.t("tip.client_routing"))),
+      M.learnMore([h("p", { text: M.t("settings.public_url_hint") }), explanation]));
   }
 
   function advancedFacts(read) {

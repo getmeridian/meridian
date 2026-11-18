@@ -6,6 +6,8 @@
  */
 import Base from '../layouts/Base.astro';
 import Hero from './Hero.astro';
+import AtlasIcon from './AtlasIcon.astro';
+import '../styles/landing.css';
 import SectionHead from './SectionHead.astro';
 import CodeBlock from './CodeBlock.astro';
 import Timeline from './Timeline.astro';
@@ -78,6 +80,8 @@ const organization = {
     </script>
   )}
   <Fragment slot="head">
+    <!-- Keep cold fragment visits aligned when WebKit applies the page styles. -->
+    <link rel="expect" href="#main" blocking="render" />
     <script type="application/ld+json" set:html={JSON.stringify(organization)} />
     <script type="application/ld+json" set:html={JSON.stringify(faq)} />
   </Fragment>
@@ -85,184 +89,95 @@ const organization = {
   <main id="main">
     <Hero locale={locale} />
 
-    <section id="setup" class="section">
+    <section id="demo" class="section" aria-labelledby="tour-title">
       <div class="container">
-        <SectionHead eyebrow={t('setup.label')} title={t('setup.title')} desc={t('setup.desc')} />
-        <figure id="video" class="setup-video">
-          <video controls preload="none" playsinline poster={`/video/meridian-setup${videoCut}-poster.jpg`} width="1280" height="720" aria-label={t('setup.videoLabel')}>
-            <source src={`/video/meridian-setup${videoCut}.mp4`} type="video/mp4" />
-          </video>
-          <figcaption set:html={t('setup.video')} />
-        </figure>
-        <div class="setup-grid">
-          <div>
-            <CodeBlock code="curl -sSf https://getmeridian.org/install.sh | bash" label={t('setup.step1.label')} copyLabel={t('builder.copy')} copiedLabel={t('builder.copied')} />
-            <div class="step-separator"><span>{t('setup.then')}</span></div>
-            <CodeBlock code="meridian setup" label={t('setup.step2.label')} copyLabel={t('builder.copy')} copiedLabel={t('builder.copied')} />
-            <p class="setup-hint" set:html={t('setup.hint')} />
-            <img src="/img/deploy-terminal.svg" alt={t('setup.terminalAlt')} class="deploy-terminal" loading="lazy" width="720" height="780" />
-          </div>
-          <div>
-            <h3 class="setup-details">{t('setup.details')}</h3>
-            <Timeline steps={steps} />
-            <Callout variant="tip" icon="↻">{t('setup.idempotent')}</Callout>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="demo" class="section section--band">
-      <div class="container">
-        <SectionHead eyebrow={t('showcase.label')} title={t('showcase.title')} desc={t('showcase.desc')} />
+        <SectionHead id="tour-title" title={t('showcase.title')} />
         <Showcase locale={locale} />
-      </div>
-    </section>
-
-    <section id="builder-section" class="section">
-      <div class="container">
-        <SectionHead eyebrow={t('builder.label')} title={t('builder.title')} desc={t('builder.desc')} />
-        <CommandBuilder locale={locale} />
-      </div>
-    </section>
-
-    <section id="technology" class="section">
-      <div class="container two-col">
-        <SectionHead eyebrow={t('tech.label')} title={t('tech.title')} desc={t('tech.desc')} />
-        <div>
-          {tech.map((item, i) => (
-            <Accordion title={item.title} open={i === 0}><Fragment set:html={item.body} /></Accordion>
-          ))}
+        <div class="landing__extra">
+          <Accordion title={t('connect.title')}>
+            <div id="connect"><AppGrid note={t('connect.apps.more')} /></div>
+            <Callout variant="tip">{t('connect.clock')}</Callout>
+          </Accordion>
         </div>
       </div>
     </section>
 
-    <section id="connect" class="section">
-      <div class="container">
-        <SectionHead eyebrow={t('connect.label')} title={t('connect.title')} desc={t('connect.desc')} />
-        <AppGrid note={t('connect.apps.more')} />
-        <Callout variant="warning">{t('connect.clock')}</Callout>
+    <section id="setup" class="section landing__band" aria-labelledby="setup-title">
+      <!-- The former closing call to action linked here. Keep its old fragment. -->
+      <div class="container" id="cta">
+        <SectionHead id="setup-title" title={t('setup.title')} desc={t('setup.desc')} />
+        <div class="setup__grid">
+          <div class="setup__commands">
+            <CodeBlock code="curl -sSf https://getmeridian.org/install.sh | bash" label={t('setup.step1.label')} copyLabel={t('builder.copy')} copiedLabel={t('builder.copied')} />
+            <CodeBlock code="meridian setup" label={t('setup.step2.label')} copyLabel={t('builder.copy')} copiedLabel={t('builder.copied')} />
+            <p class="setup__hint" set:html={t('setup.hint')} />
+          </div>
+          <figure id="video" class="setup__video">
+            <video controls controlslist="nodownload" preload="none" playsinline poster={`/video/meridian-setup${videoCut}-poster.jpg`} width="1280" height="720" aria-label={t('setup.videoLabel')}>
+              <source src={`/video/meridian-setup${videoCut}.mp4`} type="video/mp4" />
+            </video>
+            <figcaption>{t('setup.video')}</figcaption>
+          </figure>
+        </div>
+        <div class="landing__extra">
+          <Accordion title={t('setup.details')}>
+            <Timeline steps={steps} />
+            <Callout variant="tip">{t('setup.idempotent')}</Callout>
+          </Accordion>
+          <Accordion title={t('builder.title')}>
+            <div id="builder-section">
+              <p hidden id="builder-intro" class="setup__builder-intro">{t('builder.desc')}</p>
+              <a id="builder-manual" class="atlas-link" href={`/${locale}/cli-reference/`}>{t('builder.manual')}</a>
+              <CommandBuilder locale={locale} />
+            </div>
+          </Accordion>
+        </div>
       </div>
     </section>
 
-    <section id="architecture" class="section">
+    <section id="technology" class="section" aria-labelledby="notes-title">
       <div class="container">
-        <SectionHead eyebrow={t('arch.label')} title={t('arch.title')} />
-        <div class="arch-grid">
-          <div class="arch-img card"><ArchitectureDiagram label={t('arch.alt')} /></div>
+        <SectionHead id="notes-title" title={t('tech.title')} />
+        <div class="notes__grid">
           <div>
-            {arch.map((item, i) => (
-              <Accordion title={item.title} open={i === 0}><Fragment set:html={item.body} /></Accordion>
-            ))}
+            <h3 class="notes__label">{t('tech.group')}</h3>
+            {tech.map(item => <Accordion title={item.title}><Fragment set:html={item.body} /></Accordion>)}
+          </div>
+          <div id="architecture">
+            <h3 class="notes__label">{t('arch.title')}</h3>
+            {arch.map(item => <Accordion title={item.title}><Fragment set:html={item.body} /></Accordion>)}
+            <Accordion title={t('arch.figure')}><ArchitectureDiagram label={t('arch.alt')} /></Accordion>
           </div>
         </div>
+        <a class="atlas-link notes__link" href={`/${locale}/architecture/`}>{t('arch.docs')} <span class="atlas-forward"><AtlasIcon name="arrow" size={16} /></span></a>
       </div>
     </section>
 
-    <section id="cta" class="section section--band">
-      <div class="container">
-        <SectionHead title={t('cta.title')} desc={t('cta.desc')} center>
-          <div class="btn-row cta-actions">
-            <a href="#setup" class="btn btn--primary">{t('cta.install')}</a>
-            <a href={`/${locale}/getting-started/`} class="btn btn--secondary">{t('hero.docs')}</a>
-          </div>
-        </SectionHead>
-      </div>
-    </section>
   </main>
 </Base>
 
 <style>
-  .section--band {
-    background: var(--band);
+  .landing__band { background: var(--band); }
+  .setup__grid, .notes__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(24px, 4vw, 60px); }
+  .setup__commands :global(.code-block) { margin: 0 0 14px; background: var(--s1); }
+  .setup__commands :global(.code-block__label) { color: var(--ac-text); padding-block: 9px; }
+  .setup__hint, .setup__video figcaption { font-size: .96rem; line-height: 1.5; color: var(--t2); }
+  .setup__hint :global(a) { text-decoration: underline; text-underline-offset: .2em; }
+  .setup__video { margin: 0; }
+  .setup__video video { display: block; width: 100%; height: auto; border-radius: var(--r); background: var(--atlas-night); }
+  .setup__video figcaption { margin-top: 10px; }
+  .setup__builder-intro { margin: 0 0 16px; }
+  .landing__extra { margin-top: clamp(22px, 3vw, 40px); border-top: 1px solid var(--b2); }
+  .landing__extra :global(.accordion), .notes__grid :global(.accordion) {
+    background: transparent; border: 0; border-bottom: 1px solid var(--b1);
+    border-radius: 0; box-shadow: none; overflow: visible;
   }
-  .setup-grid {
-    display: grid;
-    gap: 40px;
-  }
-  .two-col,
-  .arch-grid {
-    display: grid;
-    gap: 24px 56px;
-  }
-  @media (min-width: 860px) {
-    .setup-grid {
-      grid-template-columns: 1fr 1fr;
-      gap: 56px;
-    }
-    .two-col {
-      grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-      align-items: start;
-    }
-    .arch-grid {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      align-items: start;
-    }
-  }
-
-  .step-separator {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin: 4px 0;
-    color: var(--t3);
-    font-family: var(--label-font);
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-  .step-separator::before,
-  .step-separator::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--b1);
-  }
-  .setup-video {
-    max-width: 960px;
-    margin: 0 auto 56px;
-    scroll-margin-top: 88px;
-  }
-  .setup-video video {
-    display: block;
-    width: 100%;
-    height: auto;
-    border-radius: var(--r2);
-    box-shadow: var(--shadow-md);
-    background: #1c1e28; /* the video's own background while the poster loads */
-  }
-  .setup-video figcaption {
-    margin-top: 12px;
-    font-size: 0.94rem;
-    color: var(--t2);
-    text-align: center;
-  }
-  .setup-hint {
-    margin: 16px 0 28px;
-    font-size: 0.94rem;
-    color: var(--t2);
-  }
-  .deploy-terminal {
-    display: block;
-    width: 100%;
-    max-width: 520px;
-    height: auto;
-    border-radius: var(--r2);
-    box-shadow: var(--shadow-md);
-  }
-  .setup-details {
-    font-family: var(--body);
-    font-size: 1rem;
-    font-weight: 600;
-    letter-spacing: normal;
-    color: var(--t1);
-  }
-
-  .arch-img {
-    padding: 12px;
-  }
-
-  .cta-actions {
-    justify-content: center;
-    margin-top: 28px;
+  .landing__extra :global(.accordion + .accordion), .notes__grid :global(.accordion + .accordion) { margin-top: 0; }
+  .landing__extra :global(.accordion__trigger), .notes__grid :global(.accordion__trigger) { padding: 16px 4px; }
+  .landing__extra :global(.accordion__content), .notes__grid :global(.accordion__content) { padding: 0 4px 20px; }
+  .notes__label { padding-bottom: 14px; border-bottom: 1px solid var(--b2); font-size: 1.35rem; }
+  .notes__link { margin-top: 18px; }
+  @media (max-width: 760px) {
+    .setup__grid, .notes__grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   }
 </style>

@@ -76,15 +76,16 @@ def test_full_policy_reaches_both_settings_payloads_and_every_compiled_template(
 
 
 def test_settings_driver_applies_the_reviewed_policy_and_detects_a_later_change(tmp_path: Path) -> None:
-    plan = compile_topology(
-        single_exit_intent(delivery=DeliveryIntent(client_routing="full", update_interval_hours=24))
-    )
+    intent = single_exit_intent(delivery=DeliveryIntent(client_routing="full", update_interval_hours=24))
+    plan = compile_topology(intent)
     action = next(
         action for action in build_resource_actions(plan, 1) if action.resource.logical_id == "settings:service"
     )
     context = MagicMock(spec=MeridianDriverContext)
     context.access_review_hash = None
-    context.cluster = ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/control", sub_path="connect"))
+    context.cluster = ClusterConfig(
+        topology_intent=intent, panel=PanelConfig(url="https://198.51.100.10/control", sub_path="connect")
+    )
     with serve_control(tmp_path) as url:
         context.client = lambda: ControlClient(url, ADMIN_TOKEN, report_mutations=False)
         driver = ServiceSettingsDriver(context)
@@ -96,8 +97,17 @@ def test_settings_driver_applies_the_reviewed_policy_and_detects_a_later_change(
             assert settings.client_routing == "full"
             assert settings.update_interval_hours == 24
             assert settings.public_url == "https://198.51.100.10/connect"
-            client.put_settings(ServiceSettings(profile_title="Meridian"))
-        assert not observation_converges(action, driver.observe(action, None))
+            from meridian.core.presentation import PresentationPatch
+
+            client.patch_presentation(
+                PresentationPatch(expected_version=client.presentation().version, update_interval_hours=12)
+            )
+            assert observation_converges(action, driver.observe(action, None))
+            client.put_settings(settings.model_copy(update={"client_routing": "ru-split"}), adopt_presentation=True)
+            assert not observation_converges(action, driver.observe(action, None))
+            driver.apply(action, None)
+            assert client.settings().client_routing == "full"
+            assert client.presentation().update_interval_hours == 12
 
 
 @pytest.fixture

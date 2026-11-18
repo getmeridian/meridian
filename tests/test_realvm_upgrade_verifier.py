@@ -231,7 +231,7 @@ def test_capture_keeps_every_user_agent_even_when_two_select_the_same_format(
     assert any("xray-json" in label and "Happ" in label for _person, label in captured)
 
 
-@pytest.mark.parametrize("change", ["", "document", "limit", "schema", "agent"])
+@pytest.mark.parametrize("change", ["", "document", "limit", "schema", "agent", "only-reachable", "other-person"])
 def test_the_complete_upgrade_journey_uses_old_commands_then_checks_every_upgrade_claim(
     change: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -295,7 +295,7 @@ def test_the_complete_upgrade_journey_uses_old_commands_then_checks_every_upgrad
                 if upgraded and change == "limit" and name == "bob":
                     person = person.model_copy(update={"traffic_limit_bytes": 0})
                 data = {
-                    "client": person.model_dump(mode="json"),
+                    "client": {**person.model_dump(mode="json"), **({"declared": True} if old else {})},
                     "handoff": {"subscription_url": f"https://{IP}/sub/{name}-opaque-token"},
                 }
             elif leaf == ["plan"]:
@@ -310,9 +310,18 @@ def test_the_complete_upgrade_journey_uses_old_commands_then_checks_every_upgrad
                         }
                     ]
                 }
-            elif leaf == ["test"]:
+            elif leaf == ["test", "--client", "bob"]:
                 assert upgraded
-                stdout = json.dumps({"summary": {"counts": {"passed": 3, "failed": 0, "warnings": 0, "skipped": 0}}})
+                stdout = json.dumps(
+                    {
+                        "summary": {"counts": {"passed": 3, "failed": 0, "warnings": 0, "skipped": 0}},
+                        "data": {
+                            "scope": "full",
+                            "client": "other" if change == "other-person" else "bob",
+                            "transports": [] if change == "only-reachable" else [{"outcome": "ok"}],
+                        },
+                    }
+                )
             if not stdout:
                 stdout = json.dumps({"data": data})
         return CommandResult(args=args, returncode=0, stdout=stdout)
@@ -356,10 +365,20 @@ def test_the_complete_upgrade_journey_uses_old_commands_then_checks_every_upgrad
         assert run.passed == 10
         assert len([event for event in events if event.startswith("before HTTP")]) == 10
         assert len([event for event in events if event.startswith("after HTTP")]) == 10
-        assert events[-1] == "new --json test"
+        assert events[-1] == "new --json test --client bob"
         apply = events.index("new apply --yes")
         assert all(index < apply for index, event in enumerate(events) if event.startswith("before HTTP"))
         assert all(index > apply for index, event in enumerate(events) if event.startswith("after HTTP"))
     output = capsys.readouterr().out
     assert IP not in output
     assert "opaque-token" not in output
+
+
+def test_evidence_errors_identify_verifier_code_without_echoing_the_private_document() -> None:
+    secret_marker = "synthetic-private-address"
+    with pytest.raises(ValueError) as exc:
+        verifier.client_detail({"client": {"username": secret_marker}})
+    summary = verifier.evidence_failure(exc.value)
+    assert "upgrade_support.client_detail:" in summary
+    assert secret_marker not in summary
+    assert str(Path.cwd()) not in summary

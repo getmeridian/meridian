@@ -20,26 +20,33 @@
 <link rel="apple-touch-icon" href="{{ asset_path }}/icon.svg">
 </head>
 <body>
-<div class="wrap" id="app">
+<main class="wrap" id="app">
   {% if notice %}<section class="notice owner-notice" dir="auto" role="status"><p>{{ notice.text }}</p></section>{% endif %}
-  <div class="skeleton">
+  <div class="skeleton" aria-hidden="true">
     <div class="skel skel-title"></div>
     <div class="skel skel-sub"></div>
     <div class="skel skel-card"></div>
   </div>
-</div>
-<div class="toast" id="toast" role="alert" aria-live="polite"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="copied">Copied</span></div>
 <noscript>
-  <div class="wrap">
-    <div class="hdr">
-      <h1>Connection Setup</h1>
-      <p>JavaScript is required to display connection details. Please enable JavaScript or use the direct link shared with you.</p>
-      <p lang="ru">Для отображения данных подключения необходим JavaScript.</p>
-      <p lang="fa" dir="rtl">برای نمایش جزئیات اتصال، JavaScript لازم است.</p>
-      <p lang="zh">需要启用 JavaScript 才能显示连接详情。</p>
-    </div>
-  </div>
+  {% set copy = {
+    'en': ('Your subscription link', 'Copy this link into your VPN app as a subscription.', 'Use the personal link you received as the subscription URL in your VPN app.'),
+    'ru': ('Ваша ссылка на подписку', 'Скопируйте ссылку и добавьте её как подписку в VPN-приложение.', 'Добавьте полученную личную ссылку в VPN-приложение как подписку.'),
+    'fa': ('پیوند اشتراک شما', 'این پیوند را کپی کنید و به‌عنوان اشتراک در برنامهٔ VPN خود وارد کنید.', 'پیوند شخصی‌ای را که دریافت کردید به‌عنوان اشتراک در برنامهٔ VPN خود وارد کنید.'),
+    'zh': ('你的订阅链接', '复制此链接，在 VPN 应用中添加订阅。', '在 VPN 应用中添加订阅时，粘贴你收到的个人链接。')
+  }[lang] %}
+  <section class="card manual-setup" aria-labelledby="manual-setup-title">
+    <p class="manual-brand">{{ server_name or 'Meridian' }}</p>
+    <h1 id="manual-setup-title">{{ copy[0] }}</h1>
+    {% if subscription_url %}
+    <p id="manual-setup-help">{{ copy[1] }}</p>
+    <textarea class="manual-url" readonly rows="3" dir="ltr" aria-labelledby="manual-setup-title" aria-describedby="manual-setup-help">{{ subscription_url }}</textarea>
+    {% else %}
+    <p>{{ copy[2] }}</p>
+    {% endif %}
+  </section>
 </noscript>
+</main>
+<div class="toast" id="toast" role="alert" aria-live="polite"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg><span data-t="copied">Copied</span></div>
 <script src="{{ asset_path }}/contact.js"></script>
 <script src="{{ asset_path }}/notice.js"></script>
 <script src="{{ asset_path }}/app.js" data-config="{{ config_path }}" data-worker="{{ worker_path }}" data-scope="{{ worker_scope }}"></script>

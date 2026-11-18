@@ -43,6 +43,7 @@ FleetEventKind = Literal[
     "command.result",
     "privacy.changed",
     "notice.changed",
+    "presentation.changed",
     "language.changed",
     "token.created",
     "token.revoked",
@@ -71,6 +72,12 @@ _NAME_PATTERN = r"^[^\x00-\x1f\x7f]+$"
 
 class EmptyEventDetail(CoreModel):
     """A fact needs no additional stored data."""
+
+
+class PresentationFieldsDetail(CoreModel):
+    fields: list[Literal["profile_title", "update_interval_hours", "owner_contact", "servers"]] = Field(
+        min_length=1, max_length=4
+    )
 
 
 class UserFieldsDetail(CoreModel):
@@ -132,6 +139,7 @@ class BulkEventDetail(CoreModel):
 
 EventDetail: TypeAlias = (
     BulkEventDetail
+    | PresentationFieldsDetail
     | EmptyEventDetail
     | UserFieldsDetail
     | UserStateDetail
@@ -164,6 +172,7 @@ _DETAIL_TYPES: dict[FleetEventKind, type[CoreModel]] = {
     "command.result": CommandResultDetail,
     "privacy.changed": PrivacyEventDetail,
     "notice.changed": EmptyEventDetail,
+    "presentation.changed": PresentationFieldsDetail,
     "language.changed": EmptyEventDetail,
     "token.created": TokenEventDetail,
     "token.revoked": TokenEventDetail,

@@ -24,14 +24,15 @@ from tests.support.topology import compile_panel_pass, single_exit_intent
 
 
 @pytest.mark.parametrize("hours", [1, 24, 168])
-def test_reviewed_refresh_interval_reaches_both_compiler_settings_payloads(hours: int) -> None:
+def test_only_external_panel_compiles_the_refresh_interval(hours: int) -> None:
     intent = single_exit_intent(delivery=DeliveryIntent(update_interval_hours=hours))
     service_plan = compile_topology(intent)
     panel_plan = compile_panel_pass(intent)
-    for plan, model in ((service_plan, ServiceSettingsPayload), (panel_plan, SubscriptionSettingsPayload)):
-        payload = next(resource.payload for resource in plan.resources if isinstance(resource.payload, model))
-        assert payload.update_interval_hours == hours
-        assert payload.model_dump(mode="json")["update_interval_hours"] == hours
+    settings = next(r.payload for r in service_plan.resources if isinstance(r.payload, ServiceSettingsPayload))
+    assert settings.update_interval_hours == 6
+    assert service_plan.plan_hash == compile_topology(single_exit_intent()).plan_hash
+    external = next(r.payload for r in panel_plan.resources if isinstance(r.payload, SubscriptionSettingsPayload))
+    assert external.update_interval_hours == hours
 
 
 @pytest.mark.parametrize("model", [DeliveryIntent, ServiceSettingsPayload, ServiceSettings])
@@ -55,11 +56,14 @@ def test_refresh_interval_bounds_and_integer_type_apply_at_every_boundary(model:
 
 
 def test_settings_driver_carries_the_reviewed_interval_to_subscription_headers(tmp_path: Path) -> None:
-    plan = compile_topology(single_exit_intent(delivery=DeliveryIntent(update_interval_hours=24)))
+    intent = single_exit_intent(delivery=DeliveryIntent(update_interval_hours=24))
+    plan = compile_topology(intent)
     action = next(
         action for action in build_resource_actions(plan, 1) if action.resource.logical_id == "settings:service"
     )
-    cluster = ClusterConfig(panel=PanelConfig(url="https://198.51.100.10/control", sub_path="connect"))
+    cluster = ClusterConfig(
+        panel=PanelConfig(url="https://198.51.100.10/control", sub_path="connect"), topology_intent=intent
+    )
     context = MagicMock(spec=MeridianDriverContext)
     context.access_review_hash = None
     context.cluster = cluster
@@ -78,6 +82,103 @@ def test_settings_driver_carries_the_reviewed_interval_to_subscription_headers(t
             user = client.put_user("person")
         with urlopen(f"{url}/sub/{user.sub_token}", timeout=10) as response:
             assert response.headers["profile-update-interval"] == "24"
+
+
+def test_topology_client_sends_seeds_once_then_only_server_membership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    from meridian.core.presentation import PresentationPatch
+
+    with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as client:
+        seed = ServiceSettings.model_validate(
+            {
+                "profile_title": "Initial title",
+                "update_interval_hours": 42,
+                "owner_contact": {"text": "Initial contact"},
+                "servers": {"edge": {"node_id": "main", "metadata": {"provider": "Initial provider"}}},
+            }
+        )
+        call = client._call
+        writes = []
+
+        def record(method, path, body=None):
+            if method == "PUT" and path == "api/settings":
+                writes.append(body)
+            return call(method, path, body)
+
+        monkeypatch.setattr(client, "_call", record)
+        client.put_settings(seed, adopt_presentation=True)
+        before = client.presentation()
+        assert before.seeded and writes[0]["expected_presentation_version"] == 0
+        saved = client.patch_presentation(
+            PresentationPatch(expected_version=before.version, profile_title="Owner title")
+        )
+        client.put_settings(seed, adopt_presentation=True)
+        assert (
+            not {"profile_title", "owner_contact", "update_interval_hours", "expected_presentation_version"}
+            & writes[-1].keys()
+        )
+        assert writes[-1]["servers"] == {"edge": {"node_id": "main"}}
+        assert "Initial provider" not in json.dumps(writes[-1])
+        assert client.presentation() == saved
+
+
+def test_payment_only_edit_preserves_exact_allowance_and_survives_topology_writes(tmp_path: Path) -> None:
+    from meridian.control.errors import ServiceError
+    from meridian.core.presentation import PresentationPatch
+
+    database = tmp_path / "control.db"
+    service = ControlService(database, fleet_id=FLEET_ID, version="4.0.0")
+    large = 2**60 + 7
+    settings = ServiceSettings.model_validate(
+        {
+            "profile_title": "Legacy seed",
+            "servers": {"edge": {"node_id": "main", "metadata": {"allowance_bytes": large, "provider": "Initial"}}},
+        }
+    )
+    try:
+        service.put_settings(settings)
+        before = service.presentation()
+        patch = PresentationPatch.model_validate(
+            {
+                "expected_version": before.version,
+                "profile_title": "From panel",
+                "servers": {"edge": {"pay_on": "2026-12-18", "pay_every": "month"}},
+            }
+        )
+        updated = service.update_presentation(patch)
+        assert updated.servers["edge"].allowance_bytes == large and updated.servers["edge"].provider == "Initial"
+        with pytest.raises(ServiceError, match="Upgrade"):
+            service.put_settings(settings)
+        service.put_settings(
+            settings.model_copy(update={"public_url": "https://example.test/sub"}),
+            adopt_presentation=True,
+            expected_presentation_version=updated.version,
+        )
+        updated = service.presentation()
+        assert (
+            updated.seeded
+            and updated.profile_title == "From panel"
+            and updated.servers["edge"].allowance_bytes == large
+        )
+        retired = settings.model_copy(update={"servers": {}})
+        service.put_settings(retired, adopt_presentation=True)
+        assert service.presentation().version == updated.version + 1 and not service.presentation().servers
+        with pytest.raises(ServiceError, match="no longer declared"):
+            service.update_presentation(
+                PresentationPatch.model_validate(
+                    {"expected_version": updated.version + 1, "servers": {"edge": {"provider": "Ghost"}}}
+                )
+            )
+    finally:
+        service.close()
+    reopened = ControlService(database, fleet_id=FLEET_ID, version="4.0.0")
+    try:
+        assert reopened.presentation().profile_title == "From panel" and not reopened.presentation().servers
+    finally:
+        reopened.close()
 
 
 def test_refresh_interval_persists_and_can_be_reset_to_the_default(tmp_path: Path) -> None:

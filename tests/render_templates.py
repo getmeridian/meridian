@@ -13,6 +13,7 @@ TEMPLATES_DIR = ROOT / "src" / "meridian" / "templates"
 MOCK_VARS = {
     "asset_path": "../pwa",
     "client_name": "default",
+    "subscription_url": "https://198.51.100.1/connect/sub/demo",
     "server_name": "Demo",
     "config_path": "/connect/sub/demo/config.json",
     "manifest_path": "/connect/sub/demo/manifest.webmanifest",

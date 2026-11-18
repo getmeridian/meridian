@@ -230,6 +230,9 @@
               "$ref": "#/$defs/BulkEventDetail"
             },
             {
+              "$ref": "#/$defs/PresentationFieldsDetail"
+            },
+            {
               "$ref": "#/$defs/EmptyEventDetail"
             },
             {
@@ -289,6 +292,7 @@
             "command.result",
             "privacy.changed",
             "notice.changed",
+            "presentation.changed",
             "language.changed",
             "token.created",
             "token.revoked"
@@ -380,6 +384,31 @@
       "title": "NodeEventDetail",
       "type": "object"
     },
+    "PresentationFieldsDetail": {
+      "additionalProperties": false,
+      "properties": {
+        "fields": {
+          "items": {
+            "enum": [
+              "profile_title",
+              "update_interval_hours",
+              "owner_contact",
+              "servers"
+            ],
+            "type": "string"
+          },
+          "maxItems": 4,
+          "minItems": 1,
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "fields"
+      ],
+      "title": "PresentationFieldsDetail",
+      "type": "object"
+    },
     "PrivacyEventDetail": {
       "additionalProperties": false,
       "properties": {
@@ -458,6 +487,7 @@
               "backup.read",
               "backup.edit",
               "settings.edit",
+              "settings.presentation",
               "tokens.read",
               "tokens.issue",
               "tokens.revoke",

@@ -37,6 +37,7 @@ from meridian.console import (
     fail,
     has_tty,
     info,
+    is_json_mode,
     is_quiet_mode,
     line,
     ok,
@@ -352,6 +353,14 @@ def _execute(
     cluster = ClusterConfig.load()
     _print_success(resolved.ip, request, links)
     offer_recovery_key(cluster)
+    if not is_json_mode() and not is_quiet_mode() and has_tty() and cluster.panel.url and cluster.panel.api_token:
+        from meridian.commands.panel import print_panel_access
+        from meridian.control.client import ControlServiceError
+
+        try:
+            print_panel_access(cluster, setup_link=False)
+        except ControlServiceError as exc:
+            warn(f"Could not read the web panel: {exc}. Run meridian panel to get its setup link.")
     exit_ = next(item for item in intent.exits if item.server_ref == entry.id)
     reality = next(path for path in exit_.paths if path.protocol == "reality")
     return DeployResult(

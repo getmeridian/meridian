@@ -132,7 +132,7 @@ Renewals and anniversary resets clear both period upload and download, including
 `--duration N` gives 1–3650 days from first use, with each day lasting 24 hours in UTC. Only the first accepted traffic reported by an agent activates it; opening the connection page or fetching a subscription never does. Before activation, the CLI, panel, and page say “valid for 30 days from first use”; afterwards they show the actual expiry. Choose a duration or `--expires`, not both. Setting a duration on an already-used account uses its recorded first traffic; if that historical time is unknown, set a fixed expiry. `--duration none` clears the duration while keeping an existing activated expiry. Extending an unused account adds days to its pending duration without activating it.
 
 ```bash
-meridian client add example --duration 30 --limit 50GiB --reset month_rolling --reset-day 31
+meridian client add example --duration 30 --limit 50GB --reset month_rolling --reset-day 31
 meridian client set example --renew-months 1 --renewals 3 --dry-run --json
 meridian client set example --renew-months 1 --renewals 3 --yes --json
 meridian client set example --renew-days 7 --renewals unlimited --yes
@@ -278,7 +278,7 @@ The control service includes a built-in web panel (also called the management pa
 
 The panel opens on **Overview**. A fresh browser uses **Simple** view: Overview, People, Servers, and Settings. **Detailed** adds Revisions and Tokens, a daily traffic chart, and recent revisions and recorded owner edits. The switch in the header remembers the choice in this browser and only changes what is displayed. Shared routes and drafts stay in place; switching to Simple from Revisions or Tokens returns to Overview. A direct link to either screen still opens in Simple, with **Shown in Detailed view** and a button to switch. In Simple, open the labeled disclosures for server capacity and billing. Restart sits under **More**. The **Account** menu holds theme, console language, and sign out; the subscription's default language stays in Settings.
 
-**Settings** has **General**, **Notice**, **Language**, **Privacy**, and **Security** sections. The navigation is a left column on desktop and a horizontally scrolling chip row on phones; arrow keys and Home/End select sections. The fragment identifies the section, such as `#/settings/privacy`; `#/settings` opens General. General shows the title, public address, owner contact, and client routing read-only with copyable `meridian` commands. Privacy keeps both levels, their disclosures, and the change history together. Security holds the password, sign-in code, passkeys, and signed-in devices. **Advanced**, in Detailed, holds the subscription format preview, routing facts, and reviewed app response rules. A direct `#/settings/advanced` link opens it in Simple with **Shown in Detailed view** and a switch; switching from Advanced to Simple returns to Overview through Leave/Stay. Unsaved edits guard section changes; mode and theme changes keep the inputs and focus. Captions stay short, with the full explanations under **Learn more**. Privacy links in history-off notices and recent Settings edits open the relevant section.
+**Settings** opens General at `#/settings`. Choose **Edit connection settings** to change the subscription title, refresh interval, or public contact. Review the values before saving; changing contact requires a recent identity check. Apps pick up changes on their next subscription refresh. The public address and routing policy still show copyable CLI commands. Use the other sections for notices, language, privacy (`#/settings/privacy`), and account security. Advanced shows format previews and routing rules in Detailed view.
 
 On phones, the logo, fleet title, view switch, and **Account** menu share one header row; long fleet titles use an ellipsis. The main navigation scrolls horizontally in both views, with the active page brought into view.
 
@@ -314,8 +314,8 @@ Removing a passkey prevents new sign-ins and signs out every other browser sessi
 
 | Change in the web panel | Shown read-only (change with `meridian`) |
 |---|---|
-| **People**: add, share a link and QR code, enable or disable, set expiry, traffic limit and reset period, device cap, language, private note and tag, reset traffic, clear devices, issue a new link, remove (with optional session cut-off) | **Servers**: every exit, relay, and gateway, whether its agent is online and up to date, its version, traffic, monthly allowance, and payment date; **Restart Xray** on a node |
-| **Settings**: default page and app language, owner notice for everyone, subscription format preview, and **Privacy** (device limits and daily usage history); **Security** holds password, sign-in code, passkeys, and signed-in devices | **Revisions** and **Settings**: every change applied from your computer, plus the subscription title, public address, client routing policy, and public owner contact |
+| **People**: add, share a link and QR code, enable or disable, set expiry, traffic limit and reset period, device cap, language, private note and tag, reset traffic, clear devices, issue a new link, remove (with optional session cut-off) | **Servers**: every exit, relay, and gateway, whether its agent is online and up to date, its version and traffic; **Restart Xray** on a node |
+| Settings: subscription title and refresh interval, public contact, notices, language, privacy and sign-in security. Servers: provider, monthly allowance, reset day and payment dates. | Revisions and Settings: applied changes, public address and client routing policy. |
 | **Tokens**: create and revoke scoped API tokens | |
 
 The web panel and CLI manage the same service-owned people. `meridian client list` includes people added in either surface. Both can add, remove, reissue and rotate every person; applies never undo status, limits or expiry. Every person gets a connection page at their subscription URL.
@@ -447,7 +447,7 @@ Reissue and deletion accept optional `{"cut_off": true}`; rotation includes it a
 
 ## Owner contact on connection pages
 
-`meridian fleet contact` reads the contact saved in your reviewed fleet intent. Set public instructions and a contact link with a review first:
+`meridian fleet contact` reads the public contact from the control service. Review your changes before saving:
 
 ```bash
 meridian fleet contact --text "Ask for help" --link mailto:help@example.com --dry-run --json
@@ -455,7 +455,7 @@ meridian fleet contact --text "Ask for help" --link mailto:help@example.com --ye
 meridian fleet contact --text "" --link none --yes
 ```
 
-Instructions are one line of plain text, up to 120 characters. Links must use `https:`, `tg:`, or `mailto:`; Meridian validates and canonicalizes them. The fields are independent: omitted options keep their values, `--text ""` clears instructions, and `--link none` clears the link. A JSON change requires `--yes`; a dry run and a declined review preserve your fleet. Export/import carries `delivery.owner_contact.text` and `delivery.owner_contact.link`. **Settings → General** in the web panel shows the contact with the CLI command to change it.
+Instructions are one line of plain text, up to 120 characters. Links must use `https:`, `tg:`, or `mailto:`; Meridian validates and canonicalizes them. The fields are independent: omitted options keep their values, `--text ""` clears instructions, and `--link none` clears the link. A JSON change requires `--yes`; a dry run and a declined review preserve your fleet. The panel and CLI edit the same contact; the panel asks for a recent sign-in before changing it.
 
 The connection page's help section and the support page show these public instructions and a **Contact owner** link in all four interface languages. The link opens only when clicked; the pages use local assets. When contact is configured, the support page keeps it visible and offers **Open connection page**. Apps receive the link in `support-url`; without a link, that header keeps its local support-page URL. The personal page URL stays unchanged.
 
@@ -563,7 +563,7 @@ Restore also preserves earlier profile use and refuses snapshot profiles that di
 
 `plan` and `apply` review profiles held by the service as well as those in the proposed topology. Removing the last profile is reviewed and fenced, and is refused while anyone still belongs to it.
 
-Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `node add` or `fleet contact`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.
+Every apply path, including `setup --intent`, restarting setup, and imperative commands such as `node add`, checks declared profile IDs and grants against the service before saving topology or writing to servers. A saved but unapplied profile edit is refused: edit profiles with `meridian profile` or `meridian fleet import`, or run `meridian apply` to review the saved change. Changing protocols or relay camouflage may expand an unchanged `exit:` or `gateway:` grant; the topology command's own review covers that change.
 
 A fresh fleet can introduce profiles through `setup --intent`. Bootstrap is allowed only while the service has no declaration fingerprint, no named profiles, and no non-default memberships. If the service holds profiles without a fingerprint, run `meridian apply` to review them before other topology commands.
 

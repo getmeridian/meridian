@@ -15,6 +15,7 @@ from meridian.control.delivery_settings import (
 from meridian.control.errors import ServiceError
 from meridian.control.models import ServiceSettings
 from meridian.control.page_settings import page_settings, save_page_settings
+from meridian.control.presentation import VERSION_KEY, merge_topology_settings, read_presentation
 from meridian.control.profile_declarations import (
     check_profile_declarations,
     read_profile_declarations_hash,
@@ -32,6 +33,8 @@ def save_settings(
     *,
     compose: Callable[[], None] | None = None,
     now: Callable[[], str] = utc_now,
+    adopt_presentation: bool = False,
+    expected_presentation_version: int | None = None,
     expected_access_hash: str | None = None,
     expected_profile_declarations_hash: str | None = None,
 ) -> ServiceSettings:
@@ -45,6 +48,14 @@ def save_settings(
             expected_access_hash=expected_access_hash,
             expected_profile_declarations_hash=expected_profile_declarations_hash,
         )
+        previous = read_presentation(store)
+        if (
+            adopt_presentation
+            and (not previous.seeded or expected_presentation_version is not None)
+            and expected_presentation_version != previous.version
+        ):
+            raise ServiceError("stale_presentation", "Presentation changed before handover. Review again.", 409)
+        settings = merge_topology_settings(store, settings, previous, adopt=adopt_presentation)
         save_access_profiles(store, settings.access_profiles)
         save_profile_declarations_hash(store, settings.access_profile_declarations_hash)
         save_delivery_policies(store, settings, access_profiles=settings.access_profiles)
@@ -55,6 +66,8 @@ def save_settings(
         save_client_routing(store, settings.client_routing)
         save_page_settings(store, settings)
         save_server_settings(store, settings.servers, now())
+        if read_presentation(store) != previous:
+            store.set_meta(VERSION_KEY, str(previous.version + 1))
         if compose is not None:
             compose()
         return read_settings(store)

@@ -32,7 +32,7 @@ Our VPN servers are managed with Meridian. Run `meridian help agents` before usi
 ## What the docs give agents
 
 - **Every page as Markdown.** Add `.md` to a page's address, for example [/en/relay.md](/en/relay.md). Each page also links its Markdown version in its `<head>`.
-- **Copy page and Open in buttons.** Under each page title, copy the page as Markdown or open it in ChatGPT or Claude.
+- **Copy page and Page tools.** Copy the guide as Markdown under its title, or open Page tools to read the Markdown or open the guide in ChatGPT or Claude.
 - **llms.txt.** [/llms.txt](/llms.txt) indexes the docs for language models, and [/llms-full.txt](/llms-full.txt) holds all of them in one file.
 
 ## Keep secrets out of the chat

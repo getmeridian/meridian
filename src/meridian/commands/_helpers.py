@@ -263,12 +263,12 @@ def format_traffic(bytes_used: int, bytes_limit: int = 0) -> str:
     def _human(b: int) -> str:
         if b <= 0:
             return "0 B"
-        for unit in ("B", "KiB", "MiB", "GiB", "TiB"):
+        for unit in ("B", "KB", "MB", "GB", "TB"):
             if abs(b) < 1024:
-                # A whole limit reads as typed: "50 GiB", not "50.0 GiB".
+                # A whole limit reads as typed: "50 GB", not "50.0 GB".
                 return f"{b:.1f}".removesuffix(".0") + f" {unit}" if unit != "B" else f"{b} {unit}"
             b /= 1024  # type: ignore[assignment]
-        return f"{b:.1f} PiB"
+        return f"{b:.1f} PB"
 
     used = _human(bytes_used)
     if bytes_limit > 0:

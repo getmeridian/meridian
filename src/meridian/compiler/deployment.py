@@ -12,6 +12,11 @@ from meridian.core.topology import SetupIntent
 def normalized_intent(intent: SetupIntent) -> dict[str, Any]:
     """Return the canonical order-insensitive intent representation."""
     payload = intent.model_dump(mode="json")
+    if intent.control.backend == "meridian":
+        # Presentation seeds are sealed in the deployer state, not desired node settings.
+        for key in ("profile_title", "owner_contact", "update_interval_hours"):
+            payload["delivery"].pop(key, None)
+        payload.pop("server_metadata", None)
     payload["exits"] = sorted(payload["exits"], key=lambda value: value["id"])
     for exit_ in payload["exits"]:
         exit_["paths"] = sorted(exit_["paths"], key=lambda value: value["id"])

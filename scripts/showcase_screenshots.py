@@ -44,7 +44,7 @@ def save(page: Page, name: str, *, width: int = WIDTH) -> None:
 
 
 def settle(page: Page, text: str, *, scroll_to: str | None = None) -> None:
-    page.get_by_text(text).first.wait_for()
+    page.get_by_text(text).filter(visible=True).first.wait_for()
     # The banner belongs to the live demo, not to product screenshots.
     page.add_style_tag(content="#demo-banner { display: none !important; }")
     if scroll_to:
@@ -55,25 +55,28 @@ def settle(page: Page, text: str, *, scroll_to: str | None = None) -> None:
             " const top = pinned ? h.getBoundingClientRect().bottom : 0;"
             " window.scrollTo(0, e.getBoundingClientRect().top + scrollY - top - 12); }"
         )
-    page.wait_for_timeout(400)  # Fonts and the usage bars finish drawing.
+    page.evaluate("document.fonts.ready")
+    page.wait_for_timeout(400)  # Let the usage bars finish drawing.
 
 
-def console_shots(page: Page, base: str) -> None:
-    page.goto(base + "console/?theme=light")
+def console_shots(page: Page, base: str, *, landing_only: bool) -> None:
+    page.goto(base + "console/?theme=light#/people")
     settle(page, "Luma")
     save(page, "console-people")
+    if landing_only:
+        return
     page.goto(base + "console/?theme=light#/people/Luma")
-    settle(page, "Individual connections")
+    settle(page, "Access & limits")
     save(page, "console-person")
     page.goto(base + "console/?theme=light#/servers")
-    settle(page, "Example Hosting")
+    settle(page, "Runtime healthy")
     save(page, "console-servers")
-    page.goto(base + "console/?theme=light#/settings")
-    settle(page, "Notice for everyone", scroll_to="role=heading[name='Privacy']")
+    page.goto(base + "console/?theme=light#/settings/privacy")
+    settle(page, "Client IP")
     save(page, "console-settings")
 
 
-def run(export: Path) -> None:
+def run(export: Path, *, landing_only: bool = False) -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory() as site:
         (Path(site) / "demo").symlink_to(export)
@@ -88,12 +91,12 @@ def run(export: Path) -> None:
                 light = browser.new_context(
                     viewport=desktop, device_scale_factor=2, color_scheme="light", timezone_id=ZONE, locale=LOCALE
                 )
-                console_shots(light.new_page(), base)
+                console_shots(light.new_page(), base, landing_only=landing_only)
                 dark = browser.new_context(
                     viewport=desktop, device_scale_factor=2, color_scheme="dark", timezone_id=ZONE, locale=LOCALE
                 )
                 page = dark.new_page()
-                page.goto(base + "console/?theme=dark")
+                page.goto(base + "console/?theme=dark#/people")
                 settle(page, "Luma")
                 save(page, "console-people-dark")
                 iphone = playwright.devices["iPhone 14"]
@@ -109,9 +112,12 @@ def run(export: Path) -> None:
                 )
                 page = phone.new_page()
                 page.goto(base + "?lang=en")
-                settle(page, "Your account is ready")
-                save(page, "connection-page-account", width=780)
-                settle(page, "Your account is ready", scroll_to="#setup-card")
+                page.locator('#account-panel:not([hidden]):not([aria-busy="true"])').wait_for()
+                page.locator("a[data-import]").first.wait_for()
+                settle(page, "Happ")
+                if not landing_only:
+                    save(page, "connection-page-account", width=780)
+                settle(page, "Happ", scroll_to="#setup-card")
                 save(page, "connection-page-phone", width=780)
                 browser.close()
         finally:
@@ -121,7 +127,11 @@ def run(export: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("export", type=Path, help="a directory written by scripts/build_showcase.py")
-    run(parser.parse_args().export.resolve())
+    parser.add_argument(
+        "--landing-only", action="store_true", help="refresh only the three images used on the landing page"
+    )
+    args = parser.parse_args()
+    run(args.export.resolve(), landing_only=args.landing_only)
 
 
 if __name__ == "__main__":

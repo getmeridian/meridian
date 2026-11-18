@@ -44,7 +44,10 @@ PROBE_FILE = "probe.bin"
 PROBE_BYTES = 96 * 1024
 ASSET_SEGMENT = "~pwa"  # The subscription token alphabet has no tilde.
 CONTENT_SECURITY_POLICY = (
-    "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
+    "default-src 'none'; script-src 'self'; style-src 'self'; "
+    # WebKit adds this exact inert attribute to native select internals: text-overflow:inherit.
+    "style-src-attr 'unsafe-hashes' 'sha256-3oFxofzq3N//6J8H86e9ul4WT2OkJrtonB66gn/TLJw='; "
+    "img-src 'self' data:; connect-src 'self'; "
     "manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 SECURITY_HEADERS = {
@@ -93,6 +96,7 @@ def generate_client_files(
     return {
         "index.html": render_pwa_shell(
             client_name=client_name,
+            subscription_url=subscription_url,
             server_name=server_name,
             asset_path=asset_path,
             config_path=f"{page_path}/config.json" if page_path else "config.json",

@@ -33,15 +33,16 @@ def test_settings_fragments_open_one_labelled_section(locale: str, section: str)
 
 @pytest.mark.parametrize("locale", LOCALES)
 @pytest.mark.parametrize("width", [1040, 390])
-def test_settings_subnavigation_is_a_desktop_column_and_a_scrolling_phone_chip_row(locale: str, width: int) -> None:
+def test_settings_subnavigation_is_a_desktop_column_and_a_visible_phone_grid(locale: str, width: int) -> None:
     result = run("layout", locale, width=width)
     assert result["tabs"] == ["general", "notice", "language", "privacy", "security"]
     assert result["orientation"] == ("horizontal" if width == 390 else "vertical")
     assert all(target >= 44 for target in result["targets"])
     assert result["layout"] == ("flex" if width == 390 else "grid")
-    assert result["navDirection"] == ("row" if width == 390 else "column")
     if width == 390:
-        assert result["overflow"] == "auto" and result["wrap"] == "nowrap"
+        assert result["navDisplay"] == "grid" and result["navColumns"] == "repeat(3, minmax(0, 1fr))"
+    else:
+        assert result["navDirection"] == "column"
 
 
 @pytest.mark.parametrize("locale", LOCALES)
@@ -148,7 +149,8 @@ def test_clearing_a_notice_ignores_invalid_unfinished_text_and_expiry() -> None:
 @pytest.mark.parametrize("locale", LOCALES)
 def test_general_has_copyable_commands_and_security_keeps_every_disclosure(locale: str) -> None:
     result = run("disclosures", locale)
-    assert result["generalEditable"] == 0 and len(result["commands"]) == 4
+    assert result["inlineFields"] == 0 and result["hasEditor"]
+    assert result["commands"] == ["meridian setup", "meridian fleet routing full"]
     assert result["contactIsText"] and result["injected"] is False
     assert result["securityDisclosures"] and result["privacyDisclosures"]
     assert result["learnMore"] >= 2 and result["writes"] == []

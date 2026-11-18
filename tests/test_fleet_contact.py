@@ -1,173 +1,138 @@
-"""Fleet contact CLI reads local intent and applies only a reviewed presentation edit."""
+"""CLI edits use the authoritative version and never contact the fleet's SSH servers."""
 
 from __future__ import annotations
 
 import json
 from collections.abc import Iterator
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
 from typer.testing import CliRunner
 
+from meridian import config
 from meridian.cli import app
 from meridian.cluster import ClusterConfig
 from meridian.console import set_json_mode, set_quiet_mode
 from meridian.core.schema import schema_model
-from meridian.core.topology import DeliveryIntent
-from meridian.reconciler.resources import ResourceExecutionResult
-from tests.support.text import unstyle
+from meridian.servers import ServerRegistry
+from meridian.setup.fleet_document import dump_fleet_document, fleet_document
+from tests.support.presentation import deployed
 from tests.support.topology import single_exit_intent
 
 
 @pytest.fixture(autouse=True)
-def _output_mode() -> Iterator[None]:
+def output_mode() -> Iterator[None]:
     yield
     set_json_mode(False)
     set_quiet_mode(False)
 
 
-def review_result() -> SimpleNamespace:
-    return SimpleNamespace(
-        plan=SimpleNamespace(plan_hash="a" * 64, resources=[object()]), review_hash="b" * 64, retiring=[]
-    )
+def run(*args: str, code: int = 0) -> dict:
+    result = CliRunner().invoke(app, ["--lang", "en", *args, "--json"])
+    assert result.exit_code == code, (result.output, result.exception)
+    return json.loads(result.stdout)
 
 
-def test_fleet_contact_reads_without_review_and_has_discoverable_help(tmp_home: Path) -> None:
-    ClusterConfig(topology_intent=single_exit_intent()).save()
-    with patch("meridian.setup.runtime.SetupRuntime.review") as review:
-        result = CliRunner().invoke(app, ["fleet", "contact", "--json"])
-    assert result.exit_code == 0, result.output
-    envelope = json.loads(result.stdout)
-    schema_model("fleet-contact-envelope").model_validate(envelope)
-    assert envelope["data"]["owner_contact"] == {"text": "", "link": ""}
-    review.assert_not_called()
-    help_result = CliRunner().invoke(app, ["fleet", "contact", "--help"])
-    assert "--text" in unstyle(help_result.output) and "--link" in unstyle(help_result.output)
+def test_contact_edits_review_public_values_and_preserve_local_intent(tmp_home: Path) -> None:
+    with deployed(tmp_home) as service:
+        before = service.presentation()
+        local = ClusterConfig.load().topology_intent
+        args = ("fleet", "contact", "--text", "Ask for help", "--link", "HTTPS://EXAMPLE.COM:443/help")
+        assert "--yes" in run(*args, code=2)["errors"][0]["message"]
+        preview = run(*args, "--dry-run")
+        schema_model("fleet-contact-envelope").model_validate(preview)
+        assert preview["data"]["owner_contact"] == {"text": "Ask for help", "link": "https://example.com/help"}
+        assert service.presentation() == before
+        saved = run(*args, "--yes")
+        assert saved["data"]["version"] == before.version + 1
+        assert run("fleet", "contact")["data"]["owner_contact"] == saved["data"]["owner_contact"]
+        assert run("fleet", "contact", "--link", "none", "--yes")["data"]["owner_contact"] == {
+            "text": "Ask for help",
+            "link": "",
+        }
+        assert ClusterConfig.load().topology_intent == local
 
 
-@pytest.mark.parametrize("dry_run", [True, False])
-def test_contact_edit_preserves_every_other_intent_field_and_uses_the_review_hash(
-    tmp_home: Path, dry_run: bool
-) -> None:
-    current = single_exit_intent(
-        delivery=DeliveryIntent(profile_title="Ours", update_interval_hours=24, client_routing="full")
-    )
-    ClusterConfig(topology_intent=current).save()
+def test_declining_contact_writes_nothing(tmp_home: Path) -> None:
     with (
-        patch("meridian.setup.runtime.SetupRuntime.review", return_value=review_result()) as review,
-        patch(
-            "meridian.setup.runtime.SetupRuntime.apply_intent",
-            return_value=ResourceExecutionResult(plan_hash="a" * 64, generation=2),
-        ) as apply,
-    ):
-        result = CliRunner().invoke(
-            app,
-            [
-                "fleet",
-                "contact",
-                "--text",
-                "Ask for help",
-                "--link",
-                "HTTPS://EXAMPLE.COM:443/help",
-                "--json",
-                "--dry-run" if dry_run else "--yes",
-            ],
-        )
-    assert result.exit_code == 0, result.output
-    envelope = json.loads(result.stdout)
-    schema_model("fleet-contact-envelope").model_validate(envelope)
-    assert envelope["data"]["owner_contact"] == {"text": "Ask for help", "link": "https://example.com/help"}
-    updated = review.call_args.args[0].to_intent()
-    assert updated.model_dump(exclude={"delivery"}) == current.model_dump(exclude={"delivery"})
-    assert updated.delivery.model_dump(exclude={"owner_contact"}) == current.delivery.model_dump()
-    if dry_run:
-        apply.assert_not_called()
-        assert ClusterConfig.load().topology_intent == current
-    else:
-        assert apply.call_args.args[0] == updated
-        assert apply.call_args.kwargs["expected_plan_hash"] == "b" * 64
-
-
-def test_contact_json_change_requires_confirmation_before_review(tmp_home: Path) -> None:
-    ClusterConfig(topology_intent=single_exit_intent()).save()
-    with patch("meridian.setup.runtime.SetupRuntime.review") as review:
-        result = CliRunner().invoke(app, ["fleet", "contact", "--text", "Ask for help", "--json"])
-    assert result.exit_code == 2
-    assert "--yes" in json.loads(result.stdout)["errors"][0]["message"]
-    review.assert_not_called()
-
-
-def test_declining_contact_review_preserves_the_fleet(tmp_home: Path) -> None:
-    current = single_exit_intent()
-    ClusterConfig(topology_intent=current).save()
-    with (
-        patch("meridian.setup.runtime.SetupRuntime.review", return_value=review_result()),
-        patch("meridian.setup.runtime.SetupRuntime.apply_intent") as apply,
+        deployed(tmp_home) as service,
         patch("meridian.console.has_tty", return_value=True),
         patch("meridian.console.confirm", return_value=False),
     ):
-        result = CliRunner().invoke(
-            app, ["--lang", "en", "fleet", "contact", "--link", "tg://resolve?domain=sample_support"]
-        )
-    assert result.exit_code == 1
-    assert "sample_support" in result.output and "b" * 64 in result.output
-    apply.assert_not_called()
-    assert ClusterConfig.load().topology_intent == current
+        before = service.presentation()
+        result = CliRunner().invoke(app, ["--lang", "en", "fleet", "contact", "--text", "Ask the owner"])
+        assert result.exit_code == 1 and "Ask the owner" in result.output
+        assert service.presentation() == before
 
 
-def test_contact_clears_only_the_explicit_field(tmp_home: Path) -> None:
-    delivery = DeliveryIntent.model_validate(
-        {"owner_contact": {"text": "Ask for help", "link": "mailto:help@example.com"}}
-    )
-    ClusterConfig(topology_intent=single_exit_intent(delivery=delivery)).save()
-    with (
-        patch("meridian.setup.runtime.SetupRuntime.review", return_value=review_result()) as review,
-        patch("meridian.setup.runtime.SetupRuntime.apply_intent") as apply,
-    ):
-        result = CliRunner().invoke(app, ["fleet", "contact", "--link", "none", "--dry-run", "--json"])
-    assert result.exit_code == 0, result.output
-    updated = review.call_args.args[0].to_intent()
-    assert (updated.delivery.owner_contact.text, updated.delivery.owner_contact.link) == ("Ask for help", "")
-    apply.assert_not_called()
+@pytest.mark.parametrize("command,value", [("title", "Household"), ("refresh", "19")])
+def test_cli_subscription_fields_round_trip_without_topology(tmp_home: Path, command: str, value: str) -> None:
+    with deployed(tmp_home):
+        original = run("fleet", command)["data"]["value"]
+        assert str(run("fleet", command, value, "--dry-run")["data"]["value"]) == value
+        assert run("fleet", command)["data"]["value"] == original
+        result = run("fleet", command, value, "--yes")
+        assert result["status"] == "changed"
+        assert str(run("fleet", command)["data"]["value"]) == value
+        assert run("fleet", command, value, "--yes")["status"] == "no_changes"
 
 
-def test_fleet_export_keeps_the_public_contact_link(tmp_home: Path) -> None:
-    delivery = DeliveryIntent.model_validate(
-        {"owner_contact": {"text": "Ask for help", "link": "https://example.com/help"}}
-    )
-    ClusterConfig(topology_intent=single_exit_intent(delivery=delivery)).save()
-    result = CliRunner().invoke(app, ["fleet", "export", "--json"])
-    assert result.exit_code == 0, result.output
-    assert (
-        json.loads(result.stdout)["data"]["document"]["delivery"]["owner_contact"]["link"] == "https://example.com/help"
-    )
-
-
-def test_fleet_import_reviews_and_preserves_public_contact_values(tmp_home: Path, tmp_path: Path) -> None:
-    from meridian import config
-    from meridian.servers import ServerRegistry
-    from meridian.setup.fleet_document import dump_fleet_document, fleet_document
-
+def test_export_cannot_replay_old_values_and_explicit_legacy_import_reviews_live_state(tmp_home: Path) -> None:
     current = single_exit_intent()
-    ClusterConfig(topology_intent=current).save()
-    document = fleet_document(current, ServerRegistry(config.SERVER_PROFILES_FILE))
-    document["delivery"]["owner_contact"] = {
-        "text": "Open https://example.com/help",
-        "link": "https://example.com/help",
-    }
-    source = tmp_path / "fleet.yml"
-    source.write_text(dump_fleet_document(document))
-    with (
-        patch("meridian.commands.fleet_transfer.profile_review_needed", return_value=False),
-        patch("meridian.setup.runtime.SetupRuntime.review", return_value=review_result()) as review,
-        patch("meridian.setup.runtime.SetupRuntime.apply_intent") as apply,
-    ):
-        result = CliRunner().invoke(app, ["fleet", "import", str(source), "--dry-run", "--json"])
-    assert result.exit_code == 0, result.output
-    envelope = json.loads(result.stdout)
-    change = next(change for change in envelope["data"]["changes"] if change["field"] == "owner_contact")
-    assert "https://example.com/help" in change["after"]
-    assert review.call_args.args[0].to_intent().delivery.owner_contact.text == "Open https://example.com/help"
-    apply.assert_not_called()
+    with deployed(tmp_home, current) as service:
+        run("fleet", "title", "Newer title", "--yes")
+        export = run("fleet", "export")["data"]["document"]
+        assert not set(export["delivery"]) & {"profile_title", "update_interval_hours", "owner_contact"}
+        assert "server_metadata" not in export
+        doc = fleet_document(current, ServerRegistry(config.SERVER_PROFILES_FILE))
+        doc["delivery"]["profile_title"] = "Imported title"
+        doc["delivery"]["owner_contact"] = {"text": "Help", "link": "mailto:help@example.com"}
+        source = tmp_home / "fleet.yml"
+        source.write_text(dump_fleet_document(doc))
+        args = ("fleet", "import", str(source))
+        review = run(*args, "--dry-run")
+        diff = next(row for row in review["data"]["changes"] if row["field"] == "profile_title")
+        assert (diff["before"], diff["after"]) == ("Newer title", "Imported title")
+        assert service.presentation().profile_title == "Newer title"
+        assert "--yes" in run(*args, code=2)["errors"][0]["message"]
+        doc["delivery"]["client_routing"] = "full"
+        source.write_text(dump_fleet_document(doc))
+        assert "both topology" in run(*args, "--yes", code=2)["errors"][0]["message"]
+        assert service.presentation().profile_title == "Newer title"
+        doc["delivery"].pop("client_routing")
+        source.write_text(dump_fleet_document(doc))
+        assert run(*args, "--yes")["status"] == "changed"
+        assert service.presentation().owner_contact.text == "Help"
+        assert ClusterConfig.load().topology_intent == current
+
+
+def test_real_fleet_export_and_import_distinguish_omitted_partial_and_empty_contact(tmp_home: Path) -> None:
+    with deployed(tmp_home) as admin:
+        run("fleet", "contact", "--text", "Original", "--link", "https://example.test/help", "--yes")
+        export = run("fleet", "export")["data"]["document"]
+        file = tmp_home / "roundtrip.yml"
+        args = ("fleet", "import", str(file))
+        file.write_text(dump_fleet_document(export))
+        assert run(*args, "--yes")["status"] == "no_changes"
+        assert admin.presentation().owner_contact.link == "https://example.test/help"
+        export["delivery"]["owner_contact"] = {"text": "Phone help"}
+        file.write_text(dump_fleet_document(export))
+        review = run(*args, "--dry-run")["data"]["changes"]
+        change = next(row for row in review if row["field"] == "owner_contact.link")
+        assert (change["before"], change["after"]) == ("https://example.test/help", "")
+        assert admin.presentation().owner_contact.link == "https://example.test/help"
+        run(*args, "--yes")
+        assert admin.presentation().owner_contact.model_dump() == {"text": "Phone help", "link": ""}
+        export["delivery"]["owner_contact"] = {}
+        file.write_text(dump_fleet_document(export))
+        assert run(*args, "--dry-run")["data"]["changes"][0]["after"] == ""
+        run(*args, "--yes")
+        assert admin.presentation().owner_contact.is_empty
+        export["delivery"]["profile_title"] = "Must not partially save"
+        export["server_metadata"] = {"missing": {"provider": "Unknown server"}}
+        file.write_text(dump_fleet_document(export))
+        before = admin.presentation()
+        refused = run(*args, "--yes", code=2)
+        assert "new server topology" in refused["errors"][0]["message"]
+        assert admin.presentation() == before

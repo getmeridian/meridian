@@ -28,6 +28,7 @@ from meridian.cli_options import (
     Yes,
     enable_json_output,
 )
+from meridian.cli_presentation import refresh_cmd, title_cmd
 from meridian.cli_server_metadata import server_set_cmd
 
 server_app = typer.Typer(help="Save servers and review bandwidth allowances and payment dates", no_args_is_help=True)
@@ -47,6 +48,8 @@ fleet_app.command("usage")(fleet_usage_cmd)
 node_app.command("restart", rich_help_panel="Operations")(node_restart_cmd)
 fleet_app.add_typer(routing_app, name="routing", rich_help_panel="Routing")
 fleet_app.add_typer(response_rules_app, name="response-rules", rich_help_panel="Routing")
+fleet_app.command("title", rich_help_panel="Connection pages")(title_cmd)
+fleet_app.command("refresh", rich_help_panel="Connection pages")(refresh_cmd)
 fleet_app.command("contact", rich_help_panel="Connection pages")(fleet_contact_cmd)
 fleet_app.add_typer(notice_app, name="notice", rich_help_panel="Connection pages")
 fleet_app.command("language", rich_help_panel="Connection pages")(fleet_language_cmd)

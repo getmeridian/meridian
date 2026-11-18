@@ -94,3 +94,6 @@ h1#_top,
 .sl-markdown-content a {
   text-underline-offset: 0.2em;
 }
+
+/* A long inline path can otherwise push a two-column reference past the phone viewport. */
+.sl-markdown-content td code { overflow-wrap: anywhere; }

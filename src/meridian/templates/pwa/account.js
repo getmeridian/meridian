@@ -13,14 +13,14 @@ var TEXT = {
     missing: 'This subscription is no longer available. Ask the person who shared this connection with you.',
     period: 'Traffic this period', lifetime: 'Lifetime traffic', expiry: 'Expiry', unlimited: 'Unlimited', never: 'No expiry',
     slots: 'Device slots', 'slots.hint': 'When slots are full, new devices get a limit notice on subscription refresh. Apps that do not report a device are not counted.',
-    checked: 'Checked {time}', saved: 'Last saved {time}. These details are unverified.',
+    checked: 'Checked {time}', saved: 'Last checked {time}. These details are unverified.',
     failed: 'Could not check your account. Try refreshing when you are online.',
     'days.one': '{n} day left', 'days.other': '{n} days left',
     'valid.one': 'Valid for {n} day from first use', 'valid.other': 'Valid for {n} days from first use',
     firstUseNote: 'The duration starts with your first traffic. Opening this page or refreshing the subscription does not start it.',
     nextReset: 'Next reset', nextRenewal: 'Next renewal', renewalsLeft: 'Renewals left',
     waiting: 'Waiting for first use', noRenewals: 'No more renewals', unlimitedRenewals: 'Unlimited renewals',
-    units: ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'],
+    units: ['B', 'KB', 'MB', 'GB', 'TB', 'PB'],
   },
   ru: {
     title: 'Ваш аккаунт', refresh: 'Обновить', checking: 'Проверяем статус…',
@@ -32,7 +32,7 @@ var TEXT = {
     missing: 'Эта подписка больше не действует. Обратитесь к тому, кто поделился с вами подключением.',
     period: 'Трафик за текущий период', lifetime: 'Трафик за всё время', expiry: 'Срок доступа', unlimited: 'Без лимита', never: 'Бессрочно',
     slots: 'Места для устройств', 'slots.hint': 'Когда все места заняты, новое устройство при обновлении подписки получает сообщение о лимите. Приложения без идентификатора устройства не учитываются.',
-    checked: 'Обновлено: {time}', saved: 'Сохранено: {time}. Данные могли устареть.',
+    checked: 'Обновлено: {time}', saved: 'Последняя проверка: {time}. Данные могли устареть.',
     failed: 'Не удалось обновить статус. Попробуйте ещё раз, когда появится интернет.',
     'days.one': 'Остался {n} день', 'days.few': 'Осталось {n} дня', 'days.many': 'Осталось {n} дней', 'days.other': 'Осталось {n} дня',
     'valid.one': 'Доступ на {n} день с первого использования', 'valid.few': 'Доступ на {n} дня с первого использования',
@@ -40,7 +40,7 @@ var TEXT = {
     firstUseNote: 'Отсчёт начнётся с первого трафика. Открытие страницы и обновление подписки его не запускают.',
     nextReset: 'Следующий сброс трафика', nextRenewal: 'Следующее продление', renewalsLeft: 'Осталось продлений',
     waiting: 'Ожидается первое использование', noRenewals: 'Продлений больше нет', unlimitedRenewals: 'Без ограничения числа продлений',
-    units: ['Б', 'КиБ', 'МиБ', 'ГиБ', 'ТиБ', 'ПиБ'],
+    units: ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ', 'ПБ'],
   },
   fa: {
     title: 'حساب شما', refresh: 'به‌روزرسانی', checking: 'در حال بررسی حساب…',
@@ -52,14 +52,14 @@ var TEXT = {
     missing: 'این اشتراک دیگر در دسترس نیست. از کسی که اتصال را با شما به اشتراک گذاشته بپرسید.',
     period: 'ترافیک این دوره', lifetime: 'کل ترافیک مصرف‌شده', expiry: 'پایان اعتبار', unlimited: 'نامحدود', never: 'بدون تاریخ انقضا',
     slots: 'ظرفیت دستگاه‌ها', 'slots.hint': 'وقتی ظرفیت پر باشد، دستگاه جدید هنگام تازه‌سازی اشتراک پیام محدودیت می‌گیرد. برنامه‌هایی که شناسهٔ دستگاه نمی‌فرستند شمرده نمی‌شوند.',
-    checked: 'بررسی‌شده در {time}', saved: 'آخرین ذخیره در {time}. این اطلاعات تأیید نشده‌اند.',
+    checked: 'بررسی‌شده در {time}', saved: 'آخرین بررسی در {time}. این اطلاعات تأیید نشده‌اند.',
     failed: 'بررسی حساب ممکن نشد. وقتی به اینترنت وصل شدید، دوباره به‌روزرسانی کنید.',
     'days.one': '{n} روز باقی مانده', 'days.other': '{n} روز باقی مانده',
     'valid.one': 'از اولین استفاده به‌مدت {n} روز معتبر است', 'valid.other': 'از اولین استفاده به‌مدت {n} روز معتبر است',
     firstUseNote: 'مدت اعتبار با اولین ترافیک شما آغاز می‌شود. باز کردن این صفحه یا به‌روزرسانی اشتراک آن را آغاز نمی‌کند.',
     nextReset: 'بازنشانی بعدی', nextRenewal: 'تمدید بعدی', renewalsLeft: 'تمدیدهای باقی‌مانده',
     waiting: 'در انتظار اولین استفاده', noRenewals: 'تمدید دیگری باقی نمانده است', unlimitedRenewals: 'تمدید نامحدود',
-    units: ['بایت', 'کیبی‌بایت', 'مبی‌بایت', 'گیبی‌بایت', 'تبی‌بایت', 'پبی‌بایت'],
+    units: ['بایت', 'کیلوبایت', 'مگابایت', 'گیگابایت', 'ترابایت', 'پتابایت'],
   },
   zh: {
     title: '您的账户', refresh: '刷新', checking: '正在检查账户…',
@@ -71,21 +71,21 @@ var TEXT = {
     missing: '此订阅已不可用。请联系向您分享此连接的人。',
     period: '本期流量', lifetime: '累计流量', expiry: '到期时间', unlimited: '不限流量', never: '永久有效',
     slots: '设备名额', 'slots.hint': '名额用满后，新设备刷新订阅时会收到上限提示。不报告设备标识的应用不计数。',
-    checked: '检查时间：{time}', saved: '上次保存于 {time}。这些信息尚未核实。',
+    checked: '检查时间：{time}', saved: '上次检查：{time}。这些信息尚未核实。',
     failed: '无法检查账户。请联网后重试刷新。',
     'days.one': '剩余 {n} 天', 'days.other': '剩余 {n} 天',
     'valid.one': '首次使用后有效 {n} 天', 'valid.other': '首次使用后有效 {n} 天',
     firstUseNote: '首次产生流量时开始计时。打开此页面或刷新订阅不会开始计时。',
     nextReset: '下次流量重置', nextRenewal: '下次续期', renewalsLeft: '剩余续期次数',
     waiting: '等待首次使用', noRenewals: '不再续期', unlimitedRenewals: '不限续期次数',
-    units: ['字节', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'],
+    units: ['字节', 'KB', 'MB', 'GB', 'TB', 'PB'],
   },
 };
 var INFO_TIMEOUT_MS = 10000;
 var snapshot = null, verified = false, checking = false, failed = false;
 var deviceSlots = null;
 var deliveryCapabilities = null;
-var infoUrl = '', storageKey = '', requestId = 0;
+var infoUrl = null, requestId = 0;
 
 function lang() { return TEXT[document.documentElement.lang] ? document.documentElement.lang : 'en'; }
 function t(key, vars) {
@@ -103,6 +103,7 @@ function date(value, withTime) {
   try { return new Intl.DateTimeFormat(lang() === 'fa' ? 'fa-IR-u-ca-persian' : lang(), options).format(new Date(value)); }
   catch (e) { return new Date(value).toISOString().slice(0, 10); }
 }
+/* The console and this page count 1,024 bytes per KB; API byte counters stay exact. */
 function bytes(value) {
   var count = Number(value), unit = 0;
   while (count >= 1024 && unit < TEXT.en.units.length - 1) { count /= 1024; unit++; }
@@ -194,18 +195,39 @@ function applyImportState() {
   var notice = document.getElementById('import-status');
   if (notice) { notice.textContent = reason; notice.hidden = !reason; }
 }
+/* The link keeps account details one keyboard action away without pushing setup below the fold. */
+function renderOverview() {
+  var overview = document.getElementById('account-overview');
+  if (!overview) return;
+  overview.hidden = !infoUrl;
+  if (overview.hidden) return;
+  document.getElementById('account-jump-label').textContent = t('title');
+  var signal = document.getElementById('account-signal');
+  var state = verified && snapshot && snapshot.found ? snapshot.status : '';
+  signal.className = state ? 'account-signal is-' + state : 'account-pending';
+  signal.textContent = state ? t(state) : checking ? t('checking') : '';
+  var warning = document.getElementById('account-warning');
+  var message = suspension();
+  if (failed) message = (message ? message + ' ' : '') + t('failed');
+  warning.textContent = message;
+  warning.hidden = !message;
+}
 function render() {
+  renderOverview();
   var panel = document.getElementById('account-panel');
   if (!panel) return;
+  var restoreRefresh = document.activeElement && document.activeElement.getAttribute('data-action') === 'account-refresh';
   panel.innerHTML = '';
   /* A subscription on another origin cannot be read from here; say nothing rather than alarm. */
   panel.hidden = !infoUrl;
   if (panel.hidden) return;
   panel.setAttribute('aria-busy', checking ? 'true' : 'false');
   var heading = element('div', 'account-heading');
-  heading.appendChild(element('h2', '', t('title')));
+  var title = element('h2', '', t('title'));
+  title.id = 'account-heading';
+  heading.appendChild(title);
   var button = element('button', 'btn btn-ghost btn-sm', t('refresh'));
-  button.setAttribute('data-action', 'account-refresh'); button.disabled = checking;
+  button.setAttribute('data-action', 'account-refresh'); button.setAttribute('aria-disabled', checking ? 'true' : 'false');
   heading.appendChild(button); panel.appendChild(heading);
   if (snapshot && snapshot.found) {
     panel.appendChild(element('strong', 'account-status is-' + snapshot.status, t(snapshot.status)));
@@ -239,6 +261,7 @@ function render() {
   if (snapshot) panel.appendChild(element('p', 'account-freshness', t(verified ? 'checked' : 'saved', { time: date(snapshot.checkedAt, true) })));
   if (failed) panel.appendChild(element('p', 'account-freshness account-unverified', t('failed')));
   applyImportState();
+  if (restoreRefresh) button.focus();
 }
 function refresh() {
   if (checking || !infoUrl) { if (!infoUrl) render(); return; }
@@ -256,8 +279,6 @@ function refresh() {
       snapshot = answer; verified = true;
       if (window._meridianConfig) window._meridianConfig.notice = notice;
       if (window.MeridianNotice) window.MeridianNotice.mount(document.getElementById('owner-notice'), notice, lang());
-      /* Only this projection is saved: no links, IPs, username, or device data. */
-      try { localStorage.setItem(storageKey, JSON.stringify(snapshot)); } catch (e) {}
     }
     render();
   }
@@ -281,15 +302,8 @@ function bindPage() {
       }
     }
   } catch (e) {}
-  if (target !== infoUrl || !storageKey) {
+  if (target !== infoUrl) {
     requestId++; checking = false; snapshot = null; deviceSlots = null; deliveryCapabilities = null; verified = false; failed = false; infoUrl = target;
-    /* The path scopes the snapshot to this subscription without saving its host. */
-    storageKey = target ? 'meridian-account:' + new URL(target).pathname : '';
-    try {
-      var saved = JSON.parse(localStorage.getItem(storageKey));
-      if (saved && !validSchedule(saved.schedule)) delete saved.schedule;
-      if (validSnapshot(saved)) snapshot = saved;
-    } catch (e) {}
     refresh();
   } else render();
 }

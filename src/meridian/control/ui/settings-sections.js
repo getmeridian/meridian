@@ -49,7 +49,7 @@
       mode();
       reveal();
     }
-    // The phone chip row scrolls; keep the selected chip in view after links and route changes.
+    // At large text sizes, reveal the active section if its navigation overflows.
     var revealTurn = 0;
     function reveal() {
       var mine = ++revealTurn;

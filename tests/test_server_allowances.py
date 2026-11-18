@@ -1,4 +1,4 @@
-"""Server allowances and payment dates belong to the reviewed topology."""
+"""Server allowances and payment dates are service-owned on modern fleets."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from meridian.core.server_allowances import ServerMetadata, ServerMetadataChange
 from meridian.core.server_calendar import next_payment_date, server_period
 from meridian.core.setup import SetupDraft
 from meridian.core.topology import SetupIntent
-from meridian.reconciler.resources import ResourceExecutionResult
+from tests.support.presentation import deployed
 from tests.support.topology import single_exit_intent
 
 
@@ -51,19 +51,7 @@ def test_server_metadata_survives_the_review_draft() -> None:
 
 def test_server_set_applies_the_exact_review_and_returns_metadata(tmp_home: Path) -> None:
     current = single_exit_intent()
-    ClusterConfig(topology_intent=current).save()
-    review = SimpleNamespace(
-        plan=SimpleNamespace(plan_hash="p" * 64, resources=[object()]),
-        review_hash="r" * 64,
-        retiring=[],
-    )
-    with (
-        patch("meridian.setup.runtime.SetupRuntime.review", return_value=review) as reviewed,
-        patch(
-            "meridian.setup.runtime.SetupRuntime.apply_intent",
-            return_value=ResourceExecutionResult(plan_hash="p" * 64, generation=2),
-        ) as apply,
-    ):
+    with deployed(tmp_home, current) as client:
         result = CliRunner().invoke(
             app,
             [
@@ -86,15 +74,14 @@ def test_server_set_applies_the_exact_review_and_returns_metadata(tmp_home: Path
                 "--json",
             ],
         )
+        saved = client.presentation()
     assert result.exit_code == 0, result.output
     envelope = json.loads(result.stdout)
     schema_model("server-set-envelope").model_validate_json(result.stdout)
     assert envelope["command"] == "server.set" and envelope["status"] == "changed"
     assert envelope["data"]["metadata"]["allowance_bytes"] == 20 * 1024**4
-    updated = apply.call_args.args[0]
-    assert updated.model_dump(exclude={"server_metadata"}) == current.model_dump(exclude={"server_metadata"})
-    assert reviewed.call_args.args[0].to_intent() == updated
-    assert apply.call_args.kwargs["expected_plan_hash"] == review.review_hash
+    assert saved.servers[current.control.server_ref].model_dump(mode="json") == envelope["data"]["metadata"]
+    assert ClusterConfig.load().topology_intent == current
 
 
 @pytest.mark.parametrize("size", ["20TB", "20TiB", "20GB", "20GiB", "۱٫۵TiB"])
@@ -255,7 +242,7 @@ def test_metadata_stays_with_a_physical_server_when_an_exit_moves() -> None:
     assert moved.server_metadata == current.server_metadata
 
 
-def test_configured_metadata_remains_in_fleet_status_when_service_usage_is_unavailable() -> None:
+def test_offline_status_never_displays_stale_billing_seeds() -> None:
     from meridian.adapters.cluster import topology_from_cluster
     from meridian.core.fleet import FleetSources, build_fleet_status
     from meridian.servers import ServerEntry
@@ -272,7 +259,7 @@ def test_configured_metadata_remains_in_fleet_status_when_service_usage_is_unava
     )
     status = build_fleet_status(topology, panel_healthy=False, sources=FleetSources(server_usage="unavailable"))
     server = next(item for item in status.servers if item.id == "srv-exit")
-    assert server.metadata == intent.server_metadata["srv-exit"]
+    assert server.metadata is None
     assert status.server_usage == [] and status.summary.needs_attention
 
 
@@ -284,7 +271,7 @@ def test_a_wizard_role_edit_drops_metadata_only_when_its_server_leaves() -> None
     assert SetupDraft.model_validate(data).to_intent().server_metadata == {}
 
 
-def test_compiler_changes_only_service_settings_and_maps_agents_by_physical_server() -> None:
+def test_billing_does_not_change_compiled_resources_or_node_assignments() -> None:
     from meridian.compiler import compile_topology
     from meridian.compiler.models import ServiceSettingsPayload
     from tests.support.topology import gateway_fleet_intent
@@ -298,7 +285,7 @@ def test_compiler_changes_only_service_settings_and_maps_agents_by_physical_serv
     before = {item.logical_id: item for item in compile_topology(current).resources}
     after = {item.logical_id: item for item in compile_topology(SetupIntent.model_validate(data)).resources}
     assert before.keys() == after.keys()
-    assert [key for key in after if after[key].desired_hash != before[key].desired_hash] == ["settings:service"]
+    assert [key for key in after if after[key].desired_hash != before[key].desired_hash] == []
     settings = after["settings:service"].payload
     assert isinstance(settings, ServiceSettingsPayload)
     assert {ref: value.node_id for ref, value in settings.servers.items()} == {
@@ -318,16 +305,32 @@ def test_server_list_and_fleet_export_keep_metadata_keyed_to_saved_names(tmp_hom
         allowance_bytes=100, provider="Example provider", pay_on=date(2026, 11, 15), pay_every="month"
     )
     intent = single_exit_intent(server_metadata={"srv-exit": metadata})
-    ClusterConfig(topology_intent=intent).save()
-    listed = CliRunner().invoke(app, ["server", "list", "--json"])
+    with deployed(tmp_home, intent) as client:
+        # Simulate a newer browser edit; all CLI reads must display that value, not the local seed.
+        from meridian.core.presentation import PresentationPatch
+
+        live = client.patch_presentation(
+            PresentationPatch.model_validate(
+                {
+                    "expected_version": client.presentation().version,
+                    "servers": {"srv-exit": {"provider": "Changed on the phone"}},
+                }
+            )
+        ).servers["srv-exit"]
+        listed = CliRunner().invoke(app, ["server", "list", "--json"])
+        inventory = CliRunner().invoke(app, ["fleet", "inventory", "--json"])
+        assert inventory.exit_code == 0, inventory.output
+        server = next(row for row in json.loads(inventory.stdout)["data"]["servers"] if row["id"] == "srv-exit")
+        assert server["metadata"] == live.model_dump(mode="json")
+
     assert listed.exit_code == 0, listed.output
     schema_model("server-list-envelope").model_validate_json(listed.stdout)
     edge = next(item for item in json.loads(listed.stdout)["data"]["servers"] if item["name"] == "edge")
-    assert edge["declared"] and edge["metadata"] == metadata.model_dump(mode="json")
+    assert edge["declared"] and edge["metadata"] == live.model_dump(mode="json")
     exported = CliRunner().invoke(app, ["fleet", "export", "--json"])
     assert exported.exit_code == 0, exported.output
     document = json.loads(exported.stdout)["data"]["document"]
-    assert document["server_metadata"] == {"edge": metadata.model_dump(mode="json")}
+    assert "server_metadata" not in document
     imported = intent_from_document(parse_fleet_document(dump_fleet_document(document)), intent, registry)
     assert imported == intent
 
@@ -358,8 +361,7 @@ def test_invalid_set_values_return_plain_user_envelopes_before_review(tmp_home: 
 
 def test_a_json_metadata_change_requires_yes_before_review(tmp_home: Path) -> None:
     current = single_exit_intent()
-    ClusterConfig(topology_intent=current).save()
-    with patch("meridian.setup.runtime.SetupRuntime.review") as review:
+    with deployed(tmp_home, current), patch("meridian.setup.runtime.SetupRuntime.review") as review:
         result = CliRunner().invoke(app, ["server", "set", current.control.server_ref, "--allowance", "20TB", "--json"])
     assert result.exit_code == 2, result.output
     assert "--yes" in json.loads(result.stdout)["errors"][0]["message"]
@@ -369,26 +371,24 @@ def test_a_json_metadata_change_requires_yes_before_review(tmp_home: Path) -> No
 @pytest.mark.parametrize("dry_run", [True, False], ids=["dry-run", "declined"])
 def test_reviewed_metadata_does_not_write_when_previewed_or_declined(tmp_home: Path, dry_run: bool) -> None:
     current = single_exit_intent()
-    ClusterConfig(topology_intent=current).save()
-    review = SimpleNamespace(
-        plan=SimpleNamespace(plan_hash="p" * 64, resources=[object()]), review_hash="r" * 64, retiring=[]
-    )
     with (
-        patch("meridian.setup.runtime.SetupRuntime.review", return_value=review),
+        deployed(tmp_home, current) as service,
         patch("meridian.setup.runtime.SetupRuntime.apply_intent") as apply,
         patch("meridian.console.has_tty", return_value=True),
         patch("meridian.console.confirm", return_value=False),
     ):
+        before = service.presentation()
         options = ["--dry-run", "--json"] if dry_run else []
         result = CliRunner().invoke(
             app, ["--lang", "en", "server", "set", current.control.server_ref, "--allowance", "20TB", *options]
         )
+        assert before == service.presentation()
     assert result.exit_code == (0 if dry_run else 1), result.output
     assert ClusterConfig.load().topology_intent == current
     apply.assert_not_called()
     if dry_run:
         schema_model("server-set-envelope").model_validate_json(result.stdout)
-        assert json.loads(result.stdout)["data"]["review"]["review_hash"] == review.review_hash
+        assert json.loads(result.stdout)["data"]["version"] == before.version
 
 
 def test_server_set_finds_a_server_by_the_role_name_fleet_status_shows() -> None:

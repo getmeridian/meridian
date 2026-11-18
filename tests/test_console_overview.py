@@ -124,11 +124,33 @@ def test_server_attention_links_open_the_server_and_payment_reminders() -> None:
         },
     )
     assert set(result["attention"]) == {
-        "#/servers/offline/allowance",
-        "#/servers/behind/allowance",
+        "#/servers/offline",
+        "#/servers/behind",
         "#/servers/relay/allowance",
     }
     assert "2" in result["fleetHealth"] and result["healthKind"] == "warn"
+
+
+def test_unhealthy_runtime_precedes_pending_configuration_even_on_a_live_node() -> None:
+    result = run_console(
+        "overview-attention",
+        data={
+            "fleet": {
+                "servers": [
+                    {"node_id": "pending", "live": True, "runtime_available": True, "in_sync": False},
+                    {
+                        "node_id": "broken",
+                        "live": True,
+                        "runtime_available": True,
+                        "in_sync": False,
+                        "runtime": {"health": {"status": "unhealthy"}},
+                    },
+                ]
+            }
+        },
+    )
+    assert list(result["attention"]) == ["#/servers/broken", "#/servers/pending"]
+    assert "Runtime unhealthy" in result["text"]
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
@@ -177,7 +199,7 @@ def test_traffic_uses_the_returned_window_and_never_node_lifetime_bytes() -> Non
         "overview-attention",
         data={"daily": {"days": 7, "history_days": 7, "daily": [{"day": "2026-11-02", "bytes": 4096}], "nodes": []}},
     )
-    assert result["traffic"] == "4 KiB" and result["trafficDays"] == "7"
+    assert result["traffic"] == "4 KB" and result["trafficDays"] == "7"
 
 
 @pytest.mark.parametrize("setting", ["historyOff", "historyError"])
@@ -210,6 +232,63 @@ def test_history_notices_and_recent_settings_edits_link_to_their_sections(locale
     assert result["recentLinks"] == {
         section + ".changed": "#/settings/" + section for section in ("privacy", "notice", "language")
     }
+
+
+@pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
+def test_recent_presentation_changes_use_translated_field_names_and_open_the_right_editor(
+    tmp_path: Path, locale: str
+) -> None:
+    import json
+
+    from meridian.control.models import ServiceSettings
+    from meridian.core.presentation import PresentationPatch
+
+    service = ControlService(
+        tmp_path / "events.db",
+        fleet_id=FLEET_ID,
+        version="4.0.0",
+        clock=lambda: datetime.fromisoformat(NOW).timestamp(),
+    )
+    try:
+        service.put_settings(
+            ServiceSettings.model_validate({"profile_title": "Old title", "servers": {"edge": {"metadata": {}}}})
+        )
+        with service.events.as_actor("owner"):
+            current = service.presentation()
+            current = service.update_presentation(
+                PresentationPatch.model_validate(
+                    {
+                        "expected_version": current.version,
+                        "profile_title": "Private title",
+                        "update_interval_hours": 24,
+                        "owner_contact": {"text": "Private contact"},
+                    }
+                )
+            )
+            service.update_presentation(
+                PresentationPatch.model_validate(
+                    {"expected_version": current.version, "servers": {"edge": {"provider": "Private provider"}}}
+                )
+            )
+        events = service.events.list().to_data()["events"]
+    finally:
+        service.close()
+    result = run_console("overview-attention", locale, {"storage": {"mrd.mode": "detailed"}, "events": events})
+    labels = json.loads(
+        (Path(__file__).resolve().parents[1] / "src/meridian/control/ui/locales" / (locale + ".json")).read_text()
+    )
+    assert sorted(result["presentationChanges"]) == sorted(
+        [
+            [
+                "#/settings/general",
+                labels["overview.event_presentation"],
+                " · ".join(
+                    labels["events.field." + f] for f in ("profile_title", "update_interval_hours", "owner_contact")
+                ),
+            ],
+            ["#/servers", labels["overview.event_presentation"], labels["events.field.servers"]],
+        ]
+    )
 
 
 def test_detailed_recent_changes_merge_newest_revisions_and_owner_edits() -> None:
@@ -285,7 +364,9 @@ def test_quick_actions_use_the_desktop_header_and_reserve_a_solid_phone_bar(loca
     )
     layout = result["layout"]
     assert layout["singleActionGroup"] and layout["primary"] and layout["headerActions"]
-    assert layout["dates"] == ["2026-11-01", "2026-11-02"] and "4 KiB" in layout["peak"]
+    assert layout["dates"] == ["2026-11-01", "2026-11-02"]
+    unit = {"en": "KB", "ru": "КБ", "fa": "کیلوبایت", "zh": "KB"}[locale]
+    assert f"4 {unit}" in layout["peak"]
     if width > 640:
         assert layout["position"] == "static" and layout["headerDisplay"] == "flex"
     else:
@@ -339,7 +420,7 @@ def test_phone_theme_and_rtl_contracts_cover_the_shared_components(
     visual = result["visual"]
     assert visual["background"] == background
     assert visual["columns"] == "minmax(0, 1fr)"
-    assert visual["readAlignment"] == "end" and visual["menuEdge"] == "0px"
+    assert visual["readAlignment"] == "start" and visual["menuEdge"] == "0px"
     assert all(height >= 44 for height in visual["targets"])
     assert result["dir"] == ("rtl" if locale == "fa" else "ltr")
     assert visual["ageIsolated"] and visual["meter"]
@@ -351,6 +432,6 @@ def test_partial_history_failures_keep_evidence_with_backoff_and_history_off_cle
         "overview-history-poll",
         data={"daily": {"days": 7, "history_days": 7, "daily": [{"day": "2026-11-02", "bytes": 4096}], "nodes": []}},
     )
-    assert result["beforeTraffic"] == result["staleTraffic"] == "4 KiB"
+    assert result["beforeTraffic"] == result["staleTraffic"] == "4 KB"
     assert result["historyStale"] and result["partialRetry"] and result["historyBackoff"]
     assert result["offTraffic"] == "—" and result["offUnavailable"]

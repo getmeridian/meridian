@@ -1,0 +1,95 @@
+/* The field-guide layout belongs to the four home pages. The blog and docs
+   keep their own reading measure; both still use the same type and palette. */
+:root.landing-page {
+  --page-max: 1320px;
+  --gutter: clamp(20px, 4.5vw, 60px);
+  --nav-h: 4.25rem;
+  --section-y: clamp(54px, 6.2vw, 92px);
+}
+.landing-page .nav {
+  background: var(--bg);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.landing-page .nav__inner {
+  max-width: calc(var(--page-max) - var(--gutter) * 2);
+  margin-inline: auto;
+}
+.landing-page .nav__logo {
+  font-size: 1.4rem;
+}
+.landing-page .nav__logo img {
+  width: 33px;
+  height: 33px;
+}
+.landing-page .footer {
+  margin: 0;
+}
+.landing-page .section-head {
+  max-width: none;
+  margin-bottom: clamp(20px, 2.8vw, 32px);
+}
+.landing-page .section-head h2 {
+  font-size: clamp(2.25rem, 4.1vw, 3.75rem);
+  line-height: 1.08;
+  letter-spacing: -.035em;
+  margin: 0;
+}
+.landing-page .section-head__desc {
+  max-width: 65ch;
+  margin-top: .65rem;
+  line-height: 1.55;
+}
+.atlas-label {
+  font: 500 .71rem/1.5 var(--label-font);
+  color: var(--ac-text);
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.landing-page .btn {
+  min-height: 46px;
+  gap: 12px;
+  font-size: 1rem;
+  border-radius: 7px;
+  box-shadow: none;
+}
+.landing-page .btn--primary {
+  background: var(--landing-action);
+  color: var(--landing-action-text);
+}
+.landing-page .btn--primary:hover {
+  background: var(--landing-action-hover);
+}
+.atlas-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  font-weight: 600;
+  color: var(--t1);
+  text-decoration: underline;
+  text-decoration-color: var(--b2);
+  text-underline-offset: .32em;
+}
+.atlas-link:hover {
+  text-decoration-color: currentColor;
+}
+.atlas-link svg { color: var(--ac-text); }
+.landing-page[dir='rtl'] :is(.atlas-link, .btn) .atlas-forward {
+  transform: scaleX(-1);
+}
+.atlas-forward { display: inline-flex; }
+.landing-page :is(:lang(fa), :lang(zh)):is(.eyebrow, .atlas-label) {
+  letter-spacing: normal;
+  text-transform: none;
+  font-size: .81rem;
+}
+.landing-page :is(:lang(fa), :lang(zh)):is(h1, h2, h3) {
+  letter-spacing: normal;
+  line-height: 1.25;
+}
+@media (max-width: 760px) {
+  :root.landing-page { --nav-h: 3.6rem; }
+}
+
+.landing-page [hidden] { display: none !important; }

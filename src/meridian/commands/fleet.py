@@ -75,9 +75,11 @@ def _run_inventory(*, operation: OperationContext) -> None:
     except LocalStateError as exc:
         fail(exc)
     try:
+        panel = fleet_panel(cluster, topology)
         result = collect_fleet_inventory(
             topology,
-            fleet_panel(cluster, topology),
+            panel,
+            read_server_usage=panel.server_usage,
             classify_error=_classify_panel_error,
         )
     except MeridianError as exc:
@@ -305,9 +307,7 @@ def _run_status(*, operation: OperationContext) -> int:
             check_relays=_check_relays_health,
             classify_error=_classify_panel_error,
             read_node_evidence=panel.node_evidence,
-            read_server_usage=panel.server_usage
-            if cluster.topology_intent and cluster.topology_intent.server_metadata
-            else None,
+            read_server_usage=panel.server_usage,
         )
     except MeridianError as exc:
         fail(exc)

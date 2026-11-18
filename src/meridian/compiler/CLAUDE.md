@@ -19,6 +19,8 @@
 - Every unique server has one baseline resource, and every server mutation depends on it.
 - **One camouflage per Reality inbound** — a relay whose SNI differs from its exit gets its own loopback inbound imitating that SNI, so probes never see the exit's certificate.
 - **Fingerprints never mix in a health-checked group** — copies carry `ALT_FINGERPRINT_TAG` and get their own groups (TSPU escalates when one server's fingerprint changes); sing-box skips them.
+- On the Meridian backend, presentation and billing are initial deployer seeds, not inputs to desired hashes. Server references and their node mapping still belong to the topology.
+
 ## Pitfalls
 - **Legacy backends cannot enforce response rules** — refuse nonempty app rules before compilation, including built-in policy choices, since only Meridian's service-settings resources carry them.
 - **Hash grants before resolving them** — service settings carry the core declaration fingerprint; a compiled map changes when protocols or camouflage inbounds change, even when the declared grants do not.

@@ -2,7 +2,7 @@
 
 Both control backends (Remnawave and Meridian's control service) take one
 `ClientLimitChange`; each adapter maps it onto its own API. Sizes are binary
-(1 GiB = 1024³ bytes; GB remains an input alias). A bare date
+(1 GB = 1024³ bytes; IEC input spellings are also accepted). A bare date
 expires at the end of that day in UTC (`2026-12-31` → `2026-12-31T23:59:59Z`).
 """
 
@@ -248,7 +248,7 @@ def parse_traffic_limit(text: str) -> int:
     if match is None:
         raise ClientLimitError(
             f"Traffic limit '{text}' is not a size",
-            hint="Use a number with a unit, such as 500MiB, 50GiB, or 1.5TiB, or `none` for no limit.",
+            hint="Use a number with a unit, such as 500MB, 50GB, or 1.5TB, or `none` for no limit.",
         )
     number, unit = match.groups()
     # Decimal, not float: a long digit string would become infinity, and round() then raises.
@@ -256,7 +256,7 @@ def parse_traffic_limit(text: str) -> int:
     if size > MAX_TRAFFIC_LIMIT_BYTES:
         raise ClientLimitError(
             f"Traffic limit '{text}' is too large",
-            hint=f"Use at most {MAX_TRAFFIC_LIMIT_BYTES // _UNITS['tb']}TiB, or `none` for no limit.",
+            hint=f"Use at most {MAX_TRAFFIC_LIMIT_BYTES // _UNITS['tb']}TB, or `none` for no limit.",
         )
     if size < 1:
         raise ClientLimitError(

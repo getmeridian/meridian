@@ -313,11 +313,11 @@ meridian server remove NAME_OR_IP [--yes]
 
 `server add local` saves the machine you are on; later commands run on it directly instead of over SSH. Names and addresses must be unique; `server add` refuses collisions instead of retargeting an existing server. `server remove` deletes only the saved profile and refuses while the server still has a role in your topology.
 
-**Allowances and payment dates** belong to declared exits, relays, gateways, and the control server in the reviewed topology. `server set NAME` accepts a saved server name, profile ID, or address. Omitted options keep their values; a bare command reads them. `server list --json` returns saved profiles with `metadata` and the computed next payment date.
+The control service stores allowances and payment dates for the fleet’s declared servers. `server set NAME` accepts a saved server name, profile ID, or address. Omitted options keep their values; a bare command reads them. `server list --json` returns saved profiles with `metadata` and the computed next payment date. If the control service is unavailable, the list still shows saved profiles but omits current billing details.
 
 | Server setting | Default | Meaning |
 |---|---|---|
-| `--allowance SIZE` | not set | Monthly bytes, such as 20TB or 50GiB; `none` clears it. GB/TB are binary aliases for GiB/TiB, as with client quotas |
+| `--allowance SIZE` | not set | Monthly traffic, such as `20TB` or `50GB`; `none` clears the limit. As with client quotas, 1 GB is 1,073,741,824 bytes |
 | `--reset-day DAY` | 1 | UTC midnight on day 1–31; a short month uses its last day |
 | `--provider TEXT` | empty | Plain text on one line, up to 80 characters; `none` clears it |
 | `--pay-on DATE` | not set | YYYY-MM-DD, including a past one-off payment; `none` clears both date and repeat |
@@ -332,7 +332,7 @@ meridian server set edge --allowance 20TB --reset-day 15 --yes
 meridian server set edge --allowance none --pay-on none --yes
 ```
 
-Enabling an allowance or changing its reset day starts tracking when the service receives that apply; earlier use in the current period is unknown. Changing only the allowance amount, provider, or payment date preserves period use. Monthly and yearly payment repeats advance on read after the date passes in UTC, preserving the original day through short months and leap years; one-off dates stay overdue. `fleet export` includes `server_metadata` keyed by saved server name, and `fleet import` reviews it through the same apply. Removing a server's final role drops its metadata; moving an exit keeps metadata with the physical server. Allowances and reminders are informational and do not block traffic.
+When you enable an allowance or change its reset day, counting starts as soon as the control service saves the change. Earlier traffic in the current period is unknown. Changing only the allowance amount, provider, or payment date preserves period use. Monthly and yearly payment repeats advance on read after the date passes in UTC, preserving the original day through short months and leap years; one-off dates stay overdue. Removing a server's final role drops its metadata; moving an exit keeps metadata with the physical server. Allowances and reminders are informational and do not block traffic.
 
 ### meridian node
 
@@ -448,6 +448,8 @@ meridian fleet usage [--days N] [--json]
 meridian fleet routing [ru-split|full] [--dry-run] [--yes] [--json]
 meridian fleet response-rules test [--user-agent UA] [--accept TYPE] [--person NAME] [--suffix SUFFIX] [--json]
 meridian fleet contact [--text TEXT] [--link LINK|none] [--dry-run] [--yes] [--json]
+meridian fleet title [TITLE] [--dry-run] [--yes] [--json]
+meridian fleet refresh [HOURS] [--dry-run] [--yes] [--json]
 meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
@@ -488,16 +490,19 @@ Custom token events show the effective capability labels in your CLI language; c
 
 **`fleet routing`** — reads the current client policy from local topology and explains both choices. `ru-split` (default) sends matched Russian destinations and private/LAN ranges directly; `full` tunnels internet traffic, including Russian destinations, and keeps private/LAN ranges direct. Both retain QUIC blocking and Xray JSON's best-effort BitTorrent direct rule to reduce abuse complaints against exits. Pass a policy to edit the intent, review it, confirm, and apply exactly that review. Without a terminal or with `--json`, a change requires `--yes`; `--dry-run` shows the review without applying it. JSON returns `data.client_routing`, `choices[]`, and the review and apply when present. Apps receive the choice on their next subscription refresh or a manual refresh. The web panel shows it read-only in Settings. Exit geo-blocking stays separate; Base64 links carry no routing rules. See [Client routing](/en/split-routing/) for format limits and how to allow Russian destinations at an exit.
 
-**`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, clients, and fleet settings. Servers appear by their saved name (or address when unnamed), never by internal ID, and the file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
+**`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, and access profiles. The file omits people, the subscription title and refresh interval, the public contact, and server billing. Saved servers appear by name, or by address if unnamed. The file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
 
-To import a JSON export, pass only the contents of `data.document`. Reviewed `delivery` settings, including URL paths in response rules, stay unchanged in exports, import reviews, and apply results.
+To import a JSON export, pass only the contents of `data.document`. Exports preserve app response rules, including any URL paths they contain.
 
-**`fleet import`** — reads an edited topology file (or `-` for stdin), shows its changes and retiring resources, then confirms and applies the reviewed hash. Unchanged topology reports no changes. People are managed through `client` and the service.
+**`fleet import`** — reads an edited topology file (or `-` for stdin), shows its changes and retiring resources, then confirms and applies the reviewed hash. If an older file explicitly includes subscription settings, contact, or billing, `fleet import FILE --dry-run` compares those fields with the live service. Omitted fields stay unchanged. If the file changes both topology and service settings, import the topology first without those fields, then review the original file again.
 
 **`fleet usage`** — shows per-server byte totals for each UTC day, including retained use of removed servers. `--days N` chooses 1–730 days within retention. Daily history must be on; JSON returns fleet totals and `nodes[].daily` in `data`.
 
-**`fleet contact`** — reads or reviews public owner contact. Use `--text TEXT` for one line of plain text (up to 120 characters) and `--link LINK` for a canonical `https:`, `tg:`, or `mailto:` link. Omitted fields stay unchanged; `--text ""` and `--link none` clear them. `--dry-run` returns the review; a change without a terminal or with `--json` requires `--yes`. JSON returns `data.owner_contact`, the review, and the apply when present. The web panel shows the contact read-only, and fleet export/import carries `delivery.owner_contact`. The pages show the instructions and a user-initiated link; apps use that link for their support button. See [Owner contact](/en/client-management/#owner-contact-on-connection-pages).
-**Server allowances** — `fleet status` and the read-only Servers screen in the web panel show current period use, provider, reset day, next payment date, and server attention. Usage is approximate accepted user traffic (upload + download): protocol overhead, the server's own downloads, and relay forwarding are excluded. Reports count in their UTC receipt period, so delayed reports can affect a later period. Relays and a control server without an agent say **not measured**, with no usage figure. The web panel prints `meridian server set NAME` for edits.
+**`fleet title`, `fleet refresh`** — The control service saves subscription settings independently of topology. Read or change the title with `fleet title [TITLE]` and the refresh interval with `fleet refresh [HOURS]` (1–168). Use `--dry-run` to review and `--yes` to save without a prompt. The version check refuses a change if another editor saved first.
+
+**`fleet contact`** — Use **Settings → General** in the panel or `fleet contact` to read and change the public instructions and support link. A panel contact edit requires a recent owner sign-in. Omitted CLI flags keep their current values; `--text ""` clears the text and `--link none` clears the link. JSON returns `data.owner_contact` and `data.version`. For a legacy file, omit `owner_contact` to keep the live contact. Supplying it replaces the entire contact: `owner_contact: {}` clears both fields; a text-only object clears the previous link. The preview lists each change.
+
+**Server allowances** — `fleet status` and the Servers screen in the web panel show current period use, provider, reset day, next payment date, and server attention. Usage is approximate accepted user traffic (upload + download): protocol overhead, the server's own downloads, and relay forwarding are excluded. Reports count in their UTC receipt period, so delayed reports can affect a later period. Relays and a control server without an agent say **not measured**, with no usage figure. Edit billing in **Servers** or with `meridian server set NAME`. The control service is sufficient even if an exit is offline.
 
 `GET /api/servers` needs read scope and returns the `server-usage` contract: metadata, UTC period boundaries, counted bytes, tracking start, next payment, and measurement coverage. `GET /api/attention` adds `servers[]` with `allowance_near` at 80%, `allowance_exceeded` at 100%, `payment_due` within 7 days, and `payment_overdue` for past one-off dates. Its `allowance_percent` and `allowance_exceeded_percent` query thresholds are bounded to 1–100, with the first no higher than the second; `payment_days` is 1–30. Billing warnings set `summary.needs_attention`; fleet health and exit codes continue to describe runtime health.
 

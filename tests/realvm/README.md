@@ -74,6 +74,9 @@ make real-lab TOPO=upgrade
 
 # Reproduce the published b10 -> checkout run, even while VERSION still names b10:
 REALVM_UPGRADE_FROM=4.0.0b10 make real-lab TOPO=upgrade
+
+# Test the b12 person handover, interruption, and pre-handover snapshot recovery:
+REALVM_UPGRADE_FROM=4.0.0b12 make real-lab TOPO=upgrade
 ```
 
 Automatic selection uses the newest published, not fully yanked PyPI release
@@ -102,8 +105,36 @@ The checkout runs `plan` and `apply --yes`, then verifies the control database's
 `meta.schema_version` over SSH using `host_runtime` names, a converged JSON
 plan, unchanged people and subscription URLs/bytes/headers, bob's limit,
 expiry and usage metadata, and the node's fresh runtime agent version against
-the built agent. `meridian test` runs last, so its traffic cannot alter the
-usage headers being compared.
+the built agent. After the usage comparisons, `meridian test --client bob` must
+report a successful traffic transport for the original limited person. Basic
+reachability alone does not pass.
+
+With b12 as its source, the verifier first installs and starts the actual PyPI CLI
+before provisioning. On the old deployer and VM, uv resolves packages available
+on the release day (2026-11-04, 23:59:59 UTC): b12 predates dependency pins and
+cannot start with today's Typer. The VM resolver override refuses an existing
+configuration and is removed before the checkout install.
+
+This drill includes a declared non-Latin display name. It pulls the b12 snapshot,
+interrupts the actual checkout apply just after the service commits and before its
+local checkpoint, and requires a normal client list to finish the handover. A
+stale second copy must refuse to apply, a second apply on the current copy must
+change nothing, the installed service must match the checkout wheel hash, and the
+original client data, app documents, links and working tunnel must survive.
+The drill then creates a post-snapshot witness account, stops the control service on
+this disposable VM, and restores the saved snapshot to its original address from an
+empty managing home containing only the device key. The witness must disappear;
+the old identities, links, documents, limits, and a working connection must return
+at a newer epoch. Both transport checks use bob. Because the same node keeps its
+traffic counters across recovery, the drill waits for two reports after the first
+probe; the first may already have been in flight. The restored accounts and subscription headers must include exactly
+the upload and download bytes that probe added; all subscription bodies and the
+other person's counters must remain byte-identical. Set `REALVM_RELEASE_CHECKS=1` as well to test a live panel settings
+edit while the node agent is stopped, stale-write protection, and persistence after
+a reviewed apply. The agent is restarted even on failure. The same run checks
+that each restored person's no-JavaScript page gives them their own usable app
+subscription without a panel token. These real-VM results are distinct from unit
+and Docker evidence.
 
 **Exit 75 is inconclusive:** PyPI cannot be reached or Let's Encrypt refuses
 issuance because of a rate limit, even if setup reports a self-signed fallback.
