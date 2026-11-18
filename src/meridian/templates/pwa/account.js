@@ -194,18 +194,39 @@ function applyImportState() {
   var notice = document.getElementById('import-status');
   if (notice) { notice.textContent = reason; notice.hidden = !reason; }
 }
+/* The link keeps account details one keyboard action away without pushing setup below the fold. */
+function renderOverview() {
+  var overview = document.getElementById('account-overview');
+  if (!overview) return;
+  overview.hidden = !infoUrl;
+  if (overview.hidden) return;
+  document.getElementById('account-jump-label').textContent = t('title');
+  var signal = document.getElementById('account-signal');
+  var state = verified && snapshot && snapshot.found ? snapshot.status : '';
+  signal.className = state ? 'account-signal is-' + state : 'account-pending';
+  signal.textContent = state ? t(state) : checking ? t('checking') : '';
+  var warning = document.getElementById('account-warning');
+  var message = suspension();
+  if (failed) message = (message ? message + ' ' : '') + t('failed');
+  warning.textContent = message;
+  warning.hidden = !message;
+}
 function render() {
+  renderOverview();
   var panel = document.getElementById('account-panel');
   if (!panel) return;
+  var restoreRefresh = document.activeElement && document.activeElement.getAttribute('data-action') === 'account-refresh';
   panel.innerHTML = '';
   /* A subscription on another origin cannot be read from here; say nothing rather than alarm. */
   panel.hidden = !infoUrl;
   if (panel.hidden) return;
   panel.setAttribute('aria-busy', checking ? 'true' : 'false');
   var heading = element('div', 'account-heading');
-  heading.appendChild(element('h2', '', t('title')));
+  var title = element('h2', '', t('title'));
+  title.id = 'account-heading';
+  heading.appendChild(title);
   var button = element('button', 'btn btn-ghost btn-sm', t('refresh'));
-  button.setAttribute('data-action', 'account-refresh'); button.disabled = checking;
+  button.setAttribute('data-action', 'account-refresh'); button.setAttribute('aria-disabled', checking ? 'true' : 'false');
   heading.appendChild(button); panel.appendChild(heading);
   if (snapshot && snapshot.found) {
     panel.appendChild(element('strong', 'account-status is-' + snapshot.status, t(snapshot.status)));
@@ -239,6 +260,7 @@ function render() {
   if (snapshot) panel.appendChild(element('p', 'account-freshness', t(verified ? 'checked' : 'saved', { time: date(snapshot.checkedAt, true) })));
   if (failed) panel.appendChild(element('p', 'account-freshness account-unverified', t('failed')));
   applyImportState();
+  if (restoreRefresh) button.focus();
 }
 function refresh() {
   if (checking || !infoUrl) { if (!infoUrl) render(); return; }

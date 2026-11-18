@@ -34,7 +34,8 @@
     'fa': ('پیوند اشتراک شما', 'این پیوند را کپی کنید و به‌عنوان اشتراک در برنامهٔ VPN خود وارد کنید.', 'پیوند شخصی‌ای را که دریافت کردید به‌عنوان اشتراک در برنامهٔ VPN خود وارد کنید.'),
     'zh': ('你的订阅链接', '复制此链接，在 VPN 应用中添加订阅。', '在 VPN 应用中添加订阅时，粘贴你收到的个人链接。')
   }[lang] %}
-  <section aria-labelledby="manual-setup-title">
+  <section class="card manual-setup" aria-labelledby="manual-setup-title">
+    <p class="manual-brand">{{ server_name or 'Meridian' }}</p>
     <h1 id="manual-setup-title">{{ copy[0] }}</h1>
     {% if subscription_url %}
     <p id="manual-setup-help">{{ copy[1] }}</p>

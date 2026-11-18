@@ -7,6 +7,7 @@ import pytest
 from axe_playwright_python.sync_playwright import Axe
 from playwright.sync_api import Browser, Page, Playwright, Route, expect
 
+from meridian.control.models import UserUpdate
 from meridian.control.service import ControlService
 from tests.e2e.helpers import connected
 
@@ -43,6 +44,21 @@ def test_phone_installs_the_recommended_app_and_checks_its_connection(
 
     page.route("**/probe.bin*", probe)
     connected(page, subscription_url, "Luma")
+    add = page.get_by_role("link", name="Add to Happ")
+    # A first-time visitor sees both install and import before scrolling.
+    expect(add).to_be_in_viewport(ratio=1)
+    account = page.locator("#account-panel")
+    page.get_by_role("link", name="Your account").click()
+    expect(account).to_be_focused()
+    expect(account.get_by_text("Lifetime traffic")).to_be_visible()
+    refresh = account.get_by_role("button", name="Refresh")
+    refresh.focus()
+    with page.expect_response(lambda response: response.url == subscription_url + "/info"):
+        page.keyboard.press("Enter")
+    expect(account).to_have_attribute("aria-busy", "false")
+    expect(refresh).to_be_focused()
+    choices = page.get_by_text("Change app or device", exact=True)
+    choices.click()
     expect(page.get_by_role("combobox", name="Platform", exact=True)).to_have_value("ios")
     chooser = page.get_by_role("combobox", name="App", exact=True)
     expect(chooser).to_have_value("Happ")
@@ -90,6 +106,13 @@ def test_a_new_visitor_gets_an_install_link_for_their_platform(
 ) -> None:
     page = context_factory(user_agent=f"Mozilla/5.0 ({agent}) AppleWebKit/537.36").new_page()
     page.goto(subscription_url)
+    expect(page.get_by_role("link", name="Add to Happ")).to_be_visible()
+    if platform != "android":
+        transfer = page.locator('details[data-disclosure="desktop-qr"]')
+        expect(transfer.get_by_role("img")).to_have_count(0)
+        transfer.locator("summary").click()
+        expect(transfer.get_by_role("img", name="QR code")).to_be_visible()
+    page.get_by_text("Change app or device", exact=True).click()
     expect(page.get_by_role("combobox", name="Platform", exact=True)).to_have_value(platform)
     expect(page.locator("a.app-row")).to_have_attribute("href", re.compile(installer))
     expect(page.get_by_role("link", name="Add to Happ")).to_have_attribute("href", "happ://add/" + subscription_url)
@@ -107,6 +130,24 @@ def test_persian_phone_page_has_accessible_names_contrast_and_reading_direction(
     expect(page.locator("html")).to_have_attribute("dir", "rtl")
     audit(page)
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+
+
+def test_suspended_person_sees_the_reason_before_setup_and_can_change_language_with_a_keyboard(
+    context_factory, subscription_url: str, service: ControlService
+) -> None:
+    service.update_user("Luma", UserUpdate(status="disabled"))
+    page = context_factory(viewport={"width": 390, "height": 664}, locale="ru-RU").new_page()
+    page.goto(subscription_url)
+    expect(page.locator("#account-warning")).to_contain_text("приостановил")
+    expect(page.locator("#account-warning")).to_be_in_viewport(ratio=1)
+    expect(page.locator("[data-import]")).to_have_attribute("aria-disabled", "true")
+    chinese = page.locator('[data-lang="zh"]')
+    chinese.focus()
+    page.keyboard.press("Space")
+    expect(page.locator("html")).to_have_attribute("lang", "zh")
+    expect(chinese).to_be_focused()
+    expect(page.locator("#account-warning")).to_contain_text("已停用")
+    expect(page.locator("[data-import]")).to_have_attribute("aria-disabled", "true")
 
 
 def test_no_javascript_subscription_can_be_imported_by_an_app(context_factory, subscription_url: str, app) -> None:
