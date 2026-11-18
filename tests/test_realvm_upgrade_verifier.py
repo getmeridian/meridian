@@ -372,3 +372,13 @@ def test_the_complete_upgrade_journey_uses_old_commands_then_checks_every_upgrad
     output = capsys.readouterr().out
     assert IP not in output
     assert "opaque-token" not in output
+
+
+def test_evidence_errors_identify_verifier_code_without_echoing_the_private_document() -> None:
+    secret_marker = "synthetic-private-address"
+    with pytest.raises(ValueError) as exc:
+        verifier.client_detail({"client": {"username": secret_marker}})
+    summary = verifier.evidence_failure(exc.value)
+    assert "upgrade_support.client_detail:" in summary
+    assert secret_marker not in summary
+    assert str(Path.cwd()) not in summary

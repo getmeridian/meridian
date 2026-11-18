@@ -534,6 +534,20 @@ class UpgradeVerifier:
         self.pass_check("the original limited person carried traffic through a delivered transport")
 
 
+def evidence_failure(exc: Exception) -> str:
+    """Name the failing verifier code without echoing raw responses, private paths or argument values."""
+    frames = []
+    item = exc.__traceback__
+    while item is not None:
+        code = item.tb_frame.f_code
+        module = Path(code.co_filename)
+        if module.parent == Path(__file__).parent:
+            frames.append(f"{module.stem}.{code.co_name}:{item.tb_lineno}")
+        item = item.tb_next
+    where = " at " + " → ".join(frames[-3:]) if frames else ""
+    return f"The verifier could not read the required evidence ({type(exc).__name__}{where})."
+
+
 def main() -> int:
     env = dict(os.environ)
     if env.get("CI") or env.get("GITHUB_ACTIONS"):
@@ -554,7 +568,7 @@ def main() -> int:
         print(f"{prefix}: {redact_output(str(exc), known=(env.get('HCLOUD_TOKEN', ''), ip))}")
         return exc.exit_code
     except (OSError, ValueError, KeyError, TypeError) as exc:
-        print(f"FAIL: The verifier could not read the required evidence ({type(exc).__name__}).")
+        print(f"FAIL: {evidence_failure(exc)}")
         return 1
     except KeyboardInterrupt:
         print("Upgrade verification interrupted.")
