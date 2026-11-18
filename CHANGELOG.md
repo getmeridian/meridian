@@ -20,8 +20,8 @@ newest first; the last is what 4.0 changes compared with 3.x.
   contact changes, and protects newer edits from an older tab. Applying the
   topology again preserves these settings (#139).
 - A personal connection page now offers a link to copy into a VPN app even when
-  JavaScript is disabled. Offline, it shows how to reconnect without saving the
-  personal link or account details in the browser (#94).
+  JavaScript is disabled. Offline, it shows how to reconnect; Meridian keeps
+  personal links and account details out of its offline cache (#94).
 
 ### Since 4.0.0b16
 
