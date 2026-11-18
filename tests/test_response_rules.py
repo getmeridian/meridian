@@ -312,8 +312,9 @@ def test_service_settings_driver_observes_and_preserves_reviewed_response_rules(
         assert observation_converges(action, driver.observe(action, None))
     service = ControlService(tmp_path / "control.db", fleet_id=FLEET_ID, version="4.0.0")
     try:
-        assert service.settings().response_rules == intent.delivery.response_rules
-        service.put_settings(ServiceSettings(profile_title="Meridian"))
+        settings = service.settings()
+        assert settings.response_rules == intent.delivery.response_rules
+        service.put_settings(settings.model_copy(update={"response_rules": []}), adopt_presentation=True)
         assert service.settings().response_rules == []
     finally:
         service.close()

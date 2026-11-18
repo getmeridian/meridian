@@ -357,7 +357,7 @@ def test_fresh_apply_bootstraps_and_records_only_named_profile_declarations(
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
 @pytest.mark.parametrize("entrypoint", ["setup-intent", "setup-restart", "fleet-contact"])
-def test_setup_and_imperative_cli_share_the_profile_refusal_and_native_guidance(
+def test_only_topology_writes_require_applying_pending_profile_edits(
     tmp_path: Path, tmp_home: Path, locale: str, entrypoint: str
 ):
     from meridian import config
@@ -373,6 +373,7 @@ def test_setup_and_imperative_cli_share_the_profile_refusal_and_native_guidance(
     )
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
         seed_profiles(admin, profile_intent())
+        applied_profiles = admin.settings().access_profiles
         ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=wanted).save()
         saved = config.CLUSTER_CONFIG.read_bytes()
         fence = MagicMock()
@@ -391,16 +392,17 @@ def test_setup_and_imperative_cli_share_the_profile_refusal_and_native_guidance(
                 plan_hash=plan.plan_hash, generation=1
             )
             reply = CliRunner().invoke(app, ["--lang", locale, *argv])
-        assert reply.exit_code == 2, reply.output
-        text = " ".join(unstyle(reply.output).split())
         if entrypoint == "fleet-contact":
-            error = json.loads(reply.stdout)["errors"][0]
-            assert error["message"] == i18n.t("profiles.review_required")
-            assert error["hint"] == i18n.t("profiles.review_required_hint")
+            assert reply.exit_code == 0, reply.output
+            assert json.loads(reply.stdout)["status"] == "changed"
+            assert admin.presentation().owner_contact.text == "Help"
+            assert admin.settings().access_profiles == applied_profiles
         else:
+            assert reply.exit_code == 2, reply.output
+            text = " ".join(unstyle(reply.output).split())
             assert i18n.t("profiles.review_required") in text
-        for command in ("meridian profile", "meridian fleet import", "meridian apply"):
-            assert command in text
+            for command in ("meridian profile", "meridian fleet import", "meridian apply"):
+                assert command in text
         fence.ensure.assert_not_called()
         execute.assert_not_called()
         assert config.CLUSTER_CONFIG.read_bytes() == saved
