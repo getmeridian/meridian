@@ -20,7 +20,7 @@ var TEXT = {
     firstUseNote: 'The duration starts with your first traffic. Opening this page or refreshing the subscription does not start it.',
     nextReset: 'Next reset', nextRenewal: 'Next renewal', renewalsLeft: 'Renewals left',
     waiting: 'Waiting for first use', noRenewals: 'No more renewals', unlimitedRenewals: 'Unlimited renewals',
-    units: ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'],
+    units: ['B', 'KB', 'MB', 'GB', 'TB', 'PB'],
   },
   ru: {
     title: 'Ваш аккаунт', refresh: 'Обновить', checking: 'Проверяем статус…',
@@ -40,7 +40,7 @@ var TEXT = {
     firstUseNote: 'Отсчёт начнётся с первого трафика. Открытие страницы и обновление подписки его не запускают.',
     nextReset: 'Следующий сброс трафика', nextRenewal: 'Следующее продление', renewalsLeft: 'Осталось продлений',
     waiting: 'Ожидается первое использование', noRenewals: 'Продлений больше нет', unlimitedRenewals: 'Без ограничения числа продлений',
-    units: ['Б', 'КиБ', 'МиБ', 'ГиБ', 'ТиБ', 'ПиБ'],
+    units: ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ', 'ПБ'],
   },
   fa: {
     title: 'حساب شما', refresh: 'به‌روزرسانی', checking: 'در حال بررسی حساب…',
@@ -59,7 +59,7 @@ var TEXT = {
     firstUseNote: 'مدت اعتبار با اولین ترافیک شما آغاز می‌شود. باز کردن این صفحه یا به‌روزرسانی اشتراک آن را آغاز نمی‌کند.',
     nextReset: 'بازنشانی بعدی', nextRenewal: 'تمدید بعدی', renewalsLeft: 'تمدیدهای باقی‌مانده',
     waiting: 'در انتظار اولین استفاده', noRenewals: 'تمدید دیگری باقی نمانده است', unlimitedRenewals: 'تمدید نامحدود',
-    units: ['بایت', 'کیبی‌بایت', 'مبی‌بایت', 'گیبی‌بایت', 'تبی‌بایت', 'پبی‌بایت'],
+    units: ['بایت', 'کیلوبایت', 'مگابایت', 'گیگابایت', 'ترابایت', 'پتابایت'],
   },
   zh: {
     title: '您的账户', refresh: '刷新', checking: '正在检查账户…',
@@ -78,7 +78,7 @@ var TEXT = {
     firstUseNote: '首次产生流量时开始计时。打开此页面或刷新订阅不会开始计时。',
     nextReset: '下次流量重置', nextRenewal: '下次续期', renewalsLeft: '剩余续期次数',
     waiting: '等待首次使用', noRenewals: '不再续期', unlimitedRenewals: '不限续期次数',
-    units: ['字节', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'],
+    units: ['字节', 'KB', 'MB', 'GB', 'TB', 'PB'],
   },
 };
 var INFO_TIMEOUT_MS = 10000;
@@ -103,6 +103,7 @@ function date(value, withTime) {
   try { return new Intl.DateTimeFormat(lang() === 'fa' ? 'fa-IR-u-ca-persian' : lang(), options).format(new Date(value)); }
   catch (e) { return new Date(value).toISOString().slice(0, 10); }
 }
+/* The console and this page count 1,024 bytes per KB; API byte counters stay exact. */
 function bytes(value) {
   var count = Number(value), unit = 0;
   while (count >= 1024 && unit < TEXT.en.units.length - 1) { count /= 1024; unit++; }

@@ -110,6 +110,18 @@ const cases = {
     assert.ok(text.includes('۱٫۵'), 'traffic must use Persian digits and decimal separator');
     assert.ok(text.includes('۷ روز'), 'days left must use Intl numbers');
   },
+  test_account_keeps_binary_quotas_and_uses_familiar_local_units: async function(data) {
+    data.info.user.trafficUsedBytes = String(1.5 * 1024 ** 3);
+    data.info.user.trafficLimitBytes = String(2 * 1024 ** 4);
+    const browser = createBrowser(data.config, data.catalog, { info: data.info });
+    await browser.start();
+    for (const [locale, expected] of Object.entries({
+      en: '1.5 GB / 2 TB', ru: '1,5 ГБ / 2 ТБ', fa: '۱٫۵ گیگابایت / ۲ ترابایت', zh: '1.5 GB / 2 TB',
+    })) {
+      browser.context.page.switchLang(locale);
+      assert.equal(browser.document.querySelector('.account-metric').querySelector('dd').textContent, expected);
+    }
+  },
   test_account_not_found_is_verified_and_disables_import: async function(data) {
     let missing = false;
     const browser = createBrowser(data.config, data.catalog, { fetch(url) {
@@ -139,9 +151,9 @@ const cases = {
     assert.equal(requests[0].init.cache, 'no-store');
     const panel = browser.document.getElementById('account-panel');
     assert.match(panel.textContent, /Active/);
-    assert.match(panel.textContent, /1.5.*KiB/);
-    assert.match(panel.textContent, /4.*KiB/);
-    assert.match(panel.textContent, /8.*KiB/);
+    assert.match(panel.textContent, /1\.5 KB/);
+    assert.match(panel.textContent, /4 KB/);
+    assert.match(panel.textContent, /8 KB/);
     assert.match(panel.textContent, /7 days left/);
     assert.match(panel.textContent, /Checked/);
     browser.document.visibilityState = 'hidden'; browser.fire('visibilitychange');
@@ -175,10 +187,10 @@ const cases = {
     fail = true;
     browser.fire('click', browser.document.querySelector('[data-action="account-refresh"]')); await browser.flush();
     assert.match(browser.document.getElementById('account-panel').textContent, /unverified/i);
-    assert.match(browser.document.getElementById('account-panel').textContent, /1.5.*KiB/);
+    assert.match(browser.document.getElementById('account-panel').textContent, /1\.5 KB/);
     assert.equal(checks.textContent, 'Reachability result');
     const reloaded = createBrowser(data.config, data.catalog, { ...options, storage: browser.storage }); await reloaded.start();
-    assert.doesNotMatch(reloaded.document.getElementById('account-panel').textContent, /1.5.*KiB/);
+    assert.doesNotMatch(reloaded.document.getElementById('account-panel').textContent, /1\.5 KB/);
     assert.match(reloaded.document.getElementById('account-panel').textContent, /could not|couldn.t|couldn’t/i);
   },
   test_account_unlimited_and_no_expiry_are_not_zero_or_a_sentinel_date: async function(data) {
