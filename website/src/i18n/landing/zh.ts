@@ -57,6 +57,7 @@ export const zh: LandingStrings = {
 
   // Command builder section
   'builder.title': '生成你的命令',
+  'builder.manual': '查看命令行参考：命令、选项与示例',
   'builder.desc':
     '选择选项并复制完整命令。涵盖部署、中继、检查、伪装站点扫描、诊断和卸载。',
 

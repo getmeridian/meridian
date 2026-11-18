@@ -83,7 +83,7 @@ const fieldText = (id: FieldId) => FIELD_TEXT[id];
 const shown = (id: FieldId) => first.fields.includes(id);
 ---
 
-<div class="builder card" id="builder">
+<div hidden class="builder card" id="builder">
   <div class="builder__tabs" role="tablist" aria-label={t('builder.title')}>
     {config.tabs.map((tab, i) => (
       <button
@@ -291,6 +291,9 @@ const shown = (id: FieldId) => first.fields.includes(id);
 
   selectTab(restore());
   restored = true;
+  root.hidden = false;
+  $('builder-intro').hidden = false;
+  $('builder-manual').hidden = true;
 </script>
 
 <style>

@@ -124,8 +124,11 @@ const organization = {
             <Callout variant="tip">{t('setup.idempotent')}</Callout>
           </Accordion>
           <Accordion title={t('builder.title')}>
-            <p id="builder-section" class="setup__builder-intro">{t('builder.desc')}</p>
-            <CommandBuilder locale={locale} />
+            <div id="builder-section">
+              <p hidden id="builder-intro" class="setup__builder-intro">{t('builder.desc')}</p>
+              <a id="builder-manual" class="atlas-link" href={`/${locale}/cli-reference/`}>{t('builder.manual')}</a>
+              <CommandBuilder locale={locale} />
+            </div>
           </Accordion>
         </div>
       </div>

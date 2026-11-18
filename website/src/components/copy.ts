@@ -38,6 +38,7 @@ let wired = false;
 export function wireCopyButtons(): void {
   if (wired) return;
   wired = true;
+  document.querySelectorAll<HTMLButtonElement>('.copy-btn[data-copy]').forEach((button) => { button.hidden = false; });
   document.addEventListener('click', async (event) => {
     const button = (event.target as Element | null)?.closest<HTMLElement>('.copy-btn');
     if (!button) return;

@@ -57,6 +57,7 @@ export const ru: LandingStrings = {
 
   // Command builder section
   'builder.title': 'Подобрать команду',
+  'builder.manual': 'Справочник CLI: команды, параметры и примеры',
   'builder.desc':
     'Выберите задачу и укажите параметры своего сервера. Готовую команду можно скопировать в терминал.',
 

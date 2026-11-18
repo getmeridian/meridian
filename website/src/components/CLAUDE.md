@@ -16,7 +16,7 @@
 
 ## What's done well
 
-- **CommandBuilder can't drift** — tabs, commands, and flags live in `src/data/command-builder.json`; `tests/test_website_command_builder.py` checks them against the live CLI and the palettes against `PAGE_PALETTES`. Its script gets only the current locale's strings; values are shell-quoted.
+- **CommandBuilder can't drift** — tabs, commands, and flags live in `src/data/command-builder.json`; `tests/test_website_command_builder.py` checks them against the live CLI and the palettes against `PAGE_PALETTES`. Its script gets only the current locale's strings; values are shell-quoted. Show the builder and its copy controls only after initialization; the fallback is the localized CLI reference.
 - **Fast animations, always visible** — no scroll-reveal or hover-only controls; the theme toggle stays hidden until its script runs.
 
 ## Pitfalls

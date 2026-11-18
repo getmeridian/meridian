@@ -62,6 +62,7 @@ export const en = {
 
   // Command builder section
   'builder.title': 'Build your command',
+  'builder.manual': 'Read the CLI reference: commands, options, and examples',
   'builder.desc':
     'Pick options and copy the full command. Covers deploy, relays, checks, camouflage scans, diagnostics, and teardown.',
 

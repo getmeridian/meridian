@@ -113,3 +113,5 @@
   .landing-page .section-head { display: block; }
   .landing-page .section-head__desc { margin-top: 12px; }
 }
+
+.landing-page [hidden] { display: none !important; }

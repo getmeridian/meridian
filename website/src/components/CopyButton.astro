@@ -13,7 +13,7 @@ interface Props {
 const { text, label = 'Copy', copiedLabel = 'Copied', class: className = '' } = Astro.props;
 ---
 
-<button type="button" class:list={['copy-btn', className]} data-copy={text} data-copied-label={copiedLabel} aria-label={`${label}: ${text}`}>
+<button hidden type="button" class:list={['copy-btn', className]} data-copy={text} data-copied-label={copiedLabel} aria-label={`${label}: ${text}`}>
   <span class="copy-btn__label">{label}</span>
   <svg class="copy-btn__icon" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="9" y="9" width="13" height="13" rx="2"></rect>
@@ -30,6 +30,7 @@ const { text, label = 'Copy', copiedLabel = 'Copied', class: className = '' } = 
 </script>
 
 <style is:global>
+  .copy-btn[hidden] { display: none; }
   .copy-btn {
     display: inline-flex;
     align-items: center;
