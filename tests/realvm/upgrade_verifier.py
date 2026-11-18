@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import ipaddress
 import os
 import shlex
@@ -10,6 +11,7 @@ import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping
+from contextlib import nullcontext
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -27,10 +29,12 @@ from meridian.host_runtime import CONTROL_SERVICE_STATE_DIR
 from meridian.servers import ServerRegistry
 from meridian.ssh import CommandResult
 from meridian.update import get_pypi_releases
+from tests.realvm import handover_drill
 from tests.realvm.domain_support import is_rate_limited, verification_counts
 from tests.realvm.upgrade_support import (
     SUBSCRIPTION_CASES,
     SubscriptionSnapshot,
+    VerificationError,
     build_intent,
     client_detail,
     command_data,
@@ -43,12 +47,6 @@ from tests.realvm.upgrade_support import (
     previous_published_version,
     redact_output,
 )
-
-
-class VerificationError(Exception):
-    def __init__(self, message: str, *, exit_code: int = 1) -> None:
-        super().__init__(message)
-        self.exit_code = exit_code
 
 
 def select_previous_version(checkout: str, env: Mapping[str, str]) -> str:
@@ -77,6 +75,18 @@ def preflight_upgrade(root: Path, env: Mapping[str, str]) -> tuple[str, str]:
     if not expected_agent:
         raise VerificationError("The checkout agent build has no .version sidecar. Run make agent first.", exit_code=2)
     return select_previous_version((root / "VERSION").read_text(), env), expected_agent
+
+
+def preflight_published_cli(root: Path, env: Mapping[str, str], version: str) -> None:
+    """Verify b12's actual PyPI wheel and CLI dependencies before provisioning anything."""
+    if version != handover_drill.SOURCE:
+        return
+    with tempfile.TemporaryDirectory(prefix="meridian-published-preflight-") as work:
+        checker = UpgradeVerifier(root, Path(work), "", env)
+        checker.old_env["UV_EXCLUDE_NEWER"] = handover_drill.AS_OF
+        checker.say(f"Checking published {version} with dependencies available at {handover_drill.AS_OF}")
+        checker.install_previous(version)
+        checker.execute("Check the published upgrade command tree", [*checker.previous, "apply", "--help"], old=True)
 
 
 class UpgradeVerifier:
@@ -141,7 +151,8 @@ class UpgradeVerifier:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
-                **({"input": stdin} if stdin is not None else {"stdin": subprocess.DEVNULL}),
+                input=stdin,
+                stdin=subprocess.DEVNULL if stdin is None else None,
             )
         except (OSError, subprocess.SubprocessError):
             raise VerificationError(f"{label} could not finish. Check the local tools and SSH connection.") from None
@@ -258,7 +269,7 @@ class UpgradeVerifier:
             f'export PATH={shlex.quote(str(bin_dir))}:"$PATH"\n'
         )
 
-    def deploy_previous(self) -> None:
+    def deploy_previous(self, version: str) -> None:
         home = Path(self.env["MERIDIAN_HOME"])
         if (home / "cluster.yml").exists() or (home / "servers.json").exists():
             raise VerificationError("The upgrade verifier needs an empty isolated MERIDIAN_HOME.", exit_code=2)
@@ -269,7 +280,14 @@ class UpgradeVerifier:
         if server is None:
             raise VerificationError("The published release did not save the server.")
         intent = self.work / "intent.json"
-        intent.write_text(build_intent(server.id, self.ip))
+        intent.write_text(
+            build_intent(
+                server.id,
+                self.ip,
+                legacy=Version(version) < Version("4.0.0b13"),
+                display_name=handover_drill.DISPLAY if version == handover_drill.SOURCE else "",
+            )
+        )
         self.execute(
             "Deploy the published release on the bare IP",
             [*self.previous, "setup", "--intent", str(intent), "--yes"],
@@ -394,9 +412,21 @@ class UpgradeVerifier:
     def run(self) -> None:
         version, expected_agent = preflight_upgrade(self.root, self.env)
         self.say(f"Upgrade from published {version} to the checkout")
+        handover = handover_drill.HandoverDrill(self) if version == handover_drill.SOURCE else None
+        if handover:
+            handover.require_lab_workspace()
+            self.old_env["UV_EXCLUDE_NEWER"] = handover_drill.AS_OF
         self.install_previous(version)
         self.prepare_ssh()
-        self.deploy_previous()
+        with handover.published_resolver() if handover else nullcontext():
+            self.deploy_previous(version)
+        # Since b13 an intent may legitimately contain no users at all.
+        if Version(version) >= Version("4.0.0b13"):
+            data = self.json_command(["client", "list"], old=True)
+            if not any(row["username"] == "default" for row in data["clients"]):
+                self.execute(
+                    "Create a baseline person", [*self.previous, "client", "add", "default", "--yes"], old=True
+                )
         expiry = (datetime.now(UTC).date() + timedelta(days=30)).isoformat()
         self.set_limited_client(expiry)
         people = self.people(old=True)
@@ -409,19 +439,53 @@ class UpgradeVerifier:
         self.pass_check("bob has a traffic limit and fixed expiry")
         before = self.capture(urls, "before")
         self.pass_check(f"captured {len(before)} documents and usage headers")
+        if handover:
+            handover.save_snapshot()
         self.json_command(["plan"], allowed=(0, 2))
-        self.execute("Apply the checkout in place", [*self.current, "apply", "--yes"], certificates=True, timeout=1800)
+        if handover:
+            handover.apply_and_resume(people)
+        else:
+            self.execute(
+                "Apply the checkout in place", [*self.current, "apply", "--yes"], certificates=True, timeout=1800
+            )
         self.pass_check("checkout applied in place")
         self.verify_schema()
         self.wait_for("Declarative plan convergence", self.plan_converged)
         self.pass_check("JSON plan reports converged")
-        after_people = self.people()
-        if after_people != people:
-            raise VerificationError("The set of people changed during the upgrade.")
-        after_clients, after_urls = self.details(after_people)
-        if after_urls != urls:
-            raise VerificationError("A person's subscription URL changed during the upgrade.")
-        failures = compare_subscriptions(before, self.capture(urls, "after"))
+        self.verify_accounts(before_clients, urls, before, "after", handover is not None)
+        self.wait_for("The checkout's agent version", lambda: self.agent_current(expected_agent))
+        self.pass_check("fleet status reports the checkout's built agent version")
+        if handover:
+            handover.verify_checkout_install()
+            handover.check_stale_copy()
+            handover.unchanged_apply()
+            # Prove traffic on the normal upgrade too, before rolling back to the b12 snapshot.
+            self.verify_traffic()
+            handover.restore_snapshot(people)
+            handover.verify_checkout_install()
+            self.wait_for("The restored checkout agent", lambda: self.agent_current(expected_agent))
+            self.verify_accounts(before_clients, urls, before, "restored", named=True)
+            handover.unchanged_apply()
+        self.verify_traffic()
+        if self.env.get("REALVM_RELEASE_CHECKS") == "1":
+            importlib.import_module("tests.realvm.release_checks").verify_release_changes(self)
+        self.say(f"PASS: {self.passed}  FAIL: 0")
+
+    def verify_accounts(
+        self,
+        original: dict[str, ClientDetail],
+        urls: dict[str, str],
+        subscriptions: dict[tuple[str, str], SubscriptionSnapshot],
+        phase: str,
+        named: bool,
+    ) -> None:
+        people = self.people()
+        if people != sorted(original):
+            raise VerificationError("The original set of people did not survive.")
+        clients, new_urls = self.details(people)
+        if new_urls != urls:
+            raise VerificationError("A person's original subscription URL changed.")
+        failures = compare_subscriptions(subscriptions, self.capture(urls, phase))
         if failures:
             raise VerificationError("Subscriptions changed:\n" + "\n".join(failures))
         self.pass_check("all documents and subscription-userinfo headers are byte-identical")
@@ -434,20 +498,26 @@ class UpgradeVerifier:
             "lifetime_traffic_bytes",
             "traffic_reset",
             "traffic_reset_at",
+            "created_at",
+            "profiles",
         )
-        changed = [field for field in preserved if getattr(bob, field) != getattr(after_clients["bob"], field)]
-        if changed:
-            raise VerificationError("bob's client metadata changed: " + ", ".join(changed))
-        self.pass_check("bob's limit, expiry, and usage metadata survived")
-        self.wait_for("The checkout's agent version", lambda: self.agent_current(expected_agent))
-        self.pass_check("fleet status reports the checkout's built agent version")
+        for person in people:
+            changed = [
+                field for field in preserved if getattr(original[person], field) != getattr(clients[person], field)
+            ]
+            if changed:
+                raise VerificationError("Client metadata changed: " + ", ".join(changed))
+        if named and clients["default"].display_name != handover_drill.DISPLAY:
+            raise VerificationError("The b12 display name from the fleet intent was not handed to the service.")
+        self.pass_check("every person's identity, limits, account metadata and original links survived")
+
+    def verify_traffic(self) -> None:
         # Traffic probes come last: they must not change the usage headers being compared.
         test = self.execute("Run meridian test end to end", [*self.current, "--json", "test"])
         passed, failed, _warnings, _skipped = verification_counts(test.stdout)
         if failed or passed <= 0:
             raise VerificationError("meridian test produced no passing end-to-end verdict.")
         self.pass_check("meridian test passes end to end")
-        self.say(f"PASS: {self.passed}  FAIL: 0")
 
 
 def main() -> int:

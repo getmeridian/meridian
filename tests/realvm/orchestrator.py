@@ -457,10 +457,12 @@ def cmd_up(args: argparse.Namespace) -> int:
     require_agent_build()
     upgrade_from = ""
     if topology.name == "upgrade":
-        from tests.realvm.upgrade_verifier import VerificationError, preflight_upgrade
+        from tests.realvm.upgrade_verifier import VerificationError, preflight_published_cli, preflight_upgrade
 
         try:
-            upgrade_from, _agent_version = preflight_upgrade(Path(__file__).parents[2], os.environ)
+            root = Path(__file__).parents[2]
+            upgrade_from, _agent_version = preflight_upgrade(root, os.environ)
+            preflight_published_cli(root, os.environ, upgrade_from)
         except VerificationError as exc:
             _print(f"  {'Inconclusive' if exc.exit_code == INCONCLUSIVE_EXIT else 'Refused'}: {exc}")
             return exc.exit_code

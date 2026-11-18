@@ -4,8 +4,9 @@ Provisions real cloud VMs (Hetzner via `hcloud-python`), deploys Meridian agains
 
 ## Design decisions
 - **Never in CI** — `HCLOUD_TOKEN` is never a GitHub secret (a misbehaving workflow would burn budget silently); harness files live outside `.github/workflows/`; `pyproject.toml` `norecursedirs = ["realvm"]` keeps `pytest` from collecting. Runs only via `make real-lab` locally.
-- **Topology per YAML file** — YAML declares provider / region / size / nodes, but `up` rejects any topology or verification manifest without an implemented verifier before provider access; `single` and `domain` are the implemented ones.
+- **Topology per YAML file** — YAML declares provider / region / size / nodes, but `up` rejects any topology or verification manifest without an implemented verifier before provider access; `single`, `domain`, and `upgrade` are implemented.
 - **Upgrade evidence precedes traffic** — `upgrade` installs a pinned PyPI CLI with its bundled agent in an external venv; capture each person/app separately, compare fixed expiry as-is, then test traffic after checkout apply.
+- **b12 handover drill** — Pin both published resolvers to the release day. Exercise the real local checkpoint interruption and a stale second computer; recover from the original sealed snapshot with only its device key on the same isolated VM. The checkout installer must match its wheel SHA-256.
 - **Inconclusive is not failed** — `domain` needs real DNS, so `verify/domain.sh` exits 75 when Let's Encrypt rate-limits issuance; `domain_support.py` holds its pure decisions (panel name, intent, path switch, rate-limit match).
 - **Executable claims only** — Tier α covers LE issuer, optional nmap, SSH, fail2ban, fleet, client CRUD, plan, and subscription HTTP (`single`), plus panel-domain certificates (`domain`); planned CDN/interactive tiers stay out of manifests until implemented.
 - **Labs are for journeys, `up` is for claims** — `lab.py` keeps named VMs up with a per-lab key, pinned host keys, ssh wrappers, and `env.sh`; `journey.sh`, `drive_wizard.py`, and `pwa_shots.py` run against it. Only `orchestrator up` verifies topology manifests.
