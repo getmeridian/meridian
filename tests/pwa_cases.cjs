@@ -40,6 +40,13 @@ const cases = {
       respondWith: promise => { shared = promise; } });
     assert.ok((await shared).cached, 'versioned shared assets use the cache');
   },
+  test_every_deployer_palette_reaches_the_stylesheet: async function(data) {
+    for (const color of data.palettes) {
+      const browser = createBrowser({ ...data.config, color }, data.catalog, { info: data.info });
+      await browser.start();
+      assert.equal(browser.document.documentElement.getAttribute('data-palette'), color);
+    }
+  },
   test_legacy_service_worker_releases_old_pages: async function() {
     const handlers = {}, deleted = [], navigated = [];
     let unregistered = false;

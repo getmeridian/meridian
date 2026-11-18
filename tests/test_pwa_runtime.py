@@ -11,6 +11,7 @@ import pytest
 
 from meridian.control.formats.browser import subscription_info
 from meridian.control.formats.entries import SubscriptionUser
+from meridian.core.inputs import PAGE_PALETTES
 from meridian.render import render_apps_catalog, render_config_json
 
 NODE = shutil.which("node")
@@ -48,6 +49,11 @@ def run_case(name: str, data: dict[str, object]) -> None:
         check=False,
     )
     assert result.returncode == 0, result.stderr or result.stdout
+
+
+def test_every_deployer_palette_reaches_the_stylesheet(page_data: dict[str, object]) -> None:
+    page_data["palettes"] = PAGE_PALETTES
+    run_case("test_every_deployer_palette_reaches_the_stylesheet", page_data)
 
 
 def test_legacy_service_worker_releases_old_pages(page_data: dict[str, object]) -> None:
