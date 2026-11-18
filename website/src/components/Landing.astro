@@ -80,6 +80,8 @@ const organization = {
     </script>
   )}
   <Fragment slot="head">
+    <!-- Keep cold fragment visits aligned when WebKit applies the page styles. -->
+    <link rel="expect" href="#main" blocking="render" />
     <script type="application/ld+json" set:html={JSON.stringify(organization)} />
     <script type="application/ld+json" set:html={JSON.stringify(faq)} />
   </Fragment>
