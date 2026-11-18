@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import ipaddress
 import os
 import re
@@ -18,7 +20,9 @@ from urllib.parse import urlsplit
 
 import httpx
 import pytest
-from playwright.sync_api import Browser, BrowserContext, Page, Route, sync_playwright
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from playwright.sync_api import Browser, BrowserContext, Page, Playwright, Route, sync_playwright
 
 from meridian import __version__
 from meridian.control.enrollment import token_sha256
@@ -99,8 +103,13 @@ def service(tmp_path: Path, clock: ServiceClock, record_property) -> Iterator[Co
 
 
 @pytest.fixture(scope="session")
-def tls_context(tmp_path_factory: pytest.TempPathFactory) -> ssl.SSLContext:
-    cert, key = self_signed_cert(tmp_path_factory.mktemp("e2e-tls"))
+def tls_keypair(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, Path]:
+    return self_signed_cert(tmp_path_factory.mktemp("e2e-tls"))
+
+
+@pytest.fixture(scope="session")
+def tls_context(tls_keypair: tuple[Path, Path]) -> ssl.SSLContext:
+    cert, key = tls_keypair
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(cert, key)
     return context
@@ -137,20 +146,49 @@ def base_url(service: ControlService, tls_context: ssl.SSLContext) -> Iterator[s
 
 
 @pytest.fixture(scope="session")
-def browser() -> Iterator[Browser]:
-    with sync_playwright() as playwright:
-        if not Path(playwright.chromium.executable_path).exists():
-            pytest.fail("Chromium is missing. Run: uv run --group e2e playwright install chromium")
-        args = (
-            ["--single-process", "--in-process-gpu", "--ignore-certificate-errors"]
-            if os.environ.get("E2E_SINGLE_PROCESS") == "1"
-            else []
-        )
-        browser = playwright.chromium.launch(channel="chromium", args=args)
-        try:
-            yield browser
-        finally:
-            browser.close()
+def playwright_driver() -> Iterator[Playwright]:
+    with sync_playwright() as driver:
+        yield driver
+
+
+@pytest.fixture(scope="session")
+def browser(playwright_driver: Playwright) -> Iterator[Browser]:
+    if not Path(playwright_driver.chromium.executable_path).exists():
+        pytest.fail("Chromium is missing. Run: uv run --group e2e playwright install chromium")
+    args = (
+        ["--single-process", "--in-process-gpu", "--ignore-certificate-errors"]
+        if os.environ.get("E2E_SINGLE_PROCESS") == "1"
+        else []
+    )
+    browser = playwright_driver.chromium.launch(channel="chromium", args=args)
+    try:
+        yield browser
+    finally:
+        browser.close()
+
+
+@pytest.fixture(scope="session")
+def webkit_browser(playwright_driver: Playwright) -> Iterator[Browser]:
+    browser = playwright_driver.webkit.launch()
+    try:
+        yield browser
+    finally:
+        browser.close()
+
+
+@pytest.fixture(scope="session")
+def worker_browser(playwright_driver: Playwright, tls_keypair: tuple[Path, Path]) -> Iterator[Browser]:
+    # Chromium fetches a worker outside the page context's ignore_https_errors setting.
+    cert = x509.load_pem_x509_certificate(tls_keypair[0].read_bytes())
+    spki = cert.public_key().public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    pin = base64.b64encode(hashlib.sha256(spki).digest()).decode("ascii")
+    browser = playwright_driver.chromium.launch(
+        channel="chromium", args=["--ignore-certificate-errors-spki-list=" + pin]
+    )
+    try:
+        yield browser
+    finally:
+        browser.close()
 
 
 @pytest.fixture
@@ -181,9 +219,9 @@ def context_factory(
     local_browsers: list[Browser] = []
     traces: list[Path] = []
 
-    def create(**options) -> BrowserContext:
-        target = browser
-        if os.environ.get("E2E_SINGLE_PROCESS") == "1":
+    def create(*, target_browser: Browser | None = None, **options) -> BrowserContext:
+        target = target_browser or browser
+        if target is browser and os.environ.get("E2E_SINGLE_PROCESS") == "1":
             target = browser.browser_type.launch(
                 channel="chromium", args=["--single-process", "--in-process-gpu", "--ignore-certificate-errors"]
             )

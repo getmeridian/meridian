@@ -309,11 +309,11 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+          key: ${{ runner.os }}-playwright-chromium-webkit-${{ steps.playwright.outputs.version }}
 
       # OS libraries are needed on cache hits too; Playwright reuses the cached browser.
-      - name: Install Chromium and system libraries
-        run: uv run --group e2e playwright install --with-deps chromium
+      - name: Install Chromium, WebKit and system libraries
+        run: uv run --group e2e playwright install --with-deps chromium webkit
 
       - name: Run browser journeys
         run: make e2e

@@ -57,7 +57,11 @@ dev = [
 
 [dependency-groups]
 # Real-browser journeys, deliberately excluded from normal pytest collection.
-e2e = ["playwright>=1.64,<1.65", "pytest>=8,<10"]
+e2e = [
+    "axe-playwright-python>=0.1.8,<0.2",
+    "playwright>=1.64,<1.65",
+    "pytest>=8,<10",
+]
 # Cloud SDKs for the local-only real-VM harness (tests/realvm/); never published.
 realvm = ["hcloud>=2.0"]
 
@@ -91,7 +95,7 @@ select = ["E", "F", "I", "W"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# tests/e2e/ needs Chromium; opt in with `make e2e` (tests/e2e/README.md).
+# tests/e2e/ needs Chromium and WebKit; opt in with `make e2e` (tests/e2e/README.md).
 # tests/realvm/ provisions real cloud VMs — opt-in, never auto-collected.
 # Invoke manually via `make real-lab` (see tests/realvm/README.md).
 # Pure tests under tests/systemlab/ are safe for normal collection; Docker is

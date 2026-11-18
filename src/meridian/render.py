@@ -623,6 +623,7 @@ def render_apps_catalog() -> str:
 def render_pwa_shell(
     *,
     client_name: str = "",
+    subscription_url: str = "",
     asset_path: str = "../pwa",
     server_name: str = "",
     config_path: str = "config.json",
@@ -641,6 +642,7 @@ def render_pwa_shell(
     return _render_pwa_template(
         "index.html.j2",
         client_name=client_name,
+        subscription_url=subscription_url,
         asset_path=asset_path,
         server_name=server_name,
         config_path=config_path,

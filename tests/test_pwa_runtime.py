@@ -76,8 +76,8 @@ def test_suspended_account_explains_and_dims_imports(page_data: dict[str, object
     run_case("test_suspended_account_explains_and_dims_imports", page_data)
 
 
-def test_account_failure_keeps_only_account_snapshot_and_marks_it_unverified(page_data: dict[str, object]) -> None:
-    run_case("test_account_failure_keeps_only_account_snapshot_and_marks_it_unverified", page_data)
+def test_failed_refresh_keeps_unverified_facts_only_until_reload(page_data: dict[str, object]) -> None:
+    run_case("test_failed_refresh_keeps_unverified_facts_only_until_reload", page_data)
 
 
 def test_account_unlimited_and_no_expiry_are_not_zero_or_a_sentinel_date(page_data: dict[str, object]) -> None:

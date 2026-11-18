@@ -1,6 +1,6 @@
 /* Meridian PWA — Connection page
  * One setup card (install → add), quiet secondary panels, system fonts.
- * Accent comes from the deployer's palette (app.js applyPalette). */
+ * Accent comes from the deployer's palette (data-palette). */
 
 /* ===================================================================
  * DESIGN TOKENS
@@ -8,7 +8,7 @@
 :root {
   --bg: #0E1014; --sf: #16191F; --sf2: #1D2129; --sf3: #252A33;
   --br: #262A33; --br2: #343A46;
-  --tx: #ECEDF1; --tx2: #A0A5B2; --tx3: #6E7482;
+  --tx: #ECEDF1; --tx2: #A0A5B2; --tx3: #9097A5;
   --accent: #5b9cf5; --accent-bg: #5b9cf51f; --accent-br: #5b9cf538;
   --on-accent: #0B0D12;
   --amber: #E5A44E; --green: #4CD68A; --red: #F06060;
@@ -20,10 +20,10 @@
 @media (prefers-color-scheme: light) { :root {
   --bg: #F3F4F6; --sf: #FFFFFF; --sf2: #F5F6F8; --sf3: #ECEEF2;
   --br: #E4E6EB; --br2: #D3D6DD;
-  --tx: #12141A; --tx2: #5A606E; --tx3: #8B909C;
-  --accent: #2b7de9; --accent-bg: #2b7de914; --accent-br: #2b7de938;
+  --tx: #12141A; --tx2: #5A606E; --tx3: #646A77;
+  --accent: #185fba; --accent-bg: #185fba14; --accent-br: #185fba38;
   --on-accent: #FFFFFF;
-  --amber: #B7791F; --green: #1E8C52; --red: #C93B3B;
+  --amber: #925E13; --green: #177343; --red: #C93B3B;
   --shadow: 0 1px 2px rgba(18,20,26,.04), 0 8px 24px rgba(18,20,26,.06);
   --qr-shadow: 0 0 0 1px var(--br);
   color-scheme: light;
@@ -32,6 +32,20 @@
 /* ===================================================================
  * BASE
  * =================================================================== */
+/* Palette changes stay in stylesheets under the page's strict CSP. */
+:root[data-palette="sunset"]{--accent:#e57c4e;--accent-bg:#e57c4e1f;--accent-br:#e57c4e38}
+:root[data-palette="forest"]{--accent:#4cd68a;--accent-bg:#4cd68a1f;--accent-br:#4cd68a38}
+:root[data-palette="lavender"]{--accent:#9b8cf5;--accent-bg:#9b8cf51f;--accent-br:#9b8cf538}
+:root[data-palette="rose"]{--accent:#f56b8a;--accent-bg:#f56b8a1f;--accent-br:#f56b8a38}
+:root[data-palette="slate"]{--accent:#9398ac;--accent-bg:#9398ac1f;--accent-br:#9398ac38}
+@media (prefers-color-scheme: light){
+  :root[data-palette="sunset"]{--accent:#a4491b;--accent-bg:#a4491b14;--accent-br:#a4491b38}
+  :root[data-palette="forest"]{--accent:#177343;--accent-bg:#17734314;--accent-br:#17734338}
+  :root[data-palette="lavender"]{--accent:#5c4dca;--accent-bg:#5c4dca14;--accent-br:#5c4dca38}
+  :root[data-palette="rose"]{--accent:#b23053;--accent-bg:#b2305314;--accent-br:#b2305338}
+  :root[data-palette="slate"]{--accent:#596077;--accent-bg:#59607714;--accent-br:#59607738}
+}
+
 *{margin:0;padding:0;box-sizing:border-box}
 [hidden]{display:none !important}
 body{
@@ -410,3 +424,6 @@ svg{flex-shrink:0}
 .initial-text{display:none}
 html[lang="en"] .initial-en,html[lang="ru"] .initial-ru,
 html[lang="fa"] .initial-fa,html[lang="zh"] .initial-zh{display:inline}
+
+/* A no-script visitor can select the subscription directly, without the loading placeholder. */
+@media (scripting: none) { .skeleton {display:none} }

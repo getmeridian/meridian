@@ -675,37 +675,6 @@ var ICON_SHARE = svg('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path
 var ICON_CHEVRON = svg('<path d="m9 18 6-6-6-6"/>', 16);
 
 /* -----------------------------------------------------------------------
- * Color palettes — curated presets with dark + light mode variants
- * ----------------------------------------------------------------------- */
-var PALETTES = {
-  ocean:    { dark: '#5b9cf5', light: '#2b7de9' },
-  sunset:   { dark: '#e57c4e', light: '#c4602a' },
-  forest:   { dark: '#4CD68A', light: '#1E8C52' },
-  lavender: { dark: '#9b8cf5', light: '#6b5de9' },
-  rose:     { dark: '#f56b8a', light: '#d94468' },
-  slate:    { dark: '#8B8FA2', light: '#646880' }
-};
-
-function applyPalette(paletteName) {
-  var p = PALETTES[paletteName];
-  if (!p) return;
-  var isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  var accent = isDark ? p.dark : p.light;
-  var root = document.documentElement;
-  root.style.setProperty('--accent', accent);
-  root.style.setProperty('--accent-bg', accent + (isDark ? '1f' : '14'));
-  root.style.setProperty('--accent-br', accent + '38');
-}
-
-/* Listen for system theme changes to swap palette variant */
-var _activePalette = '';
-try {
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-    if (_activePalette) applyPalette(_activePalette);
-  });
-} catch(e) { /* old browsers */ }
-
-/* -----------------------------------------------------------------------
  * Page rendering from config.json
  * ----------------------------------------------------------------------- */
 function renderPage(config) {
@@ -715,10 +684,8 @@ function renderPage(config) {
   iosButtonIndex = 0;
   var html = '';
 
-  if (config.color && PALETTES[config.color]) {
-    _activePalette = config.color;
-    applyPalette(config.color);
-  }
+  if (['ocean', 'sunset', 'forest', 'lavender', 'rose', 'slate'].indexOf(config.color) !== -1)
+    document.documentElement.setAttribute('data-palette', config.color);
 
   html += renderTopBar();
 
@@ -1249,7 +1216,7 @@ function capitalize(s) {
 }
 
 /* -----------------------------------------------------------------------
- * Service Worker + Persistent storage
+ * Service worker
  * ----------------------------------------------------------------------- */
 function registerSW() {
   if (!('serviceWorker' in navigator)) return;
@@ -1274,11 +1241,7 @@ function loadAccountPanel() {
   document.body.appendChild(script);
 }
 
-function requestPersistentStorage() {
-  if (navigator.storage && navigator.storage.persist) {
-    navigator.storage.persist().catch(function() {});
-  }
-}
+
 
 /* -----------------------------------------------------------------------
  * Event delegation — replaces all inline onclick handlers
@@ -1352,7 +1315,6 @@ var CATALOG_TIMEOUT_MS = 5000;
 function init() {
   var id = ++initId;
   registerSW();
-  requestPersistentStorage();
 
   var app = document.getElementById('app');
   var slowTimer = setTimeout(function() {

@@ -1,11 +1,11 @@
 # e2e — Real-browser journeys
 
 ## Design decisions
-- **Opt-in suite** — `norecursedirs` excludes this directory from normal pytest; `make e2e` installs the `e2e` group and runs it explicitly, with Chromium installed separately.
+- **Opt-in suite** — `norecursedirs` excludes this directory from normal pytest; `make e2e` installs the `e2e` group and runs it explicitly, with Chromium and WebKit installed separately.
 - **Journeys cross surfaces** — console gestures drive a real seeded service, anonymous connection page, and VPN app HTTP client. Component contracts stay in the normal suite.
 - **Reusable fixtures** — `service` is fresh per test; `clock` controls its injected clock and browser Date without stopping timers; `owner`, `visitor`, `app`, `base_url`, and `context_factory` share one service.
 - **Local TLS** — use the shared throwaway certificate helper; only its certificate verification is bypassed. Settings and share URLs follow the real HTTPS contract.
-- **Isolation** — contexts pin UTC, en-US, light theme, and viewport; service workers are blocked so every request reaches the network guard and live service. Worker-cache behavior belongs in a dedicated journey.
+- **Isolation** — contexts pin UTC, en-US, light theme, and viewport; service workers are blocked so every request reaches the network guard and live service. A dedicated Chromium journey enables the actual worker and checks offline navigation and storage after the page is reopened.
 - **Failure evidence** — each context traces from creation; failures keep traces and full-page screenshots under `test-results/e2e` or `E2E_ARTIFACTS`.
 - **Static demo** — `demo_url` builds once per session through the real showcase exporter; demo journeys reuse guarded visitor contexts and start with fresh adapter memory.
 - **Mode bookmarks** — one read-only preference journey shares a service/context across all six Detailed destinations and verifies each reload.
@@ -15,7 +15,7 @@
 - Browser failures include console errors and page errors; a deliberate HTTP refusal expects one URL/status error through `browser_faults.expect`.
 - Browser contexts refuse every non-loopback request; app requests use a VPN User-Agent without owner cookies.
 - Keyboard journeys inspect each tab stop and the focus destination after Add, Share, and tab navigation.
-- Playwright actions and `expect` wait for observable states; no timed sleeps, DOM doubles, or route mocks.
+- Playwright actions and `expect` wait for observable states; no timed sleeps or DOM doubles. The phone journey alone stubs the clock/transfer probe so a deliberate check yields a deterministic byte count.
 
 ## Pitfalls
 - Keep `base_url` in the context factory dependencies so browser and trace teardown finish before the service stops; late icon requests otherwise fail only during teardown.

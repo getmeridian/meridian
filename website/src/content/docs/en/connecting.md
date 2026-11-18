@@ -22,6 +22,8 @@ Keep the link to yourself. It is your personal access, and anyone who has it can
 
 If the owner enables device limits, Your account shows used / allowed device slots. When full, new devices get a limit notice on subscription refresh. Apps that do not report a device are not counted. Only counts appear; they are not saved in your browser.
 
+With JavaScript turned off, copy the personal link on the page and paste it into your VPN app as a subscription. If you reopen a previously visited page while offline, reconnect and reload it. Meridian does not save your account details or link for offline use.
+
 ## Language
 
 Your saved page choice comes first, then your account's language, then the owner's default. With automatic language, connection and support pages follow your browser and fall back to English when needed.

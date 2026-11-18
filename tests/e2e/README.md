@@ -6,10 +6,10 @@ No server, credentials, cloud resources, or internet access are needed during te
 
 ```sh
 uv sync --extra dev --group e2e
-uv run --group e2e playwright install chromium
+uv run --group e2e playwright install chromium webkit
 make e2e
 # Linux: install browser system libraries as well.
-uv run --group e2e playwright install --with-deps chromium
+uv run --group e2e playwright install --with-deps chromium webkit
 # Diagnose one journey or record durations and seed timings.
 uv run --group e2e pytest tests/e2e -k toast --durations=0 --junitxml=/tmp/e2e.xml
 ```
@@ -50,6 +50,10 @@ Some macOS agent sandboxes deny Chromium child-process Mach ports. In that
 environment only, use `E2E_SINGLE_PROCESS=1 make e2e` to run full Chromium with its
 renderer and GPU in the browser process, with a fresh browser for each isolated
 context. CI shares one browser and uses the normal process model.
+
+## Personal connection page
+
+Phone WebKit exercises recommended apps, import links, the QR toggle, and the connection check. The test runs the locked, locally bundled axe-core rules for WCAG A and AA (2.0 and 2.1) in English/light and Persian/dark. Separate journeys import a link without JavaScript and take a previously opened subscription offline. The latter enables the service worker and inspects its cache and browser storage; the network guard stays enabled.
 
 ## Layout, accessibility, and public demo
 

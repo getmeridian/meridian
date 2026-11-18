@@ -156,18 +156,14 @@ const cases = {
     assert.ok(browser.fire('click', link).defaultPrevented, 'suspended import must not navigate');
     assert.ok(browser.document.getElementById('import-status').textContent.length > 30);
   },
-  test_account_failure_keeps_only_account_snapshot_and_marks_it_unverified: async function(data) {
+  test_failed_refresh_keeps_unverified_facts_only_until_reload: async function(data) {
     let fail = false;
     const options = { fetch(url) {
       if (url.endsWith('/info')) return fail ? Promise.reject(new Error('offline')) : Promise.resolve(response(data.info));
       return Promise.resolve(response(url.endsWith('config.json') ? data.config : data.catalog));
     } };
     const browser = createBrowser(data.config, data.catalog, options); await browser.start();
-    const saved = JSON.stringify(browser.storage);
-    assert.ok(Object.keys(browser.storage).some(k => k.startsWith('meridian-account:')), 'account answer was not saved');
-    for (const secret of ['198.51.100.1', 'subscriptionUrl', 'username', 'links', 'userAgent', 'shortUuid']) {
-      assert.ok(!saved.includes(secret), 'account storage must omit ' + secret);
-    }
+    assert.ok(!Object.keys(browser.storage).some(k => k.startsWith('meridian-account:')), 'a subscription must never be a storage key');
     const checks = browser.document.getElementById('selfcheck-results'); checks.textContent = 'Reachability result';
     fail = true;
     browser.fire('click', browser.document.querySelector('[data-action="account-refresh"]')); await browser.flush();
@@ -175,8 +171,8 @@ const cases = {
     assert.match(browser.document.getElementById('account-panel').textContent, /1.5.*KiB/);
     assert.equal(checks.textContent, 'Reachability result');
     const reloaded = createBrowser(data.config, data.catalog, { ...options, storage: browser.storage }); await reloaded.start();
-    assert.match(reloaded.document.getElementById('account-panel').textContent, /unverified/i);
-    assert.match(reloaded.document.getElementById('account-panel').textContent, /1.5.*KiB/);
+    assert.doesNotMatch(reloaded.document.getElementById('account-panel').textContent, /1.5.*KiB/);
+    assert.match(reloaded.document.getElementById('account-panel').textContent, /could not|couldn.t|couldn’t/i);
   },
   test_account_unlimited_and_no_expiry_are_not_zero_or_a_sentinel_date: async function(data) {
     data.info.user.trafficLimitBytes = '0'; data.info.user.expiresAt = '2099-12-31T23:59:59.000Z';
