@@ -27,14 +27,12 @@ export const zh: LandingStrings = {
   'spec.licenseValue': '开源 (MIT)',
 
   // How it works
-  'setup.label': '安装',
-  'setup.title': '从一台服务器到一个 VPN',
-  'setup.desc': '准备一台全新安装 Debian 或 Ubuntu 的 VPS。在自己电脑的终端运行安装命令，然后跟随向导完成设置。',
-  'setup.step1.label': '01 / 安装命令行工具',
-  'setup.step2.label': '02 / 启动向导',
+  'setup.title': '设置服务器',
+  'setup.desc': '准备一台全新安装 Debian 或 Ubuntu 的 VPS，并确认可以通过 SSH 登录。在自己电脑的终端运行以下两条命令。',
+  'setup.step1.label': '安装命令行工具',
+  'setup.step2.label': '启动设置向导',
   'setup.hint': '向导会在修改服务器之前展示计划。<a href="{base}/getting-started/">阅读设置指南</a>。',
-  'setup.video':
-    '用 <code>meridian setup</code> 完成设置的全过程：3.5 分钟，英文讲解并附字幕。<a href="/video/meridian-setup.mp4" download>下载视频</a>',
+  'setup.video': '设置演示（英语，3:24）',
   'setup.videoLabel': '视频：用 Meridian 搭建个人 VPN',
   'setup.details': '幕后发生了什么',
   'setup.idempotent':
@@ -148,9 +146,7 @@ export const zh: LandingStrings = {
   'builder.status.teardownOk': '在多服务器集群中，请先用 meridian node remove 移除该服务器的角色。',
 
   // How it avoids detection
-  'tech.label': '技术说明',
-  'tech.title': '网络是怎样工作的',
-  'tech.desc': '了解连接如何到达服务器，以及观察网络流量的人能看到什么。',
+  'tech.title': 'VPN 的工作原理',
   'tech.group': '网络观察者能看到什么',
   'tech.dpi': '深度包检测（DPI）',
   'tech.dpi.body':
@@ -163,17 +159,11 @@ export const zh: LandingStrings = {
     '<p>每个 TLS 客户端都会发送独特的“Client Hello”指纹。如果指纹与其声称的应用不符，审查者就会将该连接标记出来。</p><p>客户端应用使用 <strong>uTLS</strong>，发送与 Chrome 相同的 Client Hello。Meridian 还会为每个 Reality 和 XHTTP 条目发布一份 Firefox 指纹的副本，因此一种指纹被标记时，另一种仍可使用。</p>',
 
   // Showcase
-  'showcase.label': '功能预览',
-  'showcase.title': '从两个角度看你的 VPN',
-  'showcase.desc': '两个演示均使用示例数据。你可以在控制台添加用户，也可以在连接页面体验他们的设置流程。',
-  'showcase.page.role': '给受邀的人',
-  'showcase.console.role': '给服务器管理员',
+  'showcase.title': '在线演示',
   'showcase.page.title': '连接页面',
-  'showcase.page.text': '打开专属链接，选择应用，轻点一次即可添加 VPN。同一页面还会显示已用流量和到期时间。',
-  'showcase.page.try': '体验连接页面',
+  'showcase.page.text': '受邀用户通过专属链接将 VPN 添加到应用，还可查看流量用量和到期时间。',
   'showcase.console.title': '管理控制台',
-  'showcase.console.text': '邀请用户，分享二维码，设置到期时间或流量上限，还能在同一个面板查看服务器状态。',
-  'showcase.console.try': '体验控制台',
+  'showcase.console.text': '管理服务器和用户、分享二维码，并设置到期时间或流量上限。',
 
   // Connect
   'connect.title': '可以用哪些应用连接？',
@@ -197,8 +187,4 @@ export const zh: LandingStrings = {
   'arch.relay': '中继模式（境内入口）',
   'arch.relay.body':
     '<p>境内服务器上的 <strong>Realm</strong> TCP 转发器会把连接转交给你位于境外的出口服务器。中继只承载 Reality；XHTTP、WSS 和 Hysteria2 仍直接连接出口服务器。加密在应用与出口服务器之间端到端进行，因此中继看不到明文。</p><p>用 <code>meridian relay add RELAY_IP --exit EXIT</code> 添加中继。订阅和连接页面会自动包含中继条目。</p>',
-
-  // Closing call to action
-  'cta.title': '从一台服务器开始',
-  'cta.desc': '先让第一台服务器上线，再把专属连接链接发给需要的人。以后随时可以添加更多用户或服务器。',
 };

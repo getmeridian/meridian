@@ -27,14 +27,12 @@ export const fa: LandingStrings = {
   'spec.licenseValue': 'متن‌باز (MIT)',
 
   // How it works
-  'setup.label': 'نصب',
-  'setup.title': 'از سرور تا VPN',
-  'setup.desc': 'یک VPS تازه با Debian یا Ubuntu آماده کنید. در ترمینال رایانه‌تان نصب‌کننده را اجرا کنید و مراحل راهنما را دنبال کنید.',
-  'setup.step1.label': '۰۱ / نصب ابزار خط فرمان',
-  'setup.step2.label': '۰۲ / اجرای راه‌انداز',
+  'setup.title': 'راه‌اندازی سرور',
+  'setup.desc': 'به یک VPS با نصب تازهٔ Debian یا Ubuntu و دسترسی SSH نیاز دارید. هر دو فرمان را در ترمینال رایانهٔ خودتان اجرا کنید.',
+  'setup.step1.label': 'نصب ابزار خط فرمان',
+  'setup.step2.label': 'اجرای راه‌انداز',
   'setup.hint': 'پیش از تغییر سرور، راه‌انداز برنامهٔ کار را نشان می‌دهد. <a href="{base}/getting-started/">راهنمای راه‌اندازی</a>.',
-  'setup.video':
-    'کل راه‌اندازی با <code>meridian setup</code> از ابتدا تا انتها: ۳٫۵ دقیقه، به انگلیسی با زیرنویس. <a href="/video/meridian-setup.mp4" download>دانلود ویدیو</a>',
+  'setup.video': 'ویدیوی راه‌اندازی به انگلیسی (۳:۲۴)',
   'setup.videoLabel': 'ویدیو: راه‌اندازی VPN شخصی با Meridian',
   'setup.details': 'پشت صحنه چه اتفاقی می‌افتد',
   'setup.idempotent':
@@ -148,9 +146,7 @@ export const fa: LandingStrings = {
   'builder.status.teardownOk': 'اگر چند سرور دارید، ابتدا نقش سرور را با meridian node remove بردارید.',
 
   // How it avoids detection
-  'tech.label': 'یادداشت‌های فنی',
-  'tech.title': 'درون شبکه',
-  'tech.desc': 'ببینید اتصال‌ها چطور به سرور می‌رسند و ناظر ترافیک شبکه چه چیزی می‌بیند.',
+  'tech.title': 'VPN چگونه کار می‌کند؟',
   'tech.group': 'آنچه در شبکه دیده می‌شود',
   'tech.dpi': 'بازرسی عمیق بسته (DPI)',
   'tech.dpi.body':
@@ -163,17 +159,11 @@ export const fa: LandingStrings = {
     '<p>هر کلاینت TLS یک اثرانگشت یکتای «Client Hello» می‌فرستد. سانسورگران اتصال‌هایی را که اثرانگشتشان با برنامهٔ ادعاشده نمی‌خواند علامت‌گذاری می‌کنند.</p><p>برنامه‌های کلاینت با <strong>uTLS</strong> همان Client Hello مرورگر Chrome را می‌فرستند. Meridian برای هر ورودی Reality و XHTTP یک نسخهٔ Firefox هم منتشر می‌کند، پس اگر سانسورگران یک اثرانگشت را علامت بزنند، دیگری همچنان کار می‌کند.</p>',
 
   // Showcase
-  'showcase.label': 'آشنایی با Meridian',
-  'showcase.title': 'دو نمای یک VPN',
-  'showcase.desc': 'هر دو نمونه با داده‌های آزمایشی کار می‌کنند. در پنل یک نفر اضافه کنید یا مراحل راه‌اندازی را در صفحهٔ اتصال ببینید.',
-  'showcase.page.role': 'برای کسانی که دعوت می‌کنید',
-  'showcase.console.role': 'برای مدیر سرور',
+  'showcase.title': 'دموها',
   'showcase.page.title': 'صفحهٔ اتصال',
-  'showcase.page.text': 'لینک شخصی را باز کنید، برنامه را انتخاب کنید و با یک ضربه VPN را اضافه کنید. میزان مصرف و تاریخ انقضا هم در همان صفحه است.',
-  'showcase.page.try': 'باز کردن نمونهٔ اتصال',
+  'showcase.page.text': 'هر نفر با لینک شخصی خود VPN را به برنامه اضافه می‌کند و میزان مصرف و تاریخ انقضای دسترسی را می‌بیند.',
   'showcase.console.title': 'پنل مدیریت',
-  'showcase.console.text': 'افراد را دعوت کنید، کد QR بدهید و برای زمان یا حجم مصرف سقف بگذارید. وضعیت سرورها هم در همین پنل دیده می‌شود.',
-  'showcase.console.try': 'باز کردن نمونهٔ پنل',
+  'showcase.console.text': 'سرورها و کاربران را مدیریت کنید، کد QR بدهید و برای دسترسی تاریخ انقضا یا سقف مصرف تعیین کنید.',
 
   // Connect
   'connect.title': 'از چه برنامه‌هایی می‌توانم استفاده کنم؟',
@@ -197,8 +187,4 @@ export const fa: LandingStrings = {
   'arch.relay': 'حالت رله (نقطهٔ ورود داخلی)',
   'arch.relay.body':
     '<p>یک فورواردر TCP از نوع <strong>Realm</strong> روی سروری داخل کشور شما، اتصال‌ها را به سرور خروجی شما در خارج منتقل می‌کند. رله‌ها فقط Reality را حمل می‌کنند؛ XHTTP، WSS و Hysteria2 همچنان مستقیم به سرور خروجی وصل می‌شوند. رمزنگاری سرتاسری بین برنامه و سرور خروجی برقرار است، پس رله هرگز متن آشکار را نمی‌بیند.</p><p>با <code>meridian relay add RELAY_IP --exit EXIT</code> یکی اضافه کنید. اشتراک‌ها و صفحه‌های اتصال ورودی‌های رله را خودکار برمی‌دارند.</p>',
-
-  // Closing call to action
-  'cta.title': 'با یک سرور شروع کنید',
-  'cta.desc': 'سرور اول را راه بیندازید و لینک اتصال را برای یک نفر بفرستید. هر وقت خواستید، افراد یا سرورهای بیشتری اضافه کنید.',
 };

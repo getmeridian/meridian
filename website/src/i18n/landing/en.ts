@@ -32,14 +32,12 @@ export const en = {
   'spec.licenseValue': 'Open source (MIT)',
 
   // How it works
-  'setup.label': 'Installation',
-  'setup.title': 'From a server to a VPN.',
-  'setup.desc': 'Start with a fresh Debian or Ubuntu VPS and a terminal on your computer. Run the installer, then let the setup wizard guide you.',
-  'setup.step1.label': '01 / Install the CLI',
-  'setup.step2.label': '02 / Start the wizard',
+  'setup.title': 'Set up your server',
+  'setup.desc': 'You need SSH access to a fresh Debian or Ubuntu VPS. Run both commands on your own computer.',
+  'setup.step1.label': 'Install the CLI',
+  'setup.step2.label': 'Start the wizard',
   'setup.hint': 'The wizard shows you the plan before it changes your server. <a href="{base}/getting-started/">Read the setup guide</a>.',
-  'setup.video':
-    'A full <code>meridian setup</code>, start to finish: 3½ minutes. <a href="/video/meridian-setup.mp4" download>Download the video</a>',
+  'setup.video': 'Setup walkthrough (3:24)',
   'setup.videoLabel': 'Video: setting up a personal VPN with Meridian',
   'setup.details': 'What happens behind the scenes',
   'setup.idempotent':
@@ -153,9 +151,7 @@ export const en = {
   'builder.status.teardownOk': 'In a fleet, remove a server’s role with meridian node remove first.',
 
   // How it avoids detection
-  'tech.label': 'Technical notes',
-  'tech.title': 'Inside the network.',
-  'tech.desc': 'See how connections reach your server and what someone observing the traffic can see.',
+  'tech.title': 'How the VPN works',
   'tech.group': 'What the network sees',
   'tech.dpi': 'Deep Packet Inspection (DPI)',
   'tech.dpi.body':
@@ -168,17 +164,11 @@ export const en = {
     '<p>Every TLS client sends a unique "Client Hello" fingerprint. Censors flag connections where the fingerprint doesn\'t match the claimed application.</p><p>Client apps use <strong>uTLS</strong> to send the same Client Hello as Chrome. Meridian also publishes a Firefox copy of each Reality and XHTTP entry, so if censors flag one fingerprint, the other keeps working.</p>',
 
   // Showcase
-  'showcase.label': 'Product tour',
-  'showcase.title': 'Two views of your VPN.',
-  'showcase.desc': 'Try both demos with sample data. You can add a person in the console or follow their setup steps on the connection page.',
-  'showcase.page.role': 'For the people you invite',
-  'showcase.console.role': 'For the person running the server',
+  'showcase.title': 'Demos',
   'showcase.page.title': 'Connection page',
-  'showcase.page.text': 'Open a personal link, pick an app, and add the VPN in one tap. The same page shows usage and when access expires.',
-  'showcase.page.try': 'Open the connection demo',
+  'showcase.page.text': 'Each person gets a private link to add the VPN to their app, check usage, and see when access expires.',
   'showcase.console.title': 'Owner console',
-  'showcase.console.text': 'Invite people, share QR codes, and set limits on time or traffic. Keep an eye on your servers from the same panel.',
-  'showcase.console.try': 'Open the console demo',
+  'showcase.console.text': 'Manage servers and people, share QR codes, and set expiry dates or traffic limits.',
 
   // Connect
   'connect.title': 'Which apps can I use?',
@@ -202,10 +192,6 @@ export const en = {
   'arch.relay': 'Relay mode (domestic entry point)',
   'arch.relay.body':
     '<p>A <strong>Realm</strong> TCP forwarder on a server inside your country passes connections to your exit abroad. Relays carry Reality only; XHTTP, WSS, and Hysteria2 still connect to the exit directly. Encryption runs end to end between the app and the exit, so the relay never sees plaintext.</p><p>Add one with <code>meridian relay add RELAY_IP --exit EXIT</code>. Subscriptions and connection pages pick up the relay entries automatically.</p>',
-
-  // Closing call to action
-  'cta.title': 'Start with one server.',
-  'cta.desc': 'Bring your first server online, then send someone their connection link. You can add more people or servers at any time.',
 } as const;
 
 export type LandingKey = keyof typeof en;

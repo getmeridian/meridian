@@ -14,8 +14,8 @@ const views = [
 
 <div class="showcase">
   {views.map(({key, url}) => (
-    <article class={`showcase__card showcase__card--${key}`}>
-      <a class="showcase__mount" href={url} aria-hidden="true" tabindex="-1">
+    <a class={`showcase__card showcase__card--${key}`} href={url} aria-labelledby={`showcase-${key}-title`}>
+      <div class="showcase__mount" aria-hidden="true">
         {key === 'console' ? (
           <div class="showcase__window">
             <div class="showcase__chrome"><i></i><i></i><i></i></div>
@@ -28,14 +28,12 @@ const views = [
             <img src="/img/showcase/connection-page-phone.webp" alt="" width="780" height="1328" loading="lazy" decoding="async" />
           </div>
         )}
-      </a>
-      <div class="showcase__body">
-        <p class="atlas-label">{t(`showcase.${key}.role`)}</p>
-        <h3>{t(`showcase.${key}.title`)}</h3>
-        <p class="showcase__desc">{t(`showcase.${key}.text`)}</p>
-        <a href={url} class="atlas-link">{t(`showcase.${key}.try`)} <span class="atlas-forward"><AtlasIcon name="arrow" size={16} /></span></a>
       </div>
-    </article>
+      <div class="showcase__body">
+        <h3 id={`showcase-${key}-title`}>{t(`showcase.${key}.title`)} <span class="atlas-forward"><AtlasIcon name="arrow" size={20} /></span></h3>
+        <p class="showcase__desc">{t(`showcase.${key}.text`)}</p>
+      </div>
+    </a>
   ))}
 </div>
 
@@ -45,6 +43,8 @@ const views = [
     min-width: 0; display: flex; flex-direction: column;
     border: 1px solid var(--b1); border-radius: var(--r2); overflow: hidden; background: var(--s1);
   }
+  .showcase__card:is(:hover, :focus-visible) { border-color: var(--ac-text); }
+  .showcase__card:focus-visible { border-radius: var(--r2); }
   .showcase__mount {
     position: relative; display: flex; justify-content: center; align-items: start;
     height: clamp(190px, 21vw, 300px); overflow: hidden; direction: ltr;
@@ -71,10 +71,11 @@ const views = [
   }
   .showcase__earpiece { margin: 5px auto 7px; width: 35px; height: 3px; border-radius: 8px; background: var(--atlas-night-line); }
   .showcase__phone img { border-radius: 13px; }
-  .showcase__body { display: flex; align-items: start; flex-direction: column; flex: 1; padding: clamp(20px, 2.2vw, 32px); }
-  .showcase__body h3 { font-size: clamp(1.6rem, 2.3vw, 2.1rem); margin: 7px 0; letter-spacing: -.035em; }
-  .showcase__desc { color: var(--t2); max-width: 55ch; margin-bottom: 12px; line-height: 1.55; }
-  .showcase__body .atlas-link { margin-top: auto; }
+  .showcase__body { padding: clamp(18px, 2vw, 28px); }
+  .showcase__body h3 { font-size: clamp(1.6rem, 2.3vw, 2.1rem); display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin: 0 0 5px; letter-spacing: -.035em; }
+  .showcase__body .atlas-forward { align-self: center; flex: none; color: var(--ac-text); }
+  :global([dir='rtl']) .showcase__body .atlas-forward { transform: scaleX(-1); }
+  .showcase__desc { color: var(--t2); max-width: 55ch; line-height: 1.55; }
   .showcase__mount .showcase__screen--dark { display: none; }
   :global(:root[data-theme='dark']) .showcase__screen--light { display: none; }
   :global(:root[data-theme='dark']) .showcase__screen--dark { display: block; }

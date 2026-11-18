@@ -27,44 +27,24 @@
 }
 .landing-page .section-head {
   max-width: none;
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, .85fr);
-  grid-template-areas: 'kicker description' 'title description';
-  gap: 0 clamp(28px, 6vw, 92px);
-  margin-bottom: clamp(24px, 3vw, 38px);
+  margin-bottom: clamp(20px, 2.8vw, 32px);
 }
-.landing-page .section-head .eyebrow {
-  grid-area: kicker;
-  align-self: end;
-  margin-bottom: 12px;
-}
-.landing-page .section-head h2 { grid-area: title; }
-.landing-page .section-head h2,
-.landing-page .closing h2 {
+.landing-page .section-head h2 {
   font-size: clamp(2.25rem, 4.1vw, 3.75rem);
   line-height: 1.08;
   letter-spacing: -.035em;
   margin: 0;
 }
 .landing-page .section-head__desc {
-  grid-area: description;
-  align-self: end;
-  max-width: 43ch;
+  max-width: 65ch;
+  margin-top: .65rem;
   line-height: 1.55;
 }
-.landing-page .eyebrow,
 .atlas-label {
   font: 500 .71rem/1.5 var(--label-font);
   color: var(--ac-text);
   letter-spacing: .12em;
   text-transform: uppercase;
-}
-.section-head__index {
-  display: inline-block;
-  margin-inline-end: .8em;
-  padding-inline-end: .85em;
-  border-inline-end: 1px solid var(--b2);
-  font-variant-numeric: tabular-nums;
 }
 .landing-page .btn {
   min-height: 46px;
@@ -110,8 +90,6 @@
 }
 @media (max-width: 760px) {
   :root.landing-page { --nav-h: 3.6rem; }
-  .landing-page .section-head { display: block; }
-  .landing-page .section-head__desc { margin-top: 12px; }
 }
 
 .landing-page [hidden] { display: none !important; }

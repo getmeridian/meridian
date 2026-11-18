@@ -91,7 +91,7 @@ const organization = {
 
     <section id="demo" class="section" aria-labelledby="tour-title">
       <div class="container">
-        <SectionHead index="01" id="tour-title" eyebrow={t('showcase.label')} title={t('showcase.title')} desc={t('showcase.desc')} />
+        <SectionHead id="tour-title" title={t('showcase.title')} />
         <Showcase locale={locale} />
         <div class="landing__extra">
           <Accordion title={t('connect.title')}>
@@ -103,8 +103,9 @@ const organization = {
     </section>
 
     <section id="setup" class="section landing__band" aria-labelledby="setup-title">
-      <div class="container">
-        <SectionHead index="02" id="setup-title" eyebrow={t('setup.label')} title={t('setup.title')} desc={t('setup.desc')} />
+      <!-- The former closing call to action linked here. Keep its old fragment. -->
+      <div class="container" id="cta">
+        <SectionHead id="setup-title" title={t('setup.title')} desc={t('setup.desc')} />
         <div class="setup__grid">
           <div class="setup__commands">
             <CodeBlock code="curl -sSf https://getmeridian.org/install.sh | bash" label={t('setup.step1.label')} copyLabel={t('builder.copy')} copiedLabel={t('builder.copied')} />
@@ -112,10 +113,10 @@ const organization = {
             <p class="setup__hint" set:html={t('setup.hint')} />
           </div>
           <figure id="video" class="setup__video">
-            <video controls preload="none" playsinline poster={`/video/meridian-setup${videoCut}-poster.jpg`} width="1280" height="720" aria-label={t('setup.videoLabel')}>
+            <video controls controlslist="nodownload" preload="none" playsinline poster={`/video/meridian-setup${videoCut}-poster.jpg`} width="1280" height="720" aria-label={t('setup.videoLabel')}>
               <source src={`/video/meridian-setup${videoCut}.mp4`} type="video/mp4" />
             </video>
-            <figcaption set:html={t('setup.video')} />
+            <figcaption>{t('setup.video')}</figcaption>
           </figure>
         </div>
         <div class="landing__extra">
@@ -136,7 +137,7 @@ const organization = {
 
     <section id="technology" class="section" aria-labelledby="notes-title">
       <div class="container">
-        <SectionHead index="03" id="notes-title" eyebrow={t('tech.label')} title={t('tech.title')} desc={t('tech.desc')} />
+        <SectionHead id="notes-title" title={t('tech.title')} />
         <div class="notes__grid">
           <div>
             <h3 class="notes__label">{t('tech.group')}</h3>
@@ -152,18 +153,6 @@ const organization = {
       </div>
     </section>
 
-    <section id="cta" class="closing" aria-labelledby="closing-title">
-      <div class="container closing__inner">
-        <div class="closing__text">
-          <h2 id="closing-title">{t('cta.title')}</h2>
-          <p>{t('cta.desc')}</p>
-        </div>
-        <div class="btn-row closing__actions">
-          <a href="#setup" class="btn btn--primary">{t('hero.cta')} <span class="atlas-forward"><AtlasIcon name="arrow" /></span></a>
-          <a href={`/${locale}/getting-started/`} class="atlas-link">{t('hero.docs')}</a>
-        </div>
-      </div>
-    </section>
   </main>
 </Base>
 
@@ -173,7 +162,7 @@ const organization = {
   .setup__commands :global(.code-block) { margin: 0 0 14px; background: var(--s1); }
   .setup__commands :global(.code-block__label) { color: var(--ac-text); padding-block: 9px; }
   .setup__hint, .setup__video figcaption { font-size: .96rem; line-height: 1.5; color: var(--t2); }
-  .setup__hint :global(a), .setup__video :global(a) { text-decoration: underline; text-underline-offset: .2em; }
+  .setup__hint :global(a) { text-decoration: underline; text-underline-offset: .2em; }
   .setup__video { margin: 0; }
   .setup__video video { display: block; width: 100%; height: auto; border-radius: var(--r); background: var(--atlas-night); }
   .setup__video figcaption { margin-top: 10px; }
@@ -188,17 +177,6 @@ const organization = {
   .landing__extra :global(.accordion__content), .notes__grid :global(.accordion__content) { padding: 0 4px 20px; }
   .notes__label { padding-bottom: 14px; border-bottom: 1px solid var(--b2); font-size: 1.35rem; }
   .notes__link { margin-top: 18px; }
-  .closing {
-    background: var(--atlas-night); color: var(--atlas-paper); border-block-start: 2px solid var(--atlas-brass);
-  }
-  .container.closing__inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 26px 64px; padding-block: clamp(44px, 5.5vw, 76px); }
-  .closing h2 { color: var(--atlas-paper); }
-  .closing__text { max-width: 57ch; }
-  .closing__text p { margin-top: 14px; color: var(--atlas-silver); font-size: 1.05rem; }
-  .closing__actions { align-items: center; gap: 12px 24px; }
-  .closing__actions .btn { background: var(--atlas-brass); color: var(--atlas-night); }
-  .closing__actions .btn:hover { background: var(--atlas-paper); }
-  .closing__actions .atlas-link { color: var(--atlas-paper); text-decoration-color: var(--atlas-silver); }
   @media (max-width: 760px) {
     .setup__grid, .notes__grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   }
