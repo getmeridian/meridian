@@ -199,7 +199,7 @@ def test_traffic_uses_the_returned_window_and_never_node_lifetime_bytes() -> Non
         "overview-attention",
         data={"daily": {"days": 7, "history_days": 7, "daily": [{"day": "2026-11-02", "bytes": 4096}], "nodes": []}},
     )
-    assert result["traffic"] == "4 KiB" and result["trafficDays"] == "7"
+    assert result["traffic"] == "4 KB" and result["trafficDays"] == "7"
 
 
 @pytest.mark.parametrize("setting", ["historyOff", "historyError"])
@@ -364,7 +364,7 @@ def test_quick_actions_use_the_desktop_header_and_reserve_a_solid_phone_bar(loca
     )
     layout = result["layout"]
     assert layout["singleActionGroup"] and layout["primary"] and layout["headerActions"]
-    assert layout["dates"] == ["2026-11-01", "2026-11-02"] and "4 KiB" in layout["peak"]
+    assert layout["dates"] == ["2026-11-01", "2026-11-02"] and "4 KB" in layout["peak"]
     if width > 640:
         assert layout["position"] == "static" and layout["headerDisplay"] == "flex"
     else:
@@ -430,6 +430,6 @@ def test_partial_history_failures_keep_evidence_with_backoff_and_history_off_cle
         "overview-history-poll",
         data={"daily": {"days": 7, "history_days": 7, "daily": [{"day": "2026-11-02", "bytes": 4096}], "nodes": []}},
     )
-    assert result["beforeTraffic"] == result["staleTraffic"] == "4 KiB"
+    assert result["beforeTraffic"] == result["staleTraffic"] == "4 KB"
     assert result["historyStale"] and result["partialRetry"] and result["historyBackoff"]
     assert result["offTraffic"] == "—" and result["offUnavailable"]

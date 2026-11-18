@@ -161,7 +161,7 @@
     var i = 0;
     while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
     var digits = n < 10 && i > 0 ? 1 : 0;
-    // Isolated (FSI…PDI), so "64 GiB" keeps its order inside Farsi sentences.
+    // Isolated (FSI…PDI), so "64 GB" keeps its order inside Farsi sentences.
     return "\u2068" + new Intl.NumberFormat(M.i18n.locale(), { maximumFractionDigits: digits }).format(n) + " " +
       M.t("unit." + units[i].toLowerCase()) + "\u2069";
   };

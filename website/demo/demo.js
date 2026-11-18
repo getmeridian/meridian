@@ -259,9 +259,9 @@
     return view;
   }
   D.devices = devices;
-  // notices.usage_text: six significant digits in binary units.
+  // Mirror human notice placeholders. The /info compatibility fields below retain IEC labels.
   function byteText(bytes) {
-    var units = ["B", "KiB", "MiB", "GiB", "TiB"];
+    var units = ["B", "KB", "MB", "GB", "TB"];
     var index = 0;
     while (bytes >= 1024 && index < units.length - 1) { bytes /= 1024; index++; }
     return Number(bytes.toPrecision(6)) + " " + units[index];

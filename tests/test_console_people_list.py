@@ -164,7 +164,7 @@ def test_people_rows_show_compact_usage_and_secondary_facts_and_activate_as_link
     assert result["clicked"]["name"] == result["keyboard"]["name"] == "people"
     assert result["clicked"]["arg"] == result["keyboard"]["arg"] == "p-a"
     if locale == "en":
-        assert re.sub("[\u2066-\u2069]", "", row["caption"]) == "51 of 100 GiB"
+        assert re.sub("[\u2066-\u2069]", "", row["caption"]) == "51 of 100 GB"
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
