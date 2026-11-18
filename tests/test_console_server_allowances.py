@@ -1,4 +1,4 @@
-"""The Servers screen shows reviewed billing evidence with local, read-only controls."""
+"""The Servers screen shows reviewed billing evidence with a local edit action."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ pytestmark = needs_console_dom
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
-def test_server_allowance_cards_show_usage_payment_attention_and_a_cli_command(locale: str) -> None:
+def test_server_allowance_cards_show_usage_payment_attention_and_the_edit_action(locale: str) -> None:
     usage = {
         "server_ref": "srv-a",
         "node_id": "main",
@@ -46,8 +46,8 @@ def test_server_allowance_cards_show_usage_payment_attention_and_a_cli_command(l
             ],
         },
     )
-    assert "meridian server set srv-a" in result["text"]
     catalog = json.loads((UI_DIR / f"locales/{locale}.json").read_text())
+    assert catalog["presentation.billing_edit"] in result["text"]
     for key in (
         "server_allowance.approximate",
         "server_allowance.since",
@@ -96,8 +96,9 @@ def test_relay_payment_cards_say_not_measured(locale: str) -> None:
             ],
         },
     )
-    assert "srv-relay" in result["text"] and "meridian server set srv-relay" in result["text"]
+    assert "srv-relay" in result["text"]
     catalog = json.loads((UI_DIR / f"locales/{locale}.json").read_text())
+    assert catalog["presentation.billing_edit"] in result["text"]
     assert catalog["server_allowance.not_measured"] in result["text"]
     assert catalog["server_allowance.payment_overdue"] in result["text"]
     assert "0 B" not in result["text"]

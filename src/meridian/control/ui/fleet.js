@@ -26,6 +26,7 @@
 
   M.renderServers = function (view, selectedServer, selectedSection) {
     var disclosureState = new Map(), firstDraw = true;
+    function billingChanged() { if (view.meridianLiveStop) view.meridianLiveStop.refresh(false); }
     var status = h("div", { class: "live-status" });
     var cards = h("div", { class: "live-data" }, h("div", { class: "empty" }, h("span", { class: "spinner" })));
     M.mount(view, [
@@ -55,11 +56,11 @@
         }
         var all = servers.map(function (server) {
           var item = usage.find(function (row) { return row.node_id === server.node_id; });
-          return serverCard(server, item, item ? reasons(item) : []);
+          return serverCard(server, item, item ? reasons(item) : [], billingChanged);
         });
         usage.filter(function (item) {
           return !item.node_id || !servers.some(function (server) { return server.node_id === item.node_id; });
-        }).forEach(function (item) { all.push(billingCard(item, reasons(item))); });
+        }).forEach(function (item) { all.push(billingCard(item, reasons(item), billingChanged)); });
         all.forEach(function (card) {
           var states = disclosureState.get(card.dataset.server);
           if (states) card.querySelectorAll("[data-mode-section], .capacity-history, .secondary-actions").forEach(function (detail) {
@@ -102,7 +103,7 @@
     root.querySelectorAll(".server").forEach(placeHostFacts);
   };
 
-  function serverCard(server, usage, attention) {
+  function serverCard(server, usage, attention, billingChanged) {
     var sync = !server.runtime_available ? M.pill("muted", M.t("servers.convergence_unavailable"))
       : server.failed && server.failed.length ? M.pill("err", M.t("servers.failed_badge")) : server.in_sync
       ? M.pill("ok", M.t("servers.in_sync"))
@@ -160,7 +161,7 @@
         })))
         : null,
       M.detailedSection(M.t("capacity.title"), M.serverCapacity(server.capacity), "capacity"),
-      usage ? M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention), "allowance")
+      usage ? M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention, billingChanged), "allowance")
         : h("p", { class: "muted small", text: M.t("server_allowance.approximate") }),
       h("details", { class: "secondary-actions" }, h("summary", { text: M.t("action.more") }),
         hostFacts,
@@ -172,13 +173,13 @@
 
   function billingDate(value) { return "\u2066" + String(value || "").slice(0, 10) + "\u2069"; }
 
-  function billingCard(usage, attention) {
+  function billingCard(usage, attention, billingChanged) {
     return h("section", { class: "card server", "data-server": usage.server_ref },
       h("div", { class: "card-head" }, h("h2", { class: "mono", text: usage.server_ref })),
-      M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention), "allowance"));
+      M.detailedSection(M.t("server_allowance.title"), allowanceDetails(usage, attention, billingChanged), "allowance"));
   }
 
-  function allowanceDetails(usage, attention) {
+  function allowanceDetails(usage, attention, billingChanged) {
     var metadata = usage.metadata || {};
     var measured = usage.measurement === "accepted_user_traffic";
     var repeats = { month: "server_allowance.month", year: "server_allowance.year", none: "server_allowance.one_off" };
@@ -215,8 +216,12 @@
           (reason === "allowance_exceeded" || reason === "payment_overdue" ? "notice-err" : "notice-warn"),
           text: M.t(labels[reason]) }) : null;
       }),
-      h("p", { class: "muted small", text: M.t("server_allowance.edit_hint") }),
-      M.command("meridian server set " + usage.server_ref));
+      h("div", { class: "row-actions" }, h("button", { type: "button", class: "btn btn-ghost btn-sm",
+        onclick: function () {
+          M.editPresentation(usage.server_ref).then(function (result) {
+            if (result && typeof result === "object") billingChanged();
+          });
+        } }, M.t("presentation.billing_edit"))));
   }
 
   // -- revisions --------------------------------------------------------------------------------

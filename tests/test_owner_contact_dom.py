@@ -51,9 +51,8 @@ def test_malformed_contact_cannot_create_an_active_link(mode: str) -> None:
 
 
 @pytest.mark.parametrize("locale", ["en", "ru", "fa", "zh"])
-def test_console_shows_contact_with_the_reviewed_cli_command(locale: str) -> None:
+def test_console_shows_contact_as_text_with_an_edit_action(locale: str) -> None:
     result = run_console("owner-settings", locale, {"contact": {"text": TEXT, "link": "mailto:help@example.com"}})
     assert TEXT in result["text"] and "mailto:help@example.com" in result["text"]
-    assert "meridian fleet contact" in result["text"]
-    assert result["controls"] == 0
+    assert result["controls"] == 1
     assert result["injected"] is False

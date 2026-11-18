@@ -105,7 +105,7 @@ Updating is part of the change, not a separate task. In the SAME commit:
 When in doubt: shorter is better. A 30-line CLAUDE.md that's current beats a 100-line one that's half-stale.
 
 ## Conventions
-- **Owner contact**: public, owned by reviewed delivery intent; page and app links are chosen by the operator and open only on user action
+- **Owner contact**: public; seeded from reviewed intent, then owned by the control service. A panel edit requires a recent identity check. Page and app links open only on user action
 - **Private notes and tags**: operator-owned service data; scoped reads blank them below people/admin, and delivery, events, and logs never carry their contents
 - **Shell injection**: `shlex.quote()` on ALL `conn.run()` interpolated values
 - **Demo data**: RFC 5737 IPs (`198.51.100.x`), never real server IPs
