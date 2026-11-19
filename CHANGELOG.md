@@ -15,6 +15,7 @@ newest first; the last is what 4.0 changes compared with 3.x.
 ### Since 4.0.0b18
 
 - Overview shows when a managing device last confirmed saving an encrypted recovery copy and how many changes came later. The owner can download a current copy for the keys already registered. A browser download does not claim an off-server save.
+- Restoring to a replacement VPS can finish when the original server is still reachable. Meridian retires its old nginx configuration before removing unused certificates and preserves other sites. An interrupted restore can resume from the same recovery file.
 - Updated exits refuse new connections after the last expiry they received, even while the control server is unavailable. Active transfers and other people’s connections continue; a renewal takes effect when the exit receives it.
 
 ### Since 4.0.0b17

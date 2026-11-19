@@ -28,6 +28,7 @@ from pathlib import Path
 
 from meridian import __version__, config
 from meridian.backup import BackupError
+from meridian.backup.old_control import detach_control_ingress, retire_bootstrap_certificate
 from meridian.backup.profile_restore import (
     RestoreProfileReview,
     refuse_profile_restore_mismatch,
@@ -39,6 +40,7 @@ from meridian.compiler.deployment import deployment_server_refs
 from meridian.compiler.models import ControlServicePayload, FirewallRulePayload, ResourcePlan
 from meridian.contexts import Superseded, context_home, mark_superseded, superseded
 from meridian.control.client import ControlClient, ControlServiceAuthError, ControlServiceError
+from meridian.control.enrollment import token_sha256
 from meridian.control.restore import stage_restored_database
 from meridian.control.snapshot import Snapshot, SnapshotError, SnapshotHeader, read_header
 from meridian.core.access_profiles import profile_declarations_hash
@@ -64,7 +66,7 @@ from meridian.state_fence import SSHApplyFence, handed_over
 STAGING_DIR = "restore"
 REMOTE_DATABASE = f"{CONTROL_SERVICE_STATE_DIR}/control.db"
 QUICK_TIMEOUT = 5.0
-ApplyIntent = Callable[[ClusterConfig, SetupIntent], None]
+ApplyIntent = Callable[[ClusterConfig, SetupIntent, Callable[[], None] | None], None]
 Persist = Callable[[ClusterConfig], None]
 ConnectionBuilder = Callable[[ServerEntry], ServerConnection]
 
@@ -304,8 +306,36 @@ class ControlRestorer:
             verify_restored(self.cluster, restore.fleet_epoch)
             self._checkpoint(restore, "installed")
         if not restore.reached("applied"):
+            # Bootstrap vhosts are not compiled nginx artifacts. Release them before retiring
+            # the old TLS certificate, including when a previous run already removed its files.
+            old_conn = None
+            before_retirement: Callable[[], None] | None = None
+            if review.old_reachable and restore.from_server_ref != review.target.id:
+                old = self._registry.find(restore.from_server_ref)
+                if old is None or old.host != restore.from_address or old.host == review.target.host:
+                    raise BackupError(
+                        "The previous controller's recorded address changed; check the server shelf.", category="user"
+                    )
+                if restore.from_server_ref in deployment_server_refs(review.intent):
+                    raise BackupError("The previous control server is still in the reviewed topology.", category="user")
+                old_conn = self._connection(old)
+
+                def retire_ingress() -> None:
+                    self._on_step("Retiring the previous control server's nginx ingress")
+                    assert old_conn is not None
+                    detach_control_ingress(old_conn, self.cluster.fleet_id, token_sha256(self.cluster.panel.api_token))
+
+                before_retirement = retire_ingress
+            elif restore.from_server_ref != review.target.id and review.resume_from is not None:
+                # A resumed restore may have reached the old server before the interruption;
+                # if it is no longer available, do not carry those SSH mutations into apply.
+                if forget_server(self.cluster, review.setup.retiring, restore.from_server_ref):
+                    self._persist(self.cluster)
             self._on_step("Applying the fleet: every agent enrolls with the restored service")
-            apply(self.cluster, review.intent)
+            apply(self.cluster, review.intent, before_retirement)
+            if old_conn is not None:
+                # A dedicated controller may have no exit certificate binding to retire.
+                retire_bootstrap_certificate(old_conn, review.intent.control.public_hostname or restore.from_address)
             self._checkpoint(restore, "applied")
         from meridian.people_adoption import finish_people_adoption
 

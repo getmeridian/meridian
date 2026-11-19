@@ -78,6 +78,7 @@ def execute_resource_plan(
     persist: PersistCluster | None = None,
     clock: Clock | None = None,
     max_unknown_attempts: int = 2,
+    before_retirement: Callable[[], None] | None = None,
     after_apply: AfterApply | None = None,
     cancellation: CancellationToken | None = None,
     reporter: Reporter | None = None,
@@ -118,6 +119,7 @@ def execute_resource_plan(
             save=save,
             now=now,
             max_unknown_attempts=max_unknown_attempts,
+            before_retirement=before_retirement,
             after_apply=after_apply,
             cancellation=cancellation,
             reporter=reporter,
@@ -138,6 +140,7 @@ def _execute_fenced(
     save: PersistCluster,
     now: Clock,
     max_unknown_attempts: int,
+    before_retirement: Callable[[], None] | None,
     after_apply: AfterApply | None,
     cancellation: CancellationToken | None,
     reporter: Reporter | None,
@@ -205,6 +208,8 @@ def _execute_fenced(
     if execution.all_succeeded:
         # Retire only after everything still desired has converged, so a
         # removal never strands traffic that the new plan has not yet carried.
+        if before_retirement is not None:
+            before_retirement()
         retired, errors = retire(retired_bindings(plan, cluster), drivers, cluster, save)
         execution = execution.model_copy(update={"retired": retired, "retirement_errors": errors})
     if execution.all_succeeded:

@@ -125,25 +125,123 @@ class CertificateRetirement:
             for payload in kept
         ):
             return
-        record = shlex.quote(f"Le_RealFullChainPath='{fullchain}'")
-        files = f"{shlex.quote(fullchain)} {shlex.quote(directory + '/key.pem')}"
-        command = (
-            f"for conf in $(grep -l -F {record} /root/.acme.sh/*/*.conf 2>/dev/null);"
-            ' do rm -rf "$(dirname "$conf")" || exit 1; done;'
-            f" rm -f {files}"
+        remove_unused_certificate(conn, fullchain, keep_challenge=bool(kept))
+
+
+# Inspect nginx's effective includes on the server. Never print the configuration (it can
+# hold private routes), and keep renewal for indirect symlink or variable-based references.
+_CERT_USAGE = r"""
+import os, re, shlex, sys
+base, chain = sys.argv[1:]
+certs = {os.path.realpath(chain), os.path.realpath(os.path.join(os.path.dirname(chain), "key.pem"))}
+under = os.path.realpath(base) + "/"
+lexer = shlex.shlex(sys.stdin, posix=True, punctuation_chars=";{}")
+lexer.whitespace_split = True
+shared, cert_directive = False, False
+try:
+    for value in lexer:
+        # Comments and quotes follow ordinary nginx lexical boundaries; delimiters
+        # may be adjacent (e.g. two directives on one line). Preserve uncertain uses.
+        if os.path.isabs(value):
+            real = os.path.realpath(value)
+            if real in certs:
+                print("in-use")
+                break
+            if cert_directive and real.startswith(under):
+                shared = True
+        if cert_directive and ("$" in value or not os.path.isabs(value)):
+            print("in-use")
+            break
+        cert_directive = bool(re.fullmatch(r"[a-z_]*certificate(?:_key)?", value))
+    else:
+        print("in-use" if cert_directive else "shared" if shared else "unused")
+except ValueError:
+    print("in-use")  # syntax the conservative lexer cannot interpret
+"""
+
+
+_RETIRE_CHALLENGE = r"""
+import os, pathlib, subprocess, sys
+conf, link = map(pathlib.Path, sys.argv[1:3])
+repair = len(sys.argv) > 3
+stage = conf.parents[1] / ".meridian-acme-retirement"
+pairs = [(link, stage / "link"), (conf, stage / "conf")]
+def exists(path): return os.path.lexists(path)
+if not any(exists(src) or exists(dst) for src,dst in pairs): sys.exit(0)
+if exists(stage) and (stage.is_symlink() or not stage.is_dir() or stage.stat().st_uid != os.geteuid()
+                      or stage.stat().st_mode & 0o077):
+    sys.exit("Unrecognized ACME listener staging directory.")
+for src,dst in pairs:
+    if exists(src) and exists(dst): sys.exit("ACME listener changed during retirement.")
+    if not (exists(src) or exists(dst)): continue
+    item = src if exists(src) else dst
+    if src == conf and (item.is_symlink() or not item.is_file()
+            or b"# Managed by Meridian v4 for ACME HTTP-01." not in item.read_bytes()[:2048]):
+        sys.exit(0)  # owned by someone else
+    if src == link and (not item.is_symlink() or (link.parent / os.readlink(item)).resolve() != conf):
+        sys.exit(0)
+if repair:
+    for src,dst in reversed(pairs):
+        if exists(dst): dst.rename(src)
+    if stage.exists(): stage.rmdir()
+    sys.exit(0)
+def run(*args):
+    return subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+stage.mkdir(mode=0o700,exist_ok=True)
+try:
+    for src,dst in pairs:
+        if exists(src): src.rename(dst)
+    valid = run("nginx","-t")
+    active = run("systemctl","is-active","--quiet","nginx")
+    if not valid or (active and not run("systemctl","reload","nginx")):
+        sys.exit("Could not reload nginx without the ACME listener; its files were restored.")
+except BaseException:
+    for src,dst in reversed(pairs):
+        if exists(dst) and not exists(src): dst.rename(src)
+    if run("systemctl","is-active","--quiet","nginx") and run("nginx","-t"):
+        run("systemctl","reload","nginx")
+    raise
+for _,dst in pairs: dst.unlink(missing_ok=True)
+stage.rmdir()
+"""
+
+
+def remove_unused_certificate(conn: ServerConnection, fullchain: str, *, keep_challenge: bool) -> None:
+    """Remove renewal/files only once effective nginx has released them, including on a shared host."""
+    if not _CERTIFICATE.fullmatch(fullchain):
+        raise ResourceReconcileError(f"Unexpected Meridian certificate path: {fullchain!r}")
+    directory = fullchain.rsplit("/", 1)[0]
+    usage = shlex.join(("python3", "-c", _CERT_USAGE, IP_CERTIFICATE_DIRECTORY, fullchain))
+    check = (
+        "used=unused; if command -v nginx >/dev/null; then "
+        "dump=$(mktemp) || exit 1; trap 'rm -f \"$dump\"' EXIT; "
+        'nginx -T > "$dump" 2>/dev/null || { echo "nginx configuration cannot be validated" >&2; exit 1; }; '
+        f'used=$({usage} < "$dump") || exit 1; fi; '
+        '[ "$used" != in-use ] || exit 0; '
+    )
+    record = shlex.quote(f"Le_RealFullChainPath='{fullchain}'")
+    files = f"{shlex.quote(fullchain)} {shlex.quote(directory + '/key.pem')}"
+    command = check
+    if not keep_challenge:
+        enabled = ACME_CHALLENGE_PATH.replace("/sites-available/", "/sites-enabled/")
+        challenge = shlex.join(("python3", "-c", _RETIRE_CHALLENGE, ACME_CHALLENGE_PATH, enabled))
+        command = f"if [ -d /etc/nginx/.meridian-acme-retirement ]; then {challenge} repair || exit 1; fi; " + command
+        command += f'if [ "$used" = unused ]; then {challenge} || exit 1; fi; '
+    command += (
+        'for conf in /root/.acme.sh/*/*.conf; do [ -f "$conf" ] || continue; '
+        f'if grep -Fqx -- {record} "$conf"; then '
+        'rm -rf -- "$(dirname "$conf")" || exit 1; else rc=$?; [ "$rc" -eq 1 ] || exit 1; fi; done;'
+        f" rm -f {files} || exit 1"
+    )
+    if directory != IP_CERTIFICATE_DIRECTORY:
+        command += (
+            f"; if [ -d {shlex.quote(directory)} ]; then rmdir --ignore-fail-on-non-empty {shlex.quote(directory)}; fi"
         )
-        if directory != IP_CERTIFICATE_DIRECTORY:
-            command += f" && rmdir --ignore-fail-on-non-empty {shlex.quote(directory)} 2>/dev/null; true"
-        if not kept:
-            enabled = ACME_CHALLENGE_PATH.replace("/sites-available/", "/sites-enabled/")
-            command = (
-                f"({command}) && rm -f {shlex.quote(ACME_CHALLENGE_PATH)} {shlex.quote(enabled)}"
-                " && { ! systemctl is-active --quiet nginx || { nginx -t 2>&1 && systemctl reload nginx; }; }"
-            )
-        result = conn.run(command, timeout=60)
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout).strip()[:200]
-            raise ResourceReconcileError(f"Could not remove certificate {fullchain}: {detail}")
+    result = conn.run(command, timeout=60, sensitive=True)
+    if result.returncode != 0:
+        raise ResourceReconcileError(
+            f"Could not safely remove certificate {fullchain}; check the remaining nginx configuration."
+        )
 
 
 class RealmHopRetirement:

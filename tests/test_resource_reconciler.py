@@ -333,10 +333,12 @@ class TestCheckpointedExecution:
             plan,
             cluster,
             {"firewall_rule": firewall, "client_endpoint": retiring, "control_user": retiring},
+            before_retirement=lambda: events.append("detach-old-ingress"),
             persist=lambda _state: None,
             clock=_clock,
         )
 
+        assert events.index("detach-old-ingress") < events.index("retire:control_user:gone:control_user-remote")
         assert result.all_succeeded
         assert result.retired == ["control_user:gone", "client_endpoint:gone"]
         assert events.index("apply:firewall:srv-exit:tcp:443") < events.index(
@@ -588,6 +590,7 @@ class TestCheckpointedExecution:
             new_plan,
             cluster,
             {"firewall_rule": failed},
+            before_retirement=lambda: pytest.fail("must not detach a working ingress after a failed replacement"),
             persist=lambda _state: None,
             clock=_clock,
         )

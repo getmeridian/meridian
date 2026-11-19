@@ -271,7 +271,7 @@ def test_matching_profiles_restore_and_keep_membership_while_adopting_legacy_dec
     restorer, target = restorer_for(cluster)
     fences = []
 
-    def apply(state, wanted):
+    def apply(state, wanted, before_retirement):
         plan = compile_topology(wanted)
         access = review_restored_profile_access(state, plan)
         fences.append(access)
@@ -284,7 +284,7 @@ def test_matching_profiles_restore_and_keep_membership_while_adopting_legacy_dec
         )
         context.cluster.panel.url = "https://198.51.100.13/control"
         ServiceSettingsDriver(context).apply(action, None)
-        new_server.apply(state, wanted)
+        new_server.apply(state, wanted, before_retirement)
 
     restorer.run(restorer.review(target, RestoreSource(path, snapshot)), apply)
     saved = ClusterConfig.load()

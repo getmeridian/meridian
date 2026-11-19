@@ -203,6 +203,7 @@ class SetupRuntime:
         intent: SetupIntent,
         *,
         expected_plan_hash: str | None = None,
+        before_retirement: Callable[[], None] | None = None,
     ) -> ResourceExecutionResult:
         draft = SetupDraft.from_intent(intent)
         review_hash = self.review(draft).review_hash
@@ -211,7 +212,7 @@ class SetupRuntime:
                 "The compiled topology changed after it was reviewed.",
                 hint="Review the current plan before applying it.",
             )
-        return self.apply(draft.model_copy(update={"review_hash": review_hash}))
+        return self.apply(draft.model_copy(update={"review_hash": review_hash}), before_retirement=before_retirement)
 
     def inspect_intent(
         self,
@@ -252,7 +253,9 @@ class SetupRuntime:
         fence_warning = fence.check(local_fence_view(cluster)) if fence is not None else ""
         return inspection.model_copy(update={"review_hash": review.review_hash, "fence_warning": fence_warning})
 
-    def apply(self, draft: SetupDraft) -> ResourceExecutionResult:
+    def apply(
+        self, draft: SetupDraft, *, before_retirement: Callable[[], None] | None = None
+    ) -> ResourceExecutionResult:
         cluster = self._cluster_loader()
         review = self.review(draft, cluster=cluster)
         if not draft.review_hash or draft.review_hash != review.review_hash:
@@ -309,6 +312,7 @@ class SetupRuntime:
             drivers,
             persist=self._persist,
             after_apply=environment_after_apply_barrier,
+            before_retirement=before_retirement,
             cancellation=self._cancellation,
             reporter=self._reporter,
             operation=self._operation,

@@ -20,6 +20,7 @@
 - **Restore keeps profile declarations reviewed** — compare the snapshot fingerprint before staging or target registration; unstamped snapshots need the same compiled grants, and checkpoints pin declarations through every resume.
 - **Retained local intent inherits profile history** — OR the deposited cluster's effective usage into the local flag; matching legacy maps adopt a fingerprint under their unchanged access hash, while fingerprinted restores keep the runtime's declaration fence.
 - **A copy behind the snapshot's deposited generation must not restore** — its intent would retire what newer applies added; it restores into a fresh context, and the stale one gets `superseded.json` and refuses changes.
+- A reachable replaced controller releases only its marked bootstrap nginx files and service after verifying the replacement. Retry uses the recorded original host; certificates still used by another nginx site keep their renewal.
 - **Refuse while the old control server answers** — two services at once split the fleet; only `--force` overrides.
 - **Open the control service's firewall rules before its bootstrap** — restore installs before the plan runs, and a fresh server's SSH-only firewall kept the ACME challenge out.
 - **Mark the new server's fence.json handed over** — otherwise an apply during an outage takes the lease over SSH around the service.

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import getpass
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 import typer
@@ -89,7 +90,7 @@ def run(
             err_console.print("  [dim]No terminal to confirm on; pass --yes to restore without asking.[/dim]")
         raise typer.Exit(1)
 
-    def apply(state: ClusterConfig, intent: SetupIntent) -> None:
+    def apply(state: ClusterConfig, intent: SetupIntent, before_retirement: Callable[[], None] | None = None) -> None:
         try:
             setup = SetupRuntime(registry, cluster_loader=lambda: state).review(SetupDraft.from_intent(intent))
             access_review = review_restored_profile_access(state, setup.plan)
@@ -100,6 +101,7 @@ def run(
             registry,
             intent,
             failure="The restored fleet did not finish applying",
+            before_retirement=before_retirement,
             hint="Run the same `meridian restore` again; it continues from here.",
             expected_plan_hash=setup.review_hash,
             access_review_hash=access_review.access_hash if access_review is not None else None,
