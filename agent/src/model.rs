@@ -207,6 +207,7 @@ pub struct XrayConfigSpec {
 #[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct VlessUser {
+    pub expires_unix: Option<u64>,
     pub user_id: String,
     pub uuid: String,
     pub flow: String,
@@ -225,6 +226,7 @@ pub struct XrayUsersSpec {
 #[derive(Deserialize, Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct Hysteria2User {
+    pub expires_unix: Option<u64>,
     pub user_id: String,
     pub auth: String,
 }
@@ -278,6 +280,8 @@ pub struct Resource {
     pub depends_on: Vec<String>,
     /// The resource object as received.
     pub raw: Value,
+    /// This effective resource lacks accounts removed by a signed local deadline.
+    pub expiry_filtered: bool,
     /// Protocol hash of `raw` (the observation's `applied_sha256`).
     pub hash: String,
     pub spec: Spec,
@@ -294,6 +298,7 @@ impl Resource {
             kind: header.kind,
             depends_on: header.depends_on,
             raw: raw.clone(),
+            expiry_filtered: false,
             hash,
             spec,
         })

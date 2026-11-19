@@ -12,6 +12,10 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b18
+
+- Updated exits refuse new connections after the last expiry they received, even while the control server is unavailable. Active transfers and other people’s connections continue; a renewal takes effect when the exit receives it.
+
 ### Since 4.0.0b17
 
 - Overview links each server warning to the right place and separates routine

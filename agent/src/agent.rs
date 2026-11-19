@@ -26,6 +26,7 @@ use crate::verify::{Admission, Trust, admit, verify_desired};
 use crate::{debug, info, warn};
 
 mod commands;
+mod expiry;
 mod reporting;
 
 /// Report and stats cadence before the first hello names the service's.
@@ -90,6 +91,8 @@ pub struct Agent<'a> {
     session: Option<Session>,
     /// Keep the negotiated clock even if a best-effort request drops the session.
     server_offset: i64,
+    expiry_clock: crate::expiry::Clock,
+    next_expiry: Option<u64>,
     /// The service revoked this node's certificate: only a fresh enrollment token helps.
     revoked: bool,
     /// The service refused this agent's protocol; no hello is sent before this instant.
@@ -158,6 +161,7 @@ impl<'a> Agent<'a> {
         let command_state = CommandState::load(&opts.state_dir)?;
         let roots = opts.tls_ca_file.as_deref().map(load_roots).transpose()?;
         let client = Client::new(&bootstrap.service_url, opts.allow_http, roots.clone());
+        let expiry_clock = crate::expiry::Clock::load(&opts.state_dir)?;
         let mut agent = Agent {
             bootstrap,
             state,
@@ -165,7 +169,9 @@ impl<'a> Agent<'a> {
             identity: None,
             trust: None,
             session: None,
-            server_offset: 0,
+            server_offset: expiry_clock.offset,
+            expiry_clock,
+            next_expiry: None,
             revoked: false,
             protocol_refused_until: None,
             traffic,
@@ -327,6 +333,13 @@ impl<'a> Agent<'a> {
         }
         debug!("session open until {}", session.expires_at);
         self.server_offset = session.server_offset;
+        if self.expiry_clock.offset != session.server_offset {
+            self.expiry_clock.offset = session.server_offset;
+            self.expiry_clock
+                .save(&self.opts.state_dir)
+                .map_err(HttpError::Protocol)?;
+            self.arm_deadline();
+        }
         self.session = Some(session);
         Ok(())
     }
@@ -442,6 +455,7 @@ impl<'a> Agent<'a> {
         if target.fleet_epoch < self.state.highest_epoch.unwrap_or(1) {
             return Err("The held document is from an older fleet epoch.".into());
         }
+        self.project_deadlines();
         let engine = Engine {
             root: self.opts.root.clone(),
             cache_dir: self.opts.state_dir.join("cache"),
@@ -458,6 +472,7 @@ impl<'a> Agent<'a> {
         );
         self.observations = pass.observations;
         self.flow_error = pass.flow_error;
+        self.retry_pending_expiry();
         if pass.converged {
             if self.state.applied.as_ref() != Some(&target) {
                 info!(
@@ -568,7 +583,9 @@ impl<'a> Agent<'a> {
     pub fn poll_once(&mut self) -> Result<PollOutcome, HttpError> {
         self.retry_command_results()?;
         let have = self.state.held_ref();
-        let wanted = self.opts.wait_seconds;
+        let wanted = self
+            .before_expiry(Duration::from_secs(self.opts.wait_seconds))
+            .as_secs();
         let body = self.with_session(|client, session| {
             client.poll(&PollRequest {
                 kind: "poll",
@@ -644,7 +661,8 @@ impl<'a> Agent<'a> {
                 if !self.hold(next, desired, &reference) {
                     return Accepted::Refused;
                 }
-                self.resources = verified.resources;
+                // Identical signed resources: keep the effective projection, including
+                // any accounts already removed while the controller was unreachable.
                 Accepted::Recorded
             }
             Admission::Apply => {
@@ -688,9 +706,6 @@ impl<'a> Agent<'a> {
     /// Run forever.
     pub fn run(&mut self) -> ! {
         let mut backoff = Backoff::new();
-        if let Err(err) = self.connect() {
-            info!("cannot reach the control service yet: {err}");
-        }
         if self.has_held()
             && let Err(err) = self.apply_held()
         {
@@ -700,6 +715,7 @@ impl<'a> Agent<'a> {
         let mut next_stats = Instant::now();
         let mut next_reconcile = Instant::now() + RECONCILE_INTERVAL;
         loop {
+            self.enforce_due();
             if Instant::now() >= next_reconcile {
                 if let Err(err) = self.apply_held() {
                     info!("{err}");
@@ -719,6 +735,7 @@ impl<'a> Agent<'a> {
                         }
                     };
             }
+            self.enforce_due();
             if Instant::now() >= next_report {
                 let result = self.send_report();
                 next_report = Instant::now()
@@ -730,6 +747,7 @@ impl<'a> Agent<'a> {
                         }
                     };
             }
+            self.enforce_due();
             let pause = match self.poll_once() {
                 Ok(PollOutcome::Idle(after)) => {
                     backoff.reset();
@@ -758,7 +776,7 @@ impl<'a> Agent<'a> {
                     delay
                 }
             };
-            std::thread::sleep(pause);
+            std::thread::sleep(self.before_expiry(pause));
         }
     }
 }

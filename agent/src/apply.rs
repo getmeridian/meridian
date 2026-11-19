@@ -152,6 +152,7 @@ impl Engine<'_> {
         let mut changed = BTreeSet::new();
         let mut placed_users: HashSet<String> = HashSet::new();
         let mut config_seen = false;
+        let mut expiry_pending = false;
         let mut observations = Vec::with_capacity(resources.len());
         let mut entries: HashMap<String, LedgerEntry> = HashMap::new();
         for entry in ledger.drain(..) {
@@ -227,6 +228,7 @@ impl Engine<'_> {
                     ("applied", None)
                 }
                 Outcome::Failed(failure) => {
+                    expiry_pending |= failure.code == "offline_expiry_pending";
                     info!(
                         "{} {}: {} ({})",
                         resource.kind, resource.id, failure.message, failure.code
@@ -246,6 +248,7 @@ impl Engine<'_> {
             // on disk): a null installed hash makes the next pass restart it once it runs.
             if matches!(resource.spec, Spec::Unit(_))
                 && status != "applied"
+                && !(status == "blocked" && expiry_pending)
                 && let Some(entry) = entries.get_mut(&resource.id)
             {
                 entry.installed_sha256 = None;

@@ -34,7 +34,7 @@ from meridian.control.cutoff import CutOffLedger
 from meridian.control.delivery_geodata import cached_geodata
 from meridian.control.devices import DeviceLedger, HeaderReader
 from meridian.control.enrollment import NodeAuthority
-from meridian.control.errors import ServiceError
+from meridian.control.errors import ServiceError, agent_error
 from meridian.control.events import EventLedger
 from meridian.control.languages import LanguageLedger
 from meridian.control.models import (
@@ -318,7 +318,11 @@ class ControlService:
                 (self.now(), agent_version, node_id),
             )
             if capabilities is not None:
+                row = self._node(node_id)
+                previous = json.loads(row["agent_capabilities"] or "[]") if row else []
                 self.flow_blocks.hello(node_id, capabilities)
+                if ("offline_user_expiry" in capabilities) != ("offline_user_expiry" in previous):
+                    self._compose(node_id)
 
     def node_status(self, node_id: str) -> NodeStatus:
         row = self._node(node_id)
@@ -391,6 +395,16 @@ class ControlService:
                 if newer or commands:
                     if recheck is not None:
                         recheck()
+                        # An older agent session may still be long-polling through an upgrade.
+                        if (
+                            newer
+                            and row is not None
+                            and "offline_user_expiry" not in capabilities
+                            and "offline_user_expiry" in json.loads(row["agent_capabilities"] or "[]")
+                        ):
+                            raise agent_error(
+                                "unauthenticated", "Open a new session for the current node capabilities."
+                            )
                     desired: Any = json.loads(document) if newer and document is not None else None
                     break
                 remaining = deadline - time.monotonic()
@@ -704,7 +718,12 @@ class ControlService:
         if row is None or not row["spec"]:
             return
         spec = NodeSpec.model_validate_json(row["spec"])
-        resources = with_users(spec, self.list_users(), profiles=self.settings().access_profiles)
+        resources = with_users(
+            spec,
+            self.list_users(),
+            profiles=self.settings().access_profiles,
+            offline_expiry="offline_user_expiry" in json.loads(row["agent_capabilities"] or "[]"),
+        )
         resources_sha = canonical_sha256(resources)
         held = json.loads(row["document"]) if row["document"] else None
         signed = (held["signature"]["key_id"], held["fleet_epoch"]) if held else None

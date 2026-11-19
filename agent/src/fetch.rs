@@ -92,6 +92,7 @@ pub struct Client {
     base: String,
     service_url: String,
     session: Mutex<Option<String>>,
+    deadline: Mutex<Option<u64>>,
     allow_http: bool,
 }
 
@@ -116,7 +117,22 @@ impl Client {
             base: format!("{service_url}/agent/v1"),
             service_url: service_url.to_string(),
             session: Mutex::new(None),
+            deadline: Mutex::new(None),
             allow_http,
+        }
+    }
+
+    pub(crate) fn set_deadline(&self, local: Option<u64>) {
+        *self.deadline.lock().unwrap_or_else(|e| e.into_inner()) = local;
+    }
+
+    fn time_budget(&self, usual: Duration) -> Result<Duration, String> {
+        let deadline = *self.deadline.lock().unwrap_or_else(|e| e.into_inner());
+        let remaining = deadline.map_or(usual, |t| usual.min(crate::expiry::time_left(t)));
+        if remaining.is_zero() {
+            Err("A local access deadline is due.".into())
+        } else {
+            Ok(remaining)
         }
     }
 
@@ -158,7 +174,7 @@ impl Client {
             .agent
             .post(format!("{}/{endpoint}", self.base))
             .config()
-            .timeout_global(Some(timeout))
+            .timeout_global(Some(self.time_budget(timeout).map_err(HttpError::Network)?))
             .build()
             .header("Content-Type", "application/json");
         if session && let Some(token) = self.session_token() {
@@ -246,7 +262,7 @@ impl Fetch for Client {
         };
         let response = request
             .config()
-            .timeout_global(Some(DOWNLOAD_TIMEOUT))
+            .timeout_global(Some(self.time_budget(DOWNLOAD_TIMEOUT)?))
             .build()
             .call()
             .map_err(|err| format!("{label} download failed: {}", self.scrub(err.to_string())))?;

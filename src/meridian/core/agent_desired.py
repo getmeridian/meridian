@@ -227,7 +227,20 @@ class XrayConfigResource(_ResourceBase):
         return self
 
 
-class VlessUser(AgentModel):
+class _ExpiringUser(AgentModel):
+    # Omission preserves the signed byte representation on agents without this capability.
+    expires_unix: int | None = Field(
+        default=None,
+        ge=0,
+        le=4_070_908_800,
+        exclude_if=lambda value: value is None,
+        description=(
+            "Last known access deadline in UTC seconds, rounded up. Only sent with offline_user_expiry negotiated."
+        ),
+    )
+
+
+class VlessUser(_ExpiringUser):
     """A VLESS client of one inbound."""
 
     user_id: UserId
@@ -238,7 +251,7 @@ class VlessUser(AgentModel):
     flow: Literal["", "xtls-rprx-vision"] = Field(description="VLESS flow; empty for XHTTP and WebSocket inbounds.")
 
 
-class Hysteria2User(AgentModel):
+class Hysteria2User(_ExpiringUser):
     """A Hysteria2 client of one inbound."""
 
     user_id: UserId

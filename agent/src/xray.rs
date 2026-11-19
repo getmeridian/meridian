@@ -235,7 +235,16 @@ impl Engine<'_> {
         let dest = host_path(&self.root, &spec.path);
         let current =
             fsutil::read_optional(&dest).map_err(|err| Failure::io(&err, "cannot read config"))?;
-        if current.as_deref() == Some(&bytes[..]) {
+        let expiry_projected = users.iter().any(|(_, r)| r.expiry_filtered);
+        let recorded = entries.get(&spec.id).filter(|e| e.kind == "xray_config");
+        // An interrupted expiry can have published the new config without completing
+        // its live edits. Reconcile the outstanding removal without restarting the core.
+        let recover_expiry = expiry_projected
+            && current.as_deref() == Some(&bytes[..])
+            && unrecorded(recorded, &installed)
+            && recorded.is_some()
+            && self.xray_running(resources);
+        if !recover_expiry && current.as_deref() == Some(&bytes[..]) {
             fsutil::ensure_mode_owner(&dest, 0o600, None)
                 .map_err(|err| Failure::io(&err, "cannot set mode"))?;
             placed.extend(users.iter().map(|(u, _)| u.id().to_string()));
@@ -300,13 +309,19 @@ impl Engine<'_> {
             return Err(Failure::new("validation_failed", truncate(&message, 300)));
         }
 
-        let live = self.live_plan(spec, resources, entries, current.as_deref(), &composed);
-        let live_done = if let Some(changes) = live {
-            let previous: Value =
-                serde_json::from_slice(current.as_ref().expect("live plan checked the file"))
-                    .map_err(|_| {
-                        Failure::new("validation_failed", "The previous Xray config is invalid.")
-                    })?;
+        let live = self.live_plan(
+            spec,
+            resources,
+            entries,
+            current.as_deref(),
+            &composed,
+            recover_expiry,
+        );
+        let live_done = if let Some((changes, previous)) = live {
+            let preserve_flows = expiry_projected
+                && changes
+                    .iter()
+                    .all(|c| c.add.is_none() && c.rebuild.is_none());
             self.apply_live_config(LiveApply {
                 spec,
                 resources,
@@ -314,6 +329,7 @@ impl Engine<'_> {
                 binary: &binary,
                 previous: &previous,
                 changes: &changes,
+                preserve_flows,
                 temporary: &tmp,
             })?
         } else {
@@ -355,7 +371,8 @@ impl Engine<'_> {
         entries: &HashMap<String, LedgerEntry>,
         current: Option<&[u8]>,
         composed: &Value,
-    ) -> Option<Vec<LiveChange>> {
+        recover_expiry: bool,
+    ) -> Option<(Vec<LiveChange>, Value)> {
         let config = resources.iter().find(|r| r.id == spec.id)?;
         let config_entry = entries.get(&config.id)?;
         if config_entry.kind != config.kind || config_entry.applied_sha256 != config.hash {
@@ -382,13 +399,20 @@ impl Engine<'_> {
         if previous_refs.len() != previous.len() {
             return None;
         }
-        let before = compose::render(&compose::compose(&spec.config, &previous_refs).ok()?);
-        if current != Some(&before[..]) {
+        let previous_config = compose::compose(&spec.config, &previous_refs).ok()?;
+        let before = compose::render(&previous_config);
+        if recover_expiry {
+            if config_entry.installed_sha256.as_deref()
+                != Some(crate::jcs::sha256_hex(&before).as_str())
+            {
+                return None;
+            }
+        } else if current != Some(&before[..]) {
             return None;
         }
         let mut changes = Vec::new();
         for (resource, old) in &previous {
-            if old.hash == resource.hash {
+            if old.raw == resource.raw {
                 continue;
             }
             match (&old.spec, &resource.spec) {
@@ -408,7 +432,7 @@ impl Engine<'_> {
         if changes.is_empty() || !self.xray_running(resources) {
             return None;
         }
-        Some(changes)
+        Some((changes, previous_config))
     }
 
     /// Every unit that restarts on a users resource is active.
@@ -610,6 +634,7 @@ mod tests {
             users: users
                 .iter()
                 .map(|(id, auth)| Hysteria2User {
+                    expires_unix: None,
                     user_id: (*id).into(),
                     auth: (*auth).into(),
                 })

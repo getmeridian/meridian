@@ -1029,6 +1029,7 @@
               "xray_users",
               "hysteria2_users",
               "user_flow_blocking",
+              "offline_user_expiry",
               "realm_forwarders",
               "firewall_rules",
               "binary_pins",
@@ -1133,6 +1134,21 @@
           "pattern": "^[A-Za-z0-9_-]+$",
           "title": "Auth",
           "type": "string"
+        },
+        "expires_unix": {
+          "anyOf": [
+            {
+              "maximum": 4070908800,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Last known access deadline in UTC seconds, rounded up. Only sent with offline_user_expiry negotiated.",
+          "title": "Expires Unix"
         },
         "user_id": {
           "description": "Opaque, stable user identifier assigned by the service. Xray carries it as the client `email`, so traffic counters map back to it; it is never a person's name.",
@@ -2493,6 +2509,7 @@
             "service_failed",
             "xray_api_failed",
             "flow_guard_pending",
+            "offline_expiry_pending",
             "apply_pending",
             "document_not_applied",
             "config_not_installed",
@@ -2932,6 +2949,21 @@
       "additionalProperties": false,
       "description": "A VLESS client of one inbound.",
       "properties": {
+        "expires_unix": {
+          "anyOf": [
+            {
+              "maximum": 4070908800,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Last known access deadline in UTC seconds, rounded up. Only sent with offline_user_expiry negotiated.",
+          "title": "Expires Unix"
+        },
         "flow": {
           "description": "VLESS flow; empty for XHTTP and WebSocket inbounds.",
           "enum": [
