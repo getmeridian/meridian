@@ -90,12 +90,13 @@
   function request(method, path, body, settings) {
     var controller = new AbortController();
     var writing = method !== "GET" && method !== "HEAD";
+    var binary = settings && settings.binary;
     var options = {
       method: method,
       credentials: "same-origin",
       cache: "no-store",
       redirect: "error",
-      headers: { "X-Meridian-Request": "1", Accept: "application/json" },
+      headers: { "X-Meridian-Request": "1", Accept: binary ? "application/octet-stream" : "application/json" },
       signal: controller.signal,
     };
     if (!writing && settings && settings.passive) options.headers["X-Meridian-Passive"] = "1";
@@ -110,9 +111,14 @@
         expired = true;
         controller.abort();
         reject(new ApiError(0, "timeout", "", 0, writing));
-      }, 15000);
+      }, binary ? 60000 : 15000);
     });
     var work = Promise.resolve().then(function () { return fetch(path, options); }).then(function (response) {
+      if (binary && response.ok) {
+        if ((response.headers.get("Content-Type") || "").split(";")[0] !== "application/octet-stream")
+          throw new ApiError(0, "backup_invalid", "", 0, false);
+        return response.blob();
+      }
       return response.text().then(function (text) {
         var data = null;
         try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }

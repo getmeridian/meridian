@@ -99,7 +99,7 @@ Traffic is counted once per report, even when a report is resent. By default the
 - **Topology** — `~/.config/meridian/cluster.yml` holds reviewed servers, roles, protocols, routing, the service address and credentials, and durable apply state. People live in SQLite in the control service.
 - **People** — the control service owns accounts, display names, credentials, status, limits, expiry and memberships in SQLite; CLI and console changes are immediate.
 - **Revisions** — the control service records every reviewed apply: who made it, its plan, and whether it applied. `meridian fleet history` lists them.
-- **Snapshots** — after every change, each machine that manages the fleet saves an encrypted copy of the control service's state in `snapshots/`, readable with that machine's key or the recovery key. See [Recovery](/en/recovery/#control-server-lost).
+- **Snapshots**: CLI changes save an encrypted snapshot on the computer that ran the command. Changes made in the panel can be newer than that copy. See [Recovery](/en/recovery/#control-server-lost).
 - **Saved servers** — `~/.config/meridian/servers.json` holds SSH connection details.
 
 ## Plan and apply

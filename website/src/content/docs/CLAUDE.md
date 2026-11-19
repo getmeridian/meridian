@@ -17,6 +17,7 @@
 - Connection-page instructions describe the real subscription methods and shared assets without remote templates or automatic external requests.
 - Privacy guides disclose what is stored and deleted, with counts-only anonymous views and content-free administrative events.
 ## Pitfalls
+- A panel edit is not a new off-server backup. Distinguish the last managing-device receipt from downloading a file; keep the recovery key separate.
 - Never describe people as declarations or tell users that add/remove need apply; older configuration ownership exists only in the disclosed adoption transition.
 - Do not document removal proposals as actionable; retired flags provide the replacement command and batch previews write nothing.
 - Describe exact-username precedence and ambiguity refusal against current service names, including panel renames and non-Latin display names.

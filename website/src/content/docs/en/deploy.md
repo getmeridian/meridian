@@ -273,7 +273,7 @@ At the end of your first deploy, Meridian prints a recovery key, once:
   Write it down or print it, and keep it offline, away from this computer.
 ```
 
-Store it somewhere offline, away from the machines that manage the fleet. After every change, Meridian saves an encrypted snapshot of the control service on your machine, readable with your machine's own key or the recovery key. If the control server is ever lost, [`meridian restore`](/en/recovery/#control-server-lost) rebuilds it on a new server from the newest snapshot.
+Store it somewhere offline, away from the machines that manage the fleet. CLI changes save an encrypted snapshot on the computer that ran the command. Changes made in the panel can be newer than that copy. If the control server is ever lost, [`meridian restore`](/en/recovery/#control-server-lost) rebuilds it on a new server from the newest snapshot.
 
 ## Upgrades
 

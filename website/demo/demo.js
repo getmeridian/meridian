@@ -99,11 +99,20 @@
   D.unavailable = function (method, path) {
     D.route(method, path, function () { return error("demo_unavailable", "unavailable", 409); });
   };
+  function recoverableState() {
+    // A request can change a note or title without any event, or emit several events for
+    // one change. Compare the small editable part of this synthetic fleet once per write.
+    return JSON.stringify([users, responses["GET api/settings/presentation"], responses["GET api/tokens"],
+      responses["GET api/notice"].notice, responses["GET api/privacy"].settings, responses["GET api/language"].language]);
+  }
   D.dispatch = function (method, path, params, body) {
     var route = routes.find(function (entry) { return entry.method === method && entry.pattern.test(path); });
     if (!route) return error("demo_unavailable", "unavailable", 409);
     try {
-      return route.handler({ method: method, path: path, params: params, body: body, ids: route.pattern.exec(path).slice(1).map(decodeURIComponent) });
+      var before = method !== "GET" && !path.startsWith("auth/") ? recoverableState() : null;
+      var result = route.handler({ method: method, path: path, params: params, body: body, ids: route.pattern.exec(path).slice(1).map(decodeURIComponent) });
+      if (result.ok && before !== null && before !== recoverableState()) demoChanges++;
+      return result;
     } catch (failure) {
       if (!failure.demoCode) throw failure;
       return reply({ error: { code: failure.demoCode, message: copy()[failure.label] || copy().unavailable, subjects: failure.subjects } }, failure.status);
@@ -113,6 +122,7 @@
   function iso(ms) { return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z"); }
   function now() { return iso(Date.now()); }
   D.iso = iso; D.now = now;
+  var demoSaveAt, demoChanges = 0;
   var source, initial, responses, users, events, nextId, signedIn = true, rotations = {}, activeShares = {}, rotating = Object.create(null), pages = [], newId = 0;
   var receiptCredentials = Object.create(null);
   var ready = nativeFetch(new URL("demo-data.json", script), { cache: "no-store" }).then(function (response) {
@@ -152,6 +162,7 @@
     users = responses["GET api/users"].users;
     events = responses["GET api/events"].events;
     nextId = events.reduce(function (max, event) { return Math.max(max, event.id); }, 0);
+    demoSaveAt = now();
     D.source = source; D.responses = responses; D.users = users;
     D.currentShares = Object.create(null); D.initial = initial;
     users.forEach(function (user) {
@@ -539,6 +550,12 @@
     view.display_names = names;
     return reply(view);
   });
+  // The demo only records changes in this tab; no simulated download pretends to be a recovery file.
+  D.route("GET", "api/backup/status", function () {
+    return reply({ changes: demoChanges, last_saved_changes: 0, last_saved_at: demoSaveAt,
+      has_recovery_key: true, has_deployer_state: true });
+  });
+  D.unavailable("POST", "api/backup/download");
   D.recorded("GET", "api/settings");
   D.recorded("GET", "api/revisions");
   D.recorded("GET", "api/revisions/{id}");

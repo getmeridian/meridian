@@ -32,6 +32,7 @@ from meridian.control.access_profile_routes import ACCESS_PROFILE_OWNER_ROUTES
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.api_auth import authorize_api, authorize_body, bearer_token, visible_result, visible_user
 from meridian.control.api_models import DeletedResource, DeployerStateReceipt, UserList
+from meridian.control.backup_routes import download_backup, get_backup_status
 from meridian.control.blobs import BlobStore, fleet_artifacts, served_hashes
 from meridian.control.command_models import NodeCommandRequest, UserCutOffRequest
 from meridian.control.delivery_policy_routes import DELIVERY_POLICY_OWNER_ROUTES
@@ -687,7 +688,7 @@ ROUTES: list[Route] = control_routes(_Handler)
 # The web UI's routes (`ui_routes.py`) live in their own block; `/api` routes come first.
 ALL_ROUTES: list[Route] = [*ROUTES, *UI_ROUTES]
 # Sensitive owner changes need a recent password confirmation, held again in the write's transaction.
-OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token, _Handler.put_privacy})
+OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token, _Handler.put_privacy, download_backup})
 # The only routes an owner session reaches: what the console's screens call ("people edit, the rest
 # view"). Everything else — node, endpoint, and fence writes, revisions, enrollment, user import,
 # backups — is the deployer's CLI or an API token, so a borrowed browser cannot reshape the fleet or
@@ -695,6 +696,8 @@ OWNER_STEP_UP: frozenset[Callable[..., Any]] = frozenset({_Handler.create_token,
 OWNER_ROUTES: frozenset[Callable[..., Any]] = frozenset(
     {
         *ACCESS_PROFILE_OWNER_ROUTES,
+        get_backup_status,
+        download_backup,
         *DELIVERY_POLICY_OWNER_ROUTES,
         *RESPONSE_RULE_OWNER_ROUTES,
         _Handler.get_settings,

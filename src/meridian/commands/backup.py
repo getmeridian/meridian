@@ -16,7 +16,7 @@ from rich.markup import escape
 
 from meridian import config
 from meridian.backup.keys import device_key_path, load_device_key, rotate_recovery_key
-from meridian.backup.pull import backup_client, pull_snapshot
+from meridian.backup.pull import PulledSnapshot, backup_client, pull_snapshot
 from meridian.cluster import ClusterConfig
 from meridian.commands._helpers import load_topology_cluster
 from meridian.console import confirm, err_console, fail, has_tty, info, is_json_mode, is_quiet_mode, ok, warn
@@ -59,8 +59,24 @@ def _pull_quietly(urls: set[str]) -> None:
         return
     if not is_quiet_mode():
         err_console.print(f"  [dim]Backed up the control service's state to {escape(_display(pulled.path))}[/dim]")
+    _show_receipt_warning(pulled)
     if not pulled.has_recovery_key:
         warn(RECOVERY_HINT)
+
+
+def _show_receipt_warning(pulled: PulledSnapshot) -> None:
+    if pulled.receipt == "unavailable":
+        warn("The copy was saved here, but its confirmation could not be verified by the control service.")
+    elif pulled.receipt == "incomplete":
+        warn(
+            "The saved file lacks the current fleet configuration. Run `meridian backup pull` "
+            "on the computer that last applied the fleet."
+        )
+    elif pulled.receipt == "local":
+        warn(
+            "This computer hosts a control service. To confirm an off-server copy, "
+            "run `meridian backup pull` on a separate computer."
+        )
 
 
 def run_pull(*, name: str = "") -> None:
@@ -75,6 +91,7 @@ def run_pull(*, name: str = "") -> None:
     if pulled.deposit_refused:
         warn("The control service holds newer fleet files than this machine's; this copy may be behind.")
     ok(f"Saved snapshot {_display(pulled.path)} (epoch {header.fleet_epoch}, revision {header.revision})")
+    _show_receipt_warning(pulled)
     if not pulled.has_recovery_key:
         warn(RECOVERY_HINT)
 
@@ -128,7 +145,10 @@ def show_recovery_key(pair: KeyPair) -> None:
     print_("  Write it down or print it, and keep it offline, away from this computer.")
     print_("  With it and any snapshot, `meridian restore --to NEW-SERVER --recovery-key` rebuilds")
     print_("  this fleet even if both this computer and the control server are gone.")
-    print_(f"  [dim]Snapshots are saved in {escape(config.HOME_DISPLAY)}/snapshots after every change.[/dim]")
+    print_(
+        f"  [dim]Snapshots are saved in {escape(config.HOME_DISPLAY)}/snapshots after CLI changes. "
+        "After a panel edit, run meridian backup pull.[/dim]"
+    )
     print_()
 
 

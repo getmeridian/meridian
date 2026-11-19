@@ -81,7 +81,7 @@ Re-run `deploy` at any time: keys, paths, and clients are kept. An interrupted `
 - **Camouflage:** nginx routes TCP 443 by SNI without decrypting. A probe without the key reaches a real website and gets its genuine certificate. Meridian looks for the target on the server's own network: `deploy` picks one, `setup` suggests them.
 - **Hardening:** key-only SSH, fail2ban, BBR, UFW opening only SSH and 443, and a Let's Encrypt certificate for the IP. No domain needed.
 - **Control service and web panel:** Meridian's own, on a secret HTTPS path: users, subscriptions, and the web panel. Shared links never reveal the path, and each server's agent dials out to it, so nodes open no extra ports. No Docker, no third-party panel.
-- **Privacy and backups:** no client IPs or connection logs are stored; device and daily history tracking are opt-in and off by default. After every change your machine pulls an encrypted snapshot sealed to your device keys and a recovery key. If the control server is lost or seized, `meridian restore` rebuilds it on another server.
+- **Privacy and backups:** no client IPs or connection logs are stored; device and daily history tracking are opt-in and off by default. The panel shows the last save confirmed by a managing computer. After a panel edit, save an encrypted copy outside the server from Overview or run `meridian backup pull`. Keep the recovery key separately. If the control server is lost or seized, `meridian restore` rebuilds it on another server.
 
 Options worth knowing:
 

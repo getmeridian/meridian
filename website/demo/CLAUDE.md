@@ -1,6 +1,7 @@
 # demo — Public console adapter
 
 ## Design decisions
+- **Recovery downloads are unavailable in the demo** — sample state belongs only to the current tab and cannot produce a restorable encrypted fleet.
 - **Actions follow owner rules** — validate person edits and project schedules before writes; remote actions return the local translated demo refusal.
 
 ## What's done well

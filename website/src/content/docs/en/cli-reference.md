@@ -730,7 +730,7 @@ meridian backup revoke ID
 
 After every command that changes the fleet, Meridian saves the control service's newest snapshot in `snapshots/` beside `cluster.yml` (the newest few are kept). A snapshot holds users, limits, traffic, revisions, API tokens, and a copy of this machine's `cluster.yml` and `servers.json`, so it can rebuild the fleet on a machine with nothing else. It is encrypted to every registered machine's key and to the recovery key, and never carries signing keys, sessions, or the web panel password. A failed save warns and never fails the command that triggered it.
 
-**`backup pull`** — saves a snapshot now. The first pull on a machine creates its key (`device.key`, readable only by you) and registers it with the control service.
+**`backup pull`** — saves a snapshot now. The first pull on a machine creates its key (`device.key`, readable only by you) and registers it with the control service. If this computer’s fleet files are stale and the snapshot cannot rebuild the current fleet, the partial copy is kept under `snapshots/partial/`. It does not replace a full recovery copy or confirm a save. Run the command on the computer that last applied the fleet.
 
 **`backup recovery-key`** — makes the fleet's recovery key, or replaces the existing one after asking, and prints it once. Meridian keeps only its public half, so write it down or print it and keep it offline. The first deploy of a fleet already shows one. Not available with `--json`.
 

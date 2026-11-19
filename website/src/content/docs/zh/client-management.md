@@ -274,7 +274,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 ## 客户端数据存放在哪里
 
-客户端账户（密钥、状态、限额、流量）保存在控制服务器上控制服务的数据库中。Meridian 管理的客户端列表保存在本地 `~/.config/meridian/cluster.yml` 的拓扑配置中。客户端命令调用控制服务的 API，控制服务直接根据数据库提供连接页面。每次变更后，你的机器都会保存一份该数据库的加密快照（见[备份](/zh/deploy/#备份)）。
+客户端账户（密钥、状态、限额、流量）保存在控制服务器上控制服务的数据库中。Meridian 管理的客户端列表保存在本地 `~/.config/meridian/cluster.yml` 的拓扑配置中。客户端命令调用控制服务的 API，控制服务直接根据数据库提供连接页面。要保存包含最新面板更改的加密副本，请在管理电脑上运行 `meridian backup pull`（见[备份](/zh/deploy/#备份)）。
 
 ## 网页面板
 
@@ -402,6 +402,9 @@ scrape_configs:
 
 | 操作 | 用途 |
 |---|---|
+| `GET /api/backup/status` | 读取当前更改计数以及管理设备上次确认保存的记录。 |
+| `POST /api/backup/download` | 为已注册的密钥生成加密副本。面板要求所有者近期确认过身份。 |
+| `POST /api/backup/receipts` | 确认管理设备已验证并保存快照；需要注册的设备和快照内的凭证。 |
 | `GET /api/users/{username}/flow-blocks` | 按节点返回阻止新数据流的结果；不含连接地址或设备数据 |
 | `GET /api/users` | 所有用户 |
 | `GET /api/traffic` | 每个用户的流量总计 |

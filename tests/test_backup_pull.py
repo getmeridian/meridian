@@ -24,8 +24,10 @@ from tests.support.topology import single_exit_intent
 
 
 @pytest.fixture
-def fleet(tmp_home: Path, tmp_path: Path) -> Iterator[ClusterConfig]:
-    """A saved control-service fleet whose service runs on loopback."""
+def fleet(tmp_home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[ClusterConfig]:
+    """A managing device and distinct simulated control host, talking over the real loopback service."""
+    monkeypatch.setattr("meridian.control.backup_origin.fleet_host_fingerprint", lambda _: "1" * 64)
+    monkeypatch.setattr("meridian.backup.pull.fleet_host_fingerprint", lambda _: "1" + "2" * 63)
     with serve_control(tmp_path / "state") as url:
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
@@ -36,7 +38,7 @@ def fleet(tmp_home: Path, tmp_path: Path) -> Iterator[ClusterConfig]:
             active_generation=3,
         )
         cluster.save()
-        config.SERVER_PROFILES_FILE.write_text("[]\n", encoding="utf-8")
+        config.SERVER_PROFILES_FILE.write_text('{"schema":"meridian.servers/v3","servers":[]}\n', encoding="utf-8")
         yield cluster
 
 
@@ -64,7 +66,7 @@ def test_the_snapshot_carries_this_machines_fleet_files_without_the_admin_token(
     assert deposited is not None and deposited.generation == 3
     assert ADMIN_TOKEN not in deposited.cluster_yml
     assert yaml.safe_load(deposited.cluster_yml)["fleet_id"] == FLEET_ID
-    assert deposited.servers_json == "[]\n"
+    assert deposited.servers_json == config.SERVER_PROFILES_FILE.read_text(encoding="utf-8")
 
 
 def test_only_the_newest_snapshots_are_kept(fleet: ClusterConfig) -> None:
@@ -303,3 +305,133 @@ def test_a_machine_without_its_own_key_is_offered_every_backup_key(
     backup_commands.offer_device_revocation(fleet, ask=False)
 
     assert "old-laptop" in capsys.readouterr().err
+
+
+def test_only_a_durably_saved_copy_can_confirm_an_edit(fleet: ClusterConfig, monkeypatch: pytest.MonkeyPatch) -> None:
+    import meridian.backup.pull as pulling
+
+    first = pull_snapshot(fleet)
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        confirmed = client.backup_status()
+        assert first.receipt == "confirmed"
+        assert confirmed.last_saved_changes == confirmed.changes and confirmed.last_saved_at is not None
+        client.put_user("panel-edit")
+        pending = client.backup_status()
+        assert pending.last_saved_changes == confirmed.last_saved_changes and pending.changes > confirmed.changes
+
+        def disk_full(*args, **kwargs) -> None:
+            raise OSError("disk full")
+
+        with monkeypatch.context() as ctx:
+            ctx.setattr(pulling, "write_private", disk_full)
+            with pytest.raises(OSError, match="disk full"):
+                pull_snapshot(fleet)
+        assert client.backup_status() == pending
+        latest = pull_snapshot(fleet)
+        assert latest.receipt == "confirmed"
+        assert client.backup_status().last_saved_changes == pending.changes
+        assert client.backup_status().changes == pending.changes
+        assert first.path != latest.path and first.path.exists()
+
+
+def test_a_lost_receipt_keeps_the_file_and_warns_about_confirmation(
+    fleet: ClusterConfig, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from meridian.control.client import ControlServiceError
+
+    def lost(*args, **kwargs) -> None:
+        raise ControlServiceError("service disconnected")
+
+    monkeypatch.setattr(ControlClient, "confirm_saved_snapshot", lost)
+    backup_commands.run_pull()
+    assert "copy was saved here" in capsys.readouterr().err
+    key = load_device_key()
+    assert key and decrypt_snapshot(saved_snapshots()[0].read_bytes(), [key.secret]).header.fleet_id == fleet.fleet_id
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        assert client.backup_status().last_saved_at is None
+
+
+def test_pulling_on_the_control_server_is_not_an_off_server_confirmation(fleet: ClusterConfig) -> None:
+    fleet.panel.server_ip = "127.0.0.1"
+    result = pull_snapshot(fleet)
+    assert result.path.is_file() and result.receipt == "local"
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        assert client.backup_status().last_saved_at is None
+
+
+def test_pulling_from_an_older_service_keeps_the_file_without_claiming_confirmation(
+    fleet: ClusterConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from meridian.control.snapshot import SAVE_PROOF_MEMBER, encrypt_snapshot
+
+    real_snapshot = ControlClient.snapshot
+
+    def older_snapshot(client: ControlClient) -> bytes:
+        key = load_device_key()
+        assert key
+        opened = decrypt_snapshot(real_snapshot(client), [key.secret])
+        return encrypt_snapshot(
+            opened.header, {name: data for name, data in opened.files.items() if name != SAVE_PROOF_MEMBER}
+        )
+
+    monkeypatch.setattr(ControlClient, "snapshot", older_snapshot)
+    result = pull_snapshot(fleet)
+    assert result.path.is_file() and result.receipt == "unsupported"
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        assert client.backup_status().last_saved_at is None
+
+
+def test_a_custom_control_host_on_nat_cannot_confirm_its_own_copy(
+    fleet: ClusterConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # No public address is on the local interfaces, and no local-control flag/profile exists.
+    monkeypatch.setattr("meridian.backup.pull.fleet_host_fingerprint", lambda _: "1" * 64)
+    result = pull_snapshot(fleet)
+    assert result.receipt == "local" and result.path.is_file()
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        assert client.backup_status().last_saved_at is None
+
+
+def test_concurrent_same_second_panel_snapshots_sort_and_warn_by_actual_saved_changes(
+    fleet: ClusterConfig, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from meridian.backup.pull import save_snapshot
+    from meridian.commands.restore import _open_snapshot
+    from meridian.control.snapshot import encrypt_snapshot
+
+    first = pull_snapshot(fleet)
+    key = load_device_key()
+    assert key
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        client.put_user("second-edit")
+    latest = pull_snapshot(fleet)
+    prior_data, new_data = (decrypt_snapshot(p.path.read_bytes(), [key.secret]) for p in (first, latest))
+    older, newer = prior_data.save_proof, new_data.save_proof
+    assert older and newer and older.changes < newer.changes
+    # Reverse arrival order and force both authenticated headers to one captured instant.
+    header = new_data.header.model_copy(update={"created_at": "2099-01-01T00:00:00Z"})
+    recent = save_snapshot(encrypt_snapshot(header, new_data.files), header, changes=newer.changes)
+    stale = save_snapshot(encrypt_snapshot(header, prior_data.files), header, changes=older.changes)
+    assert saved_snapshots()[:2] == [recent, stale]
+    copied = tmp_path / "mailed-offline.snapshot"
+    copied.write_bytes(stale.read_bytes())
+    _open_snapshot(str(copied), recovery_key=False)
+    assert recent.name in capsys.readouterr().err.replace("\n", " ")
+
+
+def test_a_partial_copy_from_a_stale_manager_keeps_prior_confirmation(
+    fleet: ClusterConfig, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from meridian.control.models import ApplyFenceRecord
+
+    full = pull_snapshot(fleet)
+    assert full.receipt == "confirmed"
+    with ControlClient(fleet.panel.url, ADMIN_TOKEN) as client:
+        before = client.backup_status()
+        client.swap_fence(0, ApplyFenceRecord(fleet_id=fleet.fleet_id, generation=fleet.active_generation + 1))
+        backup_commands.run_pull()
+        assert "last applied the fleet" in capsys.readouterr().err.replace("\n", " ")
+        assert client.backup_status().last_saved_changes == before.last_saved_changes
+        assert not client.backup_status().has_deployer_state
+        assert saved_snapshots() == [full.path]  # the default restore still picks the complete file
+        assert list((snapshots_dir() / "partial").glob("*.snapshot"))

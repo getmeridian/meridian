@@ -24,6 +24,7 @@ from meridian.control.account_lifecycle import enforce_user_schedules, preview_u
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
 from meridian.control.attention import read_attention
 from meridian.control.background_health import BackgroundHealth
+from meridian.control.backup_changes import track_backup_changes
 from meridian.control.backups import BackupLedger
 from meridian.control.capacity import CapacityLedger
 from meridian.control.command_models import CommandRequest, NodeCommandRecord, UserCutOffMutation
@@ -171,6 +172,7 @@ class ControlService:
             revisions=self.revisions,
         )
         self.pages = ConnectionPages(self._store, self)
+        track_backup_changes(self._store)
         with self._transaction():
             # Documents signed by an earlier signing certificate are signed again.
             self._compose_all()
@@ -188,9 +190,15 @@ class ControlService:
     def close(self) -> None:
         self._store.close()
 
-    def snapshot(self) -> bytes:
+    def snapshot(self, *, for_download: bool = False, authorize: Callable[[], object] | None = None) -> bytes:
         """This service's state, encrypted to every registered backup key (`backups.py`)."""
-        return self.backups.snapshot(fleet_id=self.fleet_id, fleet_epoch=self.fleet_epoch, version=self._version)
+        return self.backups.snapshot(
+            fleet_id=self.fleet_id,
+            fleet_epoch=self.fleet_epoch,
+            version=self._version,
+            for_download=for_download,
+            authorize=authorize,
+        )
 
     @property
     def version(self) -> str:

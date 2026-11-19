@@ -161,7 +161,7 @@ def _open_snapshot(explicit: str, *, recovery_key: bool) -> RestoreSource:
         opened = decrypt_snapshot(blob, keys)
     except MeridianError as exc:
         fail(exc)
-    newer = newer_saved_snapshot(opened.header)
+    newer = newer_saved_snapshot(opened, keys, path) if explicit else None
     if newer is not None:
         warn(
             f"{newer.name} is newer than this snapshot. The older state brings back API tokens and backup "

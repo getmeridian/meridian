@@ -15,11 +15,14 @@ the recovery key alone can rebuild the fleet on a machine that has nothing else.
 
 from __future__ import annotations
 
+import hmac
 import secrets
 import sqlite3
 import time
 from collections.abc import Callable
 
+from meridian.control import backup_origin
+from meridian.control.backup_models import BackupReceipt, BackupStatus, SnapshotSaveProof
 from meridian.control.errors import ServiceError
 from meridian.control.models import (
     DeployerState,
@@ -31,7 +34,13 @@ from meridian.control.models import (
     RecoveryKeyState,
     RecoveryKeyUpdate,
 )
-from meridian.control.snapshot import SnapshotHeader, SnapshotRecipient, encrypt_snapshot
+from meridian.control.snapshot import (
+    SAVE_PROOF_MEMBER,
+    SOURCE_HOST_MEMBER,
+    SnapshotHeader,
+    SnapshotRecipient,
+    encrypt_snapshot,
+)
 from meridian.control.store import Store
 from meridian.control.times import format_timestamp
 
@@ -49,6 +58,8 @@ BACKUP_STATE_TABLE = """CREATE TABLE IF NOT EXISTS backup_state (
 # Tables emptied in every snapshot: a restore regenerates or no longer needs them.
 NOT_SNAPSHOTTED = (
     "secrets",
+    "backup_receipts",
+    "backup_exports",
     "agent_sessions",
     "agent_command_capabilities",
     "commands",
@@ -94,6 +105,10 @@ class BackupLedger:
         self._clock = clock
         store.create(BACKUP_DEVICES_TABLE)
         store.create(BACKUP_STATE_TABLE)
+        # Never snapshotted. A replacement controller cannot accept a previous fleet epoch's receipts.
+        with store.transaction():
+            if store.secret("backup_receipt_key") is None:
+                store.set_secret("backup_receipt_key", secrets.token_bytes(32))
 
     # -- device keys ---------------------------------------------------------------------
 
@@ -135,6 +150,9 @@ class BackupLedger:
     def set_recovery_key(self, update: RecoveryKeyUpdate) -> RecoveryKeyState:
         state = RecoveryKeyState(public_key=update.public_key, set_at=self._now())
         with self._store.transaction():
+            held = self.recovery_key()
+            if held.public_key == update.public_key:
+                return held
             self._set_state(_RECOVERY, state.model_dump_json())
         return state
 
@@ -145,6 +163,8 @@ class BackupLedger:
             held = self.deployer_state()
             if held is not None and held.generation > deposit.generation:
                 raise ServiceError("conflict", "A newer fleet state is already deposited.", 409)
+            if held is not None and held.model_dump(exclude={"deposited_at"}) == deposit.model_dump():
+                return held
             self._set_state(_DEPLOYER, state.model_dump_json())
         return state
 
@@ -154,9 +174,101 @@ class BackupLedger:
 
     # -- snapshots -------------------------------------------------------------------------
 
-    def snapshot(self, *, fleet_id: str, fleet_epoch: int, version: str) -> bytes:
+    def status(self) -> BackupStatus:
+        with self._store.lock:
+            receipt = self._store.row(
+                "SELECT r.changes, r.saved_at FROM backup_receipts r JOIN backup_devices d USING (device_id) "
+                "WHERE d.revoked_at IS NULL ORDER BY r.changes DESC, r.saved_at DESC LIMIT 1"
+            )
+            return BackupStatus(
+                changes=self._changes(),
+                last_saved_changes=int(receipt["changes"]) if receipt else None,
+                last_saved_at=receipt["saved_at"] if receipt else None,
+                has_recovery_key=self.recovery_key().public_key is not None,
+                has_deployer_state=self._has_current_deposit(),
+            )
+
+    def record_save(self, receipt: BackupReceipt) -> BackupStatus:
+        with self._store.transaction():
+            device = self._device(receipt.device_id)
+            if device.revoked_at is not None:
+                raise ServiceError("conflict", "This backup device has been revoked.", 409)
+            captured = int(receipt.proof[:16], 16)
+            if receipt.changes > self._changes() or not hmac.compare_digest(
+                receipt.proof, self._proof(receipt.changes, captured).proof
+            ):
+                raise ServiceError("conflict", "This receipt does not match a snapshot from this controller.", 409)
+            if receipt.changes == self._changes() and not self._has_current_deposit():
+                raise ServiceError(
+                    "conflict",
+                    "The snapshot lacks the current fleet files; pull from the managing computer that applied them.",
+                    409,
+                )
+            held = self._store.row("SELECT changes FROM backup_receipts WHERE device_id=?", (device.id,))
+            if held and receipt.changes < held["changes"]:
+                raise ServiceError("conflict", "A newer save is already confirmed for this computer.", 409)
+            self._store.db.execute(
+                "INSERT INTO backup_receipts VALUES (?,?,?,?) ON CONFLICT(device_id) DO UPDATE SET "
+                "changes=excluded.changes, saved_at=excluded.saved_at, captured=excluded.captured "
+                "WHERE excluded.changes > backup_receipts.changes OR "
+                "(excluded.changes = backup_receipts.changes AND excluded.captured > backup_receipts.captured)",
+                (device.id, receipt.changes, self._now(), captured),
+            )
+            return self.status()
+
+    def record_export(self, actor: str) -> None:
+        """A bounded local export audit separate from save receipts and the legacy fleet event wire."""
+        with self._store.transaction():
+            self._store.db.execute("INSERT INTO backup_exports(exported_at, actor) VALUES (?,?)", (self._now(), actor))
+            self._store.db.execute("DELETE FROM backup_exports WHERE id <= (SELECT MAX(id) - 100 FROM backup_exports)")
+
+    def _has_current_deposit(self) -> bool:
+        # Rebuilding solely from this file must not apply an older topology onto the surviving servers.
+        return (
+            self._store.row(
+                "SELECT 1 FROM backup_state WHERE name=? AND (NOT EXISTS (SELECT 1 FROM apply_fence) OR "
+                "json_extract(body,'$.generation') >= "
+                "(SELECT json_extract(record,'$.generation') FROM apply_fence WHERE id=1))",
+                (_DEPLOYER,),
+            )
+            is not None
+        )
+
+    def _changes(self) -> int:
+        return int(self._store.db.execute("SELECT changes FROM backup_progress WHERE id=1").fetchone()[0])
+
+    def _proof(self, changes: int, captured: int) -> SnapshotSaveProof:
+        key = self._store.secret("backup_receipt_key")
+        assert key is not None
+        data = f"backup-save-v1:{self._store.fleet_epoch}:{changes}:{captured}".encode("ascii")
+        return SnapshotSaveProof(
+            changes=changes, proof=f"{captured:016x}" + hmac.digest(key, data, "sha256").hex()[:48]
+        )
+
+    def snapshot(
+        self,
+        *,
+        fleet_id: str,
+        fleet_epoch: int,
+        version: str,
+        for_download: bool = False,
+        authorize: Callable[[], object] | None = None,
+    ) -> bytes:
         """A consistent, secret-free copy of the database, sealed to every active key."""
         with self._store.lock:
+            if authorize:
+                authorize()
+            has_deposit = self._has_current_deposit()
+            if for_download:
+                if not self.recovery_key().public_key:
+                    raise ServiceError("conflict", "Set a recovery key on a managing computer first.", 409)
+                if not has_deposit:
+                    raise ServiceError(
+                        "conflict",
+                        "Run meridian backup pull on the computer that last applied the fleet.",
+                        409,
+                    )
+            proof = self._proof(self._changes(), int(self._clock())) if has_deposit else None
             recipients = [
                 SnapshotRecipient(kind="device", id=item.id, public_key=item.public_key)
                 for item in self.list_devices().devices
@@ -184,7 +296,12 @@ class BackupLedger:
             service_version=version[:64],
             recipients=recipients,
         )
-        return encrypt_snapshot(header, {"control.db": database})
+        files = {"control.db": database}
+        files[SAVE_PROOF_MEMBER] = proof.model_dump_json().encode() if proof else b"null"
+        source_host = backup_origin.fleet_host_fingerprint(fleet_id)
+        if source_host is not None:
+            files[SOURCE_HOST_MEMBER] = source_host.encode("ascii")
+        return encrypt_snapshot(header, files)
 
     # -- storage ---------------------------------------------------------------------------
 

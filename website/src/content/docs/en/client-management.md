@@ -272,7 +272,7 @@ Xray JSON subscriptions (Happ and other Xray-based apps) send recognized BitTorr
 
 ## Where client data lives
 
-Client accounts (keys, status, limits, traffic) live in the control service's database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the control service's API, and the service serves connection pages directly from its database. After every change, your machine saves an encrypted snapshot of that database (see [Backups](/en/deploy/#backups)).
+Client accounts (keys, status, limits, traffic) live in the control service's database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the control service's API, and the service serves connection pages directly from its database. Run `meridian backup pull` on a managing computer to save an encrypted copy including the latest panel edits (see [Backups](/en/deploy/#backups)).
 
 ## Web panel
 
@@ -401,6 +401,9 @@ Read **OpenAPI 3.1** from `GET /api/openapi.json`, or the generated `contracts/m
 
 | Operation | Purpose |
 |---|---|
+| `GET /api/backup/status` | Read the current change count and last confirmed managing-device save. |
+| `POST /api/backup/download` | Prepare an encrypted copy for existing keys. The owner panel asks for recent identity confirmation. |
+| `POST /api/backup/receipts` | Confirm a verified local save; requires a registered device and the proof from its snapshot. |
 | `GET /api/users/{username}/flow-blocks` | Per-node evidence for blocking new flows; no connection addresses or device data |
 | `GET /api/users` | Every person |
 | `GET /api/traffic` | Traffic totals per person |

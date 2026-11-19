@@ -273,7 +273,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
   Write it down or print it, and keep it offline, away from this computer.
 ```
 
-请把它离线保存，远离管理集群的机器。每次变更后，Meridian 都会在你的机器上保存一份控制服务的加密快照，可以用你机器自己的密钥或恢复密钥读取。如果控制服务器丢失，[`meridian restore`](/zh/recovery/#控制服务器丢失) 可以用最新的快照在新服务器上重建它。
+请把它离线保存，远离管理集群的机器。通过 CLI 修改配置后，加密快照会保存在执行命令的那台电脑上。之后在面板中所做的修改可能还没有保存在这份快照里。 如果控制服务器丢失，[`meridian restore`](/zh/recovery/#控制服务器丢失) 可以用最新的快照在新服务器上重建它。
 
 ## 升级
 

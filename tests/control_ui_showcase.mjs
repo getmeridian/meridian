@@ -110,8 +110,17 @@ if (mode === 'showcase-navigation') {
   report.tokens = (await M.api('GET', 'api/tokens')).tokens.length;
   report.banner = w.document.querySelector('#demo-banner a').getAttribute('href');
 } else if (mode === 'showcase-mutations') {
+  const beforeSave = await M.api('GET', 'api/backup/status');
   await M.api('PATCH', 'api/users/Luma', { note: 'Literal <b>demo note</b>', tag: 'TRIAL' });
   report.edited = (await M.api('GET', 'api/users/Luma')).note;
+  const afterNote = await M.api('GET', 'api/backup/status');
+  await M.api('PATCH', 'api/users/Luma', {note: report.edited});
+  const beforeTitle = await M.api('GET', 'api/backup/status');
+  const presentation = await M.api('GET', 'api/settings/presentation');
+  await M.api('PATCH', 'api/settings/presentation', {expected_version: presentation.version, profile_title: 'My sample fleet'});
+  const afterTitle = await M.api('GET', 'api/backup/status');
+  report.unsavedCounts = [beforeSave, afterNote, beforeTitle, afterTitle].map(s => s.changes - s.last_saved_changes);
+
   await M.api('GET', 'ui/api/people/Luma/expiry?months=3');
   await M.api('DELETE', 'api/users/Luma/devices');
   report.devices = (await M.api('GET', 'api/users/Luma/devices')).count;

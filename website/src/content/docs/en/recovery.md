@@ -83,7 +83,9 @@ If the control server is gone (deleted, seized, or blocked for good), rebuild it
 meridian restore --to 198.51.100.30
 ```
 
-Every machine that manages the fleet saves an encrypted snapshot of the control service after each change, so the newest one is already on your machine. Restore reviews what it will do, installs the control service on the new server from that snapshot, and applies the fleet: every exit's agent enrolls with the new server, and clients keep their accounts, limits, and traffic.
+CLI changes save an encrypted snapshot on the computer that ran the command. Changes made in the panel can be newer than that copy. On Overview, check when a managing device last confirmed a save and how many changes came afterwards. To keep the current state, run `meridian backup pull` on a separate computer or download the encrypted copy from the panel. Save the file away from the VPS and keep the recovery key separately. Starting a browser download does not update the confirmed save.
+
+Restore reviews what it will do, installs the control service on the new server from that snapshot, and applies the fleet: every exit's agent enrolls with the new server, and clients keep their accounts, limits, and traffic.
 
 Restore uses the fleet files on this machine when they are at least as new as the copy inside the snapshot, and the snapshot's copy otherwise.
 

@@ -21,6 +21,7 @@ class Store:
         self._database = database
         self.lock = threading.RLock()
         self._local = threading.local()
+        self.transaction_number = 0  # process-local identity for once-per-transaction observers
         self.changed = threading.Condition(self.lock)
         database.parent.mkdir(parents=True, exist_ok=True)
         self.db = sqlite3.connect(database, check_same_thread=False, isolation_level=None)
@@ -70,6 +71,7 @@ class Store:
     def transaction(self) -> Iterator[None]:
         with self.lock:
             self.db.execute("BEGIN IMMEDIATE")
+            self.transaction_number += 1
             try:
                 for check in getattr(self._local, "checks", ()):
                     check()
