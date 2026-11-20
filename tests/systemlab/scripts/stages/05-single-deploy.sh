@@ -70,7 +70,19 @@ with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
 PYEOF
 pass "client remove retired the service user and kept the others"
 
-meridian teardown "$EXIT_B_IP" --yes
+# The controller and exit containers share a kernel: a saved copy here is not off-server.
+TEARDOWN_LOG=/tmp/meridian-single-teardown.log
+if COLUMNS=160 meridian teardown "$EXIT_B_IP" --yes >"$TEARDOWN_LOG" 2>&1; then
+  echo "teardown accepted a recovery copy on the same host" >&2
+  exit 1
+fi
+cat "$TEARDOWN_LOG"
+grep -Fq 'no current off-server recovery copy' "$TEARDOWN_LOG"
+test -f "$MERIDIAN_HOME/cluster.yml"
+ssh root@"$EXIT_B_IP" systemctl is-active --quiet ctld
+pass "teardown refused the same-host copy and kept the controller running"
+
+meridian teardown "$EXIT_B_IP" --yes --discard-backup
 test ! -e "$MERIDIAN_HOME/cluster.yml"
 ssh root@"$EXIT_B_IP" '
   test ! -e /opt/ctld && test ! -e /usr/local/bin/netagent && test ! -e /usr/local/lib/netagent

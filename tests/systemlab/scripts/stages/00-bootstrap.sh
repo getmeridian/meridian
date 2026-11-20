@@ -82,12 +82,11 @@ for host in $(all_server_ips); do
 done
 pass "all topology servers booted"
 
-# Agents dial the control service over HTTPS, and Pebble issued its certificate. Each node
-# trusts Pebble's issuance root in its CA bundle (GitHub downloads keep working), and a
-# drop-in points netagent at that bundle before any deploy writes the unit.
+# Agents dial the control service over HTTPS. Give new services this lab's CA bundle
+# through PID 1 so teardown and re-enrollment leave no custom netagent unit behind.
 for host in $(all_server_ips); do
   scp -q "$PEBBLE_ISSUER_CA" root@"$host":"$PEBBLE_ISSUER_CA"
-  ssh root@"$host" "update-ca-certificates >/dev/null 2>&1 && mkdir -p ${AGENT_CA_DROPIN%/*} && printf '%s\n' '[Service]' 'Environment=NETAGENT_TLS_CA_FILE=/etc/ssl/certs/ca-certificates.crt' > $AGENT_CA_DROPIN && systemctl daemon-reload"
+  ssh root@"$host" 'update-ca-certificates >/dev/null && systemctl set-environment NETAGENT_TLS_CA_FILE=/etc/ssl/certs/ca-certificates.crt'
 done
 pass "every node trusts the Pebble issuance root, agents included"
 

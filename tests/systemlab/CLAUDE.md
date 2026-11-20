@@ -27,11 +27,10 @@ uv run pytest tests/systemlab/ -q
 - **Memory workloads walk the heavy lists only after the mirror lands** — `ctld` mirrors the Xray archive in the background, so wait for its geodata first; documentation names and addresses match the private lists, so use an example.com name (category-ru) and a public resolver address (geoip:ru).
 - **Stage scripts import Meridian outside pytest** — a moved helper breaks only the Docker run; grep `tests/systemlab/scripts` whenever a public helper moves.
 - **Debug one stage, not the lab** — `SYSTEMLAB_KEEP=1 SYSTEMLAB_STAGES="10-deploy.sh 40-removal.sh"` keeps the fleet up for reruns.
-- **Agents verify the service against WebPKI roots** — bootstrap adds Pebble's issuance root and `NETAGENT_TLS_CA_FILE` before any deploy, or no agent enrolls.
-- **Keep the controller's install editable** — a regular install deploys the released package from PyPI, not the code under test.
+- **Agents must trust Pebble across enrollments** — bootstrap adds its issuance root and sets `NETAGENT_TLS_CA_FILE` in systemd's manager environment; a unit drop-in would correctly block teardown.
+- **Containers share a kernel** — the lab checks that teardown rejects its same-host recovery copy before explicitly discarding disposable fleet data.
 - **Browser captures replay at `/info`** — a bare browser URL now gets the page, which is checked separately.
-- **Route the connectivity probe to the pool** — a fixed exit makes failover assertions meaningless.
-- **Intermediate Realm hops never appear as subscription endpoints.**
+- Route the connectivity probe to the pool so it tests failover. Intermediate Realm hops never appear as subscription endpoints.
 - **Preflight proves a real image pull** — bridge DNS can pass while the daemon's resolver fails.
 - **Accept `degraded` systemd** inside privileged containers when required services are healthy.
 - **Client startup failures never satisfy negative tests**; qualify a Reality target only by authenticated traffic, never raw TLS reachability.
