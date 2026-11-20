@@ -10,7 +10,7 @@ import typer
 from rich.markup import escape
 
 from meridian import __version__, config
-from meridian.binary_pins import UPGRADABLE_BINARIES, BinaryPin, effective_binary_pins
+from meridian.binary_pins import UPGRADABLE_BINARIES, BinaryPin, effective_binary_pins, parse_version
 from meridian.commands._helpers import apply_reviewed_intent, load_topology_cluster, require_intent, reviewed_runtime
 from meridian.console import confirm, err_console, fail, info, ok, warn
 from meridian.core.errors import LocalStateError, MeridianError
@@ -73,6 +73,12 @@ def run_upgrade(*, yes: bool = False, latest: bool = False) -> None:
             hint="Restore SSH and service access (check with `meridian check`), then rerun `meridian fleet upgrade`.",
             hint_type="system",
         )
+    if any(component.status == "newer" and component.name == "Realm" for component in observed):
+        fail(
+            "A relay already runs a newer Realm than the selected version; nothing was downgraded.",
+            hint="Update Meridian or use fleet upgrade --latest to review a supported upstream version.",
+            hint_type="user",
+        )
     if any(component.status == "newer" for component in observed):
         newest = max((c.running for c in observed if c.status == "newer" and c.name == "Control service"), default="")
         fail(
@@ -87,6 +93,12 @@ def run_upgrade(*, yes: bool = False, latest: bool = False) -> None:
     changes = sum(1 for component in observed if component.behind)
     if not changes:
         if binary_overrides != cluster.binary_pins:
+            if (
+                any(pin != target for pin, target in binaries.values())
+                and not yes
+                and not confirm("Record this newer Realm version for future relays and applies?")
+            ):
+                raise typer.Exit(1)
             _save_pins(cluster, binary_overrides)
         ok("Every server already runs its target versions")
         return
@@ -118,13 +130,15 @@ def _observe(
     components = list(_observe_service(cluster, intent))
     if realm_target:
         for relay in _observe_relays(registry, intent):
+            running, target = parse_version(relay.running), parse_version(realm_target)
+            newer = running is not None and target is not None and running > target
             components.append(
                 Component(
                     relay.label,
                     "Realm",
                     relay.running,
                     realm_target,
-                    _status(relay.running, realm_target),
+                    "newer" if newer else _status(relay.running, realm_target),
                     relay.error,
                 )
             )

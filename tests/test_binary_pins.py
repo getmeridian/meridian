@@ -204,6 +204,40 @@ def _relay(running: str) -> fleet_upgrade.RelayRealm:
     return fleet_upgrade.RelayRealm("srv-r", "relay", running)
 
 
+def test_a_relay_ahead_of_the_saved_pin_is_never_silently_downgraded(tmp_home: Path) -> None:
+    cluster = ClusterConfig(topology_intent=_relay_intent())
+    with (
+        patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
+        patch.object(fleet_upgrade, "_observe_service", return_value=[]),
+        patch.object(fleet_upgrade, "_observe_relays", return_value=[_relay(_NEWER.version)]),
+        patch.object(fleet_upgrade, "_save_pins") as save,
+        patch.object(fleet_upgrade, "_apply") as apply,
+    ):
+        result = CliRunner().invoke(app, ["fleet", "upgrade", "--yes"])
+    assert result.exit_code == 2 and "nothing was downgraded" in " ".join(result.output.split())
+    save.assert_not_called()
+    apply.assert_not_called()
+
+
+def test_an_upstream_version_already_running_needs_consent_before_it_becomes_the_fleet_pin(tmp_home: Path) -> None:
+    cluster = ClusterConfig(topology_intent=_relay_intent())
+    with (
+        patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
+        patch("meridian.github_releases.latest_binary_release", return_value=_NEWER),
+        patch.object(fleet_upgrade, "_observe_service", return_value=[]),
+        patch.object(fleet_upgrade, "_observe_relays", return_value=[_relay(_NEWER.version)]),
+        patch.object(fleet_upgrade, "confirm", return_value=False),
+        patch.object(fleet_upgrade, "_save_pins") as save,
+        patch.object(fleet_upgrade, "_apply") as apply,
+    ):
+        with pytest.raises(typer.Exit):
+            fleet_upgrade.run_upgrade(latest=True)
+        save.assert_not_called()
+        fleet_upgrade.run_upgrade(latest=True, yes=True)
+        save.assert_called_once_with(cluster, {"realm": _NEWER})
+        apply.assert_not_called()
+
+
 def test_a_newer_realm_is_confirmed_saved_and_applied() -> None:
     cluster = ClusterConfig(topology_intent=single_server_intent(None, server_ref="srv-a"))
     default = UPGRADABLE_BINARIES["realm"]
