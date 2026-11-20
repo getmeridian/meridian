@@ -55,7 +55,8 @@ class FleetRoutingResult(CoreModel):
     notes: list[str] = Field(
         default_factory=lambda: [
             "Both policies block QUIC (UDP/443) after direct destination rules so apps fall back to TCP.",
-            "Only ru-split sends detected BitTorrent peers directly in Xray JSON. Under full, public peers use the VPN.",
+            "Only ru-split sends detected BitTorrent peers directly in Xray JSON. "
+            "Under full, public peers use the VPN.",
             "Base64 links carry no routing rules; configure routing in those apps separately.",
         ]
     )

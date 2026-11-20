@@ -14,6 +14,12 @@ newest first; the last is what 4.0 changes compared with 3.x.
 
 ### Since 4.0.0b18
 
+- The built-in `full` policy tunnels recognized BitTorrent traffic in Xray. The default Russian split policy is unchanged. A personal invitation explains routing for the selected app; a plain link cannot configure device routing.
+- A valid invitation with no available connections now names the problem and points the person back to the owner. Copy and QR still work for setting up another personal device; the recipient page no longer offers to forward the access link.
+- Meridian-owned nginx listeners suppress request logging, including HTTP certificate challenges and private paths in upstream errors. Other sites retain their own logs.
+- Teardown of the last control server shows how current the off-server backup is and verifies a current save before deleting the database. To intentionally skip that protection, pass `--discard-backup`. Teardown refuses ambiguous or shared installations before removing their resources.
+- `meridian fleet upgrade` keeps Realm on the version tested with this release or the newer version already selected for the fleet. Pass `--latest` to look for newer upstream relay releases.
+- The 3.x transition guide explains how to retire a dedicated VPS or keep a shared one. The recovery guide covers a lost managing computer and temporary individual relay connections when the invitation page is unreachable.
 - Overview shows when a managing device last confirmed saving an encrypted recovery copy and how many changes came later. The owner can download a current copy for the keys already registered. A browser download does not claim an off-server save.
 - Restoring to a replacement VPS can finish when the original server is still reachable. Meridian retires its old nginx configuration before removing unused certificates and preserves other sites. An interrupted restore can resume from the same recovery file.
 - Updated exits refuse new connections after the last expiry they received, even while the control server is unavailable. Active transfers and other people’s connections continue; a renewal takes effect when the exit receives it.
