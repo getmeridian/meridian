@@ -32,7 +32,7 @@ The default client policy is **`ru-split`**. Xray JSON, Mihomo, and Stash subscr
 
 sing-box uses the same policy with inline rules for private IPs and the three Russian domain suffixes. It does not download geosite or geoip lists, so other Russian domains and IP ranges may still use the tunnel.
 
-Both policies block QUIC (UDP 443) after the direct destination rules, so apps fall back to TCP. Both also retain the **BitTorrent direct rule in Xray JSON** to reduce abuse complaints against exits. It matches recognized peer handshakes only: encrypted peers and UDP DHT/uTP may still use the VPN. Mihomo, Stash, and sing-box do not receive a BitTorrent matcher.
+Both presets block QUIC (UDP 443) after direct destination rules, so apps can fall back to TCP. With `ru-split`, Xray JSON also sends recognized BitTorrent connections directly: peers can see the device’s public IP. Encrypted peers and UDP DHT/uTP may still use the VPN. With `full`, public peers use the VPN. Mihomo, Stash and sing-box have no BitTorrent matcher.
 
 ### Choose a policy
 

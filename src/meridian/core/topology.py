@@ -340,7 +340,7 @@ class DeliveryIntent(OwnerContactSettings, ResponseRuleSettings):
         default=DEFAULT_CLIENT_ROUTING,
         exclude_if=lambda value: value == DEFAULT_CLIENT_ROUTING,
         description="Client routing: ru-split bypasses Russian destinations; full tunnels them. "
-        "Both bypass private/LAN ranges and retain Xray's best-effort BitTorrent bypass.",
+        "Both keep private/LAN ranges direct. Only ru-split bypasses detected BitTorrent peers in Xray JSON.",
     )
 
     @field_validator("formats")

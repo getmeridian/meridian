@@ -32,7 +32,7 @@ Meridian 默认开启**服务器端地理封锁**：出口会丢弃发往俄罗�
 
 sing-box 使用同一策略，但只采用私有 IP 和三个俄罗斯域名后缀的内联规则。它不会下载 geosite 或 geoip 列表，因此其他俄罗斯域名和 IP 段仍可能通过 VPN。
 
-两种策略都会在直连目标规则之后阻止 QUIC（UDP 443），使应用回退到 TCP。两种策略也都保留 **Xray JSON 中的 BitTorrent 直连规则**，以减少针对出口服务器的滥用投诉。该规则仅匹配已识别的对等连接握手；加密的对等连接和 UDP DHT/uTP 仍可能通过 VPN。Mihomo、Stash 和 sing-box 不携带 BitTorrent 匹配规则。
+两种模式都会在直连规则之后阻止 QUIC（UDP 443），让应用能回退到 TCP。使用 `ru-split` 时，Xray JSON 也会直连已识别的 BitTorrent 对等节点，这些节点可看到设备的公网 IP。加密对等连接和 UDP DHT/uTP 仍可能通过 VPN。使用 `full` 时，公网对等连接通过 VPN。Mihomo、Stash 和 sing-box 没有 BitTorrent 匹配规则。
 
 ### 选择策略
 

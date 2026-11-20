@@ -578,7 +578,7 @@
   "commands.no_core": "This node has no running managed Xray unit. Apply its node configuration first.",
   "settings.client_routing": "Client routing",
   "settings.routing_ru_split": "Russian destinations and private/LAN ranges go directly; other traffic uses the VPN. Detected BitTorrent peers also go directly in Xray JSON.",
-  "settings.routing_full": "Internet traffic uses the VPN, including Russian destinations; private/LAN ranges and detected BitTorrent peers in Xray JSON go directly.",
+  "settings.routing_full": "Internet traffic, including public BitTorrent peers, uses the VPN; local networks stay direct.",
   "settings.routing_hint": "Change this policy from your computer:",
   "person.metadata": "Private notes and tag",
   "person.metadata_private": "Only the owner and people/admin tokens can read these fields. They stay out of connection pages and subscriptions and ride encrypted backups.",

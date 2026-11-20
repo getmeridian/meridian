@@ -6,7 +6,7 @@
 - Usernames identify service accounts; live display names are public fields. Exact username wins before folded username/display-name matching; ambiguity refuses.
 - Named access grants belong to topology; membership belongs to the service. The built-in default grants every managed inbound, while public aliases share enforcement.
 - Profile declaration fingerprints hash intent before expansion, so protocol changes do not silently accept a profile edit.
-- One delivery resolver orders person overrides, reviewed app rules, profile defaults, named fleet defaults and presets. Unsupported formats remain explicit.
+- One delivery resolver orders person overrides, reviewed app rules, profile defaults, named fleet defaults and presets. Unsupported formats remain explicit. Full has no public peer bypass; only ru-split gives Xray a direct BitTorrent rule.
 - People queries have one typed selection; paging never changes matching people. Bulk before/after and receipts omit credentials and private notes.
 - Token schemas freeze explicit cataloged capabilities independently of compatible presets, with private metadata and credential permissions kept separate.
 - Account schedules share UTC calendar arithmetic, first-use activation, clamped renewal anchors and bounded future timestamps.

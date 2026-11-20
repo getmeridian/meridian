@@ -10,6 +10,7 @@ from urllib.parse import urlsplit
 from meridian.control.page_support import render_support_html
 from meridian.control.store import Store
 from meridian.control.subscriptions import SubscriptionResponse, unknown_subscription
+from meridian.core.delivery_policies import resolve_delivery_policy
 from meridian.core.inputs import is_ip
 from meridian.core.languages import resolve_language
 from meridian.core.notices import RenderedNotice
@@ -55,6 +56,13 @@ class ConnectionPages:
             if person is None:
                 return unknown_subscription()
             language = resolve_language(self._service.languages.read().language, person.language)
+            policy = resolve_delivery_policy(settings, profiles=person.profiles, person_override=person.delivery_policy)
+            # The browser cannot know the headers, version, or preferences the installed app will use.
+            varies = any(
+                rule.action.kind in {"block", "format"} or (rule.action.kind == "policy" and not person.delivery_policy)
+                for rule in settings.response_rules
+            )
+            routing = "app-dependent" if varies else "custom" if policy.policy.rules else policy.policy.preset
         # Rendering and QR work do not hold the service's state lock.
         assets = packaged_assets()
         asset_path = f"{prefix}/sub/{ASSET_SEGMENT}/{assets.version}"
@@ -76,6 +84,7 @@ class ConnectionPages:
             server_icon=settings.server_icon,
             color=settings.color,
             subscription_url=canonical,
+            routing=routing,
             no_connections=info["user"].get("hasUsableConnections") is False,
             exit_countries=settings.exit_countries,
             owner_contact=settings.owner_contact,

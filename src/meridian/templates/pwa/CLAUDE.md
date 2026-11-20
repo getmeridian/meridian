@@ -26,7 +26,7 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 - **Connection remarks stay verbatim** — translate protocol hints only, and show entries in subscription order.
 
 ## Pitfalls
-- **Routing comes from the subscription** — setup never promises a fixed split policy; raw links carry no routing rules.
+- **Routing comes from the subscription** — setup explains the effective preset against the selected app’s normal format; app-dependent responses and unknown clients make no routing promise. Raw links carry no routing rules.
 - **Nested details CSS** — use `> summary`, and suppress markers with `list-style:none`, `::-webkit-details-marker`, and `::marker`.
 - **SW staleness** — develop with `meridian dev preview --watch`, which disables the worker; every `no-store` request bypasses it.
 - **Catalog parity** — `_PWA_APPS` must match `website/src/data/apps.json` field for field and in order; CI validates.

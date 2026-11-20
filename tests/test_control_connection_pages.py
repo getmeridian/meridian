@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -69,6 +70,37 @@ def test_browser_gets_html_and_apps_keep_configs(page_fleet: tuple[str, ControlC
     info = httpx.get(f"{url}/sub/{person.sub_token}/info", headers={"Accept": "text/html"})
     assert info.headers["content-type"].startswith("application/json")
     assert info.json()["user"]["username"] == "guest"
+
+
+def test_connection_page_describes_effective_routing_without_private_rule_names(tmp_path: Path) -> None:
+    from meridian.core.person_delivery_policy import PersonDeliveryPolicyWrite
+    from tests.test_delivery_policies import delivery_data
+    from tests.test_response_rules import app_rule
+
+    service = ControlService(tmp_path / "db", fleet_id=FLEET_ID, version="4.0.0")
+    try:
+        person = service.put_user("guest")
+        settings = ServiceSettings.model_validate({"profile_title": "Meridian", **delivery_data()})
+        service.put_settings(settings)
+
+        def summary() -> str:
+            config = json.loads(service.pages.render(person.sub_token, "config.json").body)
+            assert "example.test" not in json.dumps(config) and "work" not in config["routing"]
+            return config["routing"]
+
+        assert summary() == "custom"
+        change = service.delivery.set_person("guest", PersonDeliveryPolicyWrite(policy="full"))
+        service.delivery.set_person(
+            "guest", PersonDeliveryPolicyWrite(policy="full", confirm=True, review_hash=change.review_hash)
+        )
+        assert summary() == "full"
+        settings = ServiceSettings.model_validate(
+            {**settings.to_data(), "response_rules": [app_rule({"kind": "format", "format": "base64"})]}
+        )
+        service.put_settings(settings)
+        assert summary() == "app-dependent"
+    finally:
+        service.close()
 
 
 def test_empty_grant_is_distinct_from_a_suspension(page_fleet: tuple[str, ControlClient, UserRecord]) -> None:

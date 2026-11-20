@@ -37,7 +37,7 @@ DEFAULT_CLIENT_ROUTES: tuple[ClientRoute, ...] = (
     ),
     ClientRoute("direct", ips=("geoip:ru",), ru_split_only=True),
     ClientRoute("block", network="udp", port="443"),
-    ClientRoute("direct", protocols=("bittorrent",)),
+    ClientRoute("direct", protocols=("bittorrent",), ru_split_only=True),
 )
 
 

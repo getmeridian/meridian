@@ -220,7 +220,7 @@
       "properties": {
         "client_routing": {
           "default": "ru-split",
-          "description": "Client routing: ru-split bypasses Russian destinations; full tunnels them. Both bypass private/LAN ranges and retain Xray's best-effort BitTorrent bypass.",
+          "description": "Client routing: ru-split bypasses Russian destinations; full tunnels them. Both keep private/LAN ranges direct. Only ru-split bypasses detected BitTorrent peers in Xray JSON.",
           "enum": [
             "ru-split",
             "full"

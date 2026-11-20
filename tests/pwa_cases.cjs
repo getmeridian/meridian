@@ -122,6 +122,26 @@ const cases = {
       assert.equal(browser.document.querySelector('.account-metric').querySelector('dd').textContent, expected);
     }
   },
+  test_import_explains_the_app_and_changes_with_selection: async function(data) {
+    data.config.routing = 'ru-split';
+    const browser = createBrowser(data.config, data.catalog, { info: data.info, userAgent: 'Mozilla/5.0 (iPhone)' });
+    await browser.start();
+    const doc = browser.document;
+    function choose(name) {
+      const select = doc.getElementById('app-choice'); select.value = name; browser.fire('change', select);
+      return doc.getElementById('import-routing').textContent;
+    }
+    assert.match(doc.getElementById('import-routing').textContent, /Russian.*BitTorrent peers connect directly/);
+    assert.match(choose('ShadowRocket'), /no routing rules/);
+    assert.match(choose('sing-box'), /\.su/);
+    browser.context.page.switchLang('ru');
+    assert.match(doc.getElementById('import-routing').textContent, /домены/);
+    const cfg = browser.context._meridianConfig;
+    cfg.routing = 'full'; assert.match(choose('Happ'), /Интернет-трафик идёт через VPN/);
+    cfg.routing = 'custom'; assert.match(choose('Happ'), /свои правила/);
+    cfg.routing = 'app-dependent'; assert.match(choose('ShadowRocket'), /зависит от полученного профиля/);
+    delete cfg.routing; assert.match(choose('Happ'), /зависит от полученного профиля/);
+  },
   test_empty_grant_can_recover_without_reissuing_or_sharing: async function(data) {
     data.info.user.hasUsableConnections = false;
     const browser = createBrowser(data.config, data.catalog, { info: data.info });

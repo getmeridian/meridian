@@ -437,7 +437,7 @@
   "fleet_routing.current": "客户端路由：{policy}",
   "fleet_routing.ru_split": "俄罗斯目的地和私有地址、局域网直连，其他流量通过 VPN。",
   "fleet_routing.full": "互联网流量通过 VPN，包括俄罗斯目的地；私有地址和局域网直连。",
-  "fleet_routing.bittorrent": "两种策略均保留 Xray JSON 对已识别 BitTorrent 对等连接的直连规则，以减少针对出口服务器的滥用投诉；识别并非始终可靠。",
+  "fleet_routing.bittorrent": "仅在 ru-split 下，Xray JSON 才会直连已识别的 BitTorrent 对等节点。full 下的公网对等连接通过 VPN。",
   "fleet_routing.quic": "两种策略均阻止 QUIC（UDP/443），使应用回退到 TCP。",
   "fleet_routing.base64": "Base64 链接不携带路由规则；请在这类应用中单独设置路由。",
   "fleet_routing.exit_policy": "出口服务器的地理封锁规则仍然有效；full 只更改设备上的路由。",

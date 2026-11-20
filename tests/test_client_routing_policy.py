@@ -71,7 +71,7 @@ def test_full_policy_reaches_both_settings_payloads_and_every_compiled_template(
         if template.template_type == "XRAY_JSON":
             assert template.template_json is not None
             rules = template.template_json["routing"]["rules"]
-            assert {"type": "field", "protocol": ["bittorrent"], "outboundTag": "DIRECT"} in rules[:-1]
+            assert not any("protocol" in rule for rule in rules)
             assert rules[-1]["balancerTag"] == "MERIDIAN_AUTO"
 
 
@@ -136,7 +136,7 @@ def test_service_subscriptions_follow_the_policy_in_every_automatic_group(
             assert {"type": "field", "ip": ["geoip:private"], "outboundTag": "DIRECT"} in rules
             assert ({"type": "field", "ip": ["geoip:ru"], "outboundTag": "DIRECT"} in rules) == split
             assert any("domain:ru" in rule.get("domain", []) for rule in rules) == split
-            assert {"type": "field", "protocol": ["bittorrent"], "outboundTag": "DIRECT"} in rules[:-1]
+            assert ({"type": "field", "protocol": ["bittorrent"], "outboundTag": "DIRECT"} in rules[:-1]) == split
             assert config["routing"]["balancers"][0]["fallbackTag"] == "BLOCK"
             assert rules[-1] == {"type": "field", "network": "tcp,udp", "balancerTag": "MERIDIAN_AUTO"}
     elif document in ("mihomo", "stash"):

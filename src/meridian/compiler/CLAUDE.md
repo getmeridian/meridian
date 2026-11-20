@@ -8,7 +8,7 @@
 **Pure and deterministic** — output depends only on `SetupIntent` and a secret-free `DeploymentContract`: no I/O, secrets, clock reads, or randomness (tested). It never holds generated credentials or private Reality keys.
 **Finite reviewed resources** — typed payloads have stable IDs, sorted dependencies, postconditions, ownership markers and hashes; the plan binds the graph, SSH targets, runtime pins and renderer contract.
 **Control-service backend** — `meridian_backend.py` runs after the base compile and swaps panel kinds for `control_service`, `agent_runtime`, `node_workload`, `client_endpoint`, and `service_settings`; a routing gateway is one more agent node whose pools and routes fold into its workload. Only client-IP forwarding is refused (it changes the PROXY chain).
-**One routing list** — `delivery.DEFAULT_CLIENT_ROUTES` serves every structured format; presets differ only in Russian bypasses and retain LAN, QUIC and BitTorrent rules. Never require sing-box to fetch remote lists, since failures prevent startup. Base64 carries no routing rules.
+**One routing list** — `delivery.DEFAULT_CLIENT_ROUTES` serves every structured format; both retain LAN and QUIC rules; only ru-split bypasses matched Russian destinations and detected Xray BitTorrent peers. Never require sing-box to fetch remote lists, since failures prevent startup. Base64 carries no routing rules.
 **Aggregate workload profiles** — each exit Profile owns its complete Inbound set; derived Inbound resources expose the identities bindings and endpoints need. Exit egress overrides compile into the Profile's routing rules ahead of the default egress.
 **Gateway rule targets** — an exit's bridge edge, a pool's balancer, or the gateway's own `direct`/`block`; `SetupIntent.gateway_routes()` is the one rule order, shared with the wizard summary.
 **Self-steal camouflage** — `self_steal.py` falls a Reality path back to a loopback nginx TLS server holding the operator's own certificate; XHTTP/WSS on that name use it, and the 443 route for the name belongs to Reality.
@@ -30,7 +30,7 @@
 - **New optional payload or intent fields use `Field(exclude_if=...)` at their default** — otherwise every existing fleet's plan hash changes and re-applies.
 - **A relay's endpoint takes keys from the exit behind it** — resolve `workload_ref` through the Host's `node_ref` runtime, never `owner_ref` (the relay).
 - **Certificates depend on their TCP/80 ACME rule, never on the node runtime** — Hysteria2 makes Xray load the certificate at startup, so the runtime waits for the certificate; the control bootstrap likewise depends on its public 80/443 rules.
-- **Xray sniffs BitTorrent with `enabled: true`**, never in `destOverride` (invalid); keep its direct rule after UDP/443 blocking and before the catch-all.
+- **Xray sniffs BitTorrent with `enabled: true`**, never in `destOverride` (invalid); keep its ru-split direct rule after UDP/443 blocking; full tunnels public peers through the catch-all.
 - **Raise `TopologyCompileError` for unsupported intent**; deployment contracts are empty or cover every topology server ref exactly.
 - **Build every published name through `names.py`** — format length limits and `host_remark()` keep labels consistent.
 - **Endpoints publish only after their listener and runtime**, in `PROTOCOL_PRIORITY` order with the control server's exit first (the entry clients pick by default); Xray-JSON-only entries exclude other formats, or sing-box and Stash list duplicates.
