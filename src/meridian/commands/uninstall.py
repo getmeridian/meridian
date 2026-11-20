@@ -127,23 +127,27 @@ def run(
 
     resolved = ensure_server_connection(resolved)
 
-    generation = (
-        teardown_backup.confirmed_generation(cluster, current) if is_panel_host and not discard_backup else None
-    )
-    info(f"Removing Meridian from {resolved.ip}...")
-    err_console.print()
-
     from meridian.provision.progress import RichStepRenderer
     from meridian.provision.steps import ProvisionContext, Provisioner
     from meridian.provision.uninstall import Uninstall
 
-    ctx = ProvisionContext(
-        ip=resolved.ip,
-        user=resolved.user,
-        cluster=cluster,
-    )
-
-    provisioner = Provisioner([Uninstall(controller=is_panel_host, generation=generation, discard=discard_backup)])
+    ctx = ProvisionContext(ip=resolved.ip, user=resolved.user, cluster=cluster)
+    action = Uninstall(controller=is_panel_host, discard=discard_backup)
+    if is_panel_host:
+        checked = action.preflight(resolved.conn, ctx)
+        if checked.status == "failed":
+            fail(
+                "Teardown preflight refused; no backup or server change was made.",
+                hint=checked.detail,
+                hint_type="user",
+            )
+        if checked.detail == "ready" and not discard_backup:
+            action.generation = teardown_backup.confirmed_generation(cluster, current)
+        elif checked.detail in {"pending", "complete"}:
+            info("Checking the host’s earlier teardown and finishing any pending cleanup.")
+    info(f"Removing Meridian from {resolved.ip}...")
+    err_console.print()
+    provisioner = Provisioner([action])
     results = provisioner.run(resolved.conn, ctx, renderer=RichStepRenderer())
 
     failed = [r for r in results if r.status == "failed"]

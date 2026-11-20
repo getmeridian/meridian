@@ -66,7 +66,13 @@ class Uninstall:
     discard: bool = False
     name = "Uninstall Meridian"
 
+    def preflight(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
+        return self._host(conn, ctx, preflight=True)
+
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
+        return self._host(conn, ctx, preflight=False)
+
+    def _host(self, conn: ServerConnection, ctx: ProvisionContext, *, preflight: bool) -> StepResult:
         fleet, token_hash = "", ""
         certs: set[str] = set()
         markers: set[str] = set()
@@ -99,10 +105,24 @@ class Uninstall:
             sorted(markers),
             sorted(fragments),
             topology,
+            "preflight" if preflight else "run",
         ]
-        script = files("meridian.provision").joinpath("teardown_host.py").read_text(encoding="utf-8")
+        package = files("meridian.provision")
+        # The target may run an older Meridian, or keep its package in an isolated venv. Execute our
+        # standard-library helpers in memory with system Python; even preflight sends no files to the host.
+        script = "import sys,types\n"
+        for name in ("teardown_journal", "teardown_nginx"):
+            source = package.joinpath(name + ".py").read_text(encoding="utf-8")
+            script += f"m=types.ModuleType('meridian.provision.{name}');sys.modules[m.__name__]=m;"
+            script += f"exec({source!r},m.__dict__)\n"
+        source = package.joinpath("teardown_host.py").read_text(encoding="utf-8")
+        script += f"exec({source!r})"
+
         result = conn.run(shlex.join(("python3", "-c", script, json.dumps(request))), timeout=120, sensitive=True)
-        if result.returncode or result.stdout.strip() != "retired":
+        outcome = result.stdout.strip()
+        if preflight and not result.returncode and outcome in {"ready", "pending", "complete"}:
+            return StepResult(name=self.name, status="ok", detail=outcome)
+        if result.returncode or outcome != "retired":
             return StepResult(
                 name=self.name,
                 status="failed",

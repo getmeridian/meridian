@@ -8,6 +8,7 @@ a reason to guess. Nothing is deleted until preflight and the final backup check
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import hashlib
 import hmac
 import json
@@ -18,8 +19,11 @@ import shutil
 import sqlite3
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
+from typing import Any
+
+from meridian.provision.teardown_journal import JournalError, Retirement
+from meridian.provision.teardown_nginx import verify_nginx_runtime
 
 NGINX = Path("/etc/nginx")
 UNITS = Path("/etc/systemd/system")
@@ -30,6 +34,8 @@ ACME = Path("/root/.acme.sh")
 CERTBOT = Path("/etc/letsencrypt/renewal")
 DEFAULT_WEBROOT = Path("/usr/share/nginx/html")
 MOUNTS = Path("/proc/self/mountinfo")
+JOURNALS = Path("/var/lib")
+UFW_FILES = (Path("/etc/ufw/user.rules"), Path("/etc/ufw/user6.rules"))
 BOOTSTRAP = {
     "conf.d/meridian-http.conf": b"# Meridian Proxy Configuration",
     "stream.d/meridian.conf": b"# nginx SNI Router",
@@ -62,7 +68,7 @@ class Refuse(Exception):
 
 
 def command(*args: str) -> str:
-    result = subprocess.run(args, capture_output=True, text=True)
+    result = subprocess.run(args, capture_output=True, text=True, env=dict(os.environ, LC_ALL="C"))
     if result.returncode:
         raise Refuse(f"{args[0]} {args[1]} did not succeed; inspect it on the VPS.")
     return result.stdout
@@ -138,7 +144,7 @@ def pristine_default(path: Path) -> bool:
 def inspect_sites(files: list[Path]) -> None:
     # nginx -T names every effective include, even outside /etc/nginx. Never return its contents.
     known = {p.resolve() for p in files}
-    dump = command("nginx", "-T")
+    dump = command("/usr/sbin/nginx", "-c", "/etc/nginx/nginx.conf", "-T")
     if not dump.startswith("# configuration file "):
         raise Refuse("Cannot identify the effective nginx configuration.")
     for block in re.split(r"(?m)^# configuration file ", dump)[1:]:
@@ -171,6 +177,11 @@ def inspect_unit(unit: str, executable: str) -> bool:
 
 def check_database(path: Path, fleet: str, topology: list[str | int], generation: str) -> None:
     # Also run after ctld stops: a panel edit or fleet apply during review MUST survive.
+    for part in (path, Path(str(path) + "-wal"), Path(str(path) + "-shm"), Path(str(path) + "-journal")):
+        if part == path or os.path.lexists(part):
+            absolute(part)
+            if not part.is_file() or part.stat().st_nlink != 1:
+                raise Refuse("The control database or its journal has an external link. Its data was left alone.")
     with contextlib.closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as db:
         fence = db.execute("SELECT record FROM apply_fence WHERE id=1").fetchone()
         record = json.loads(fence[0]) if fence else {}
@@ -182,7 +193,7 @@ def check_database(path: Path, fleet: str, topology: list[str | int], generation
             raise Refuse(
                 "The fleet topology changed or an apply is in progress. Use the latest managing copy and retry."
             )
-        if generation == "discard":
+        if generation in {"discard", "preflight"}:
             return
         row = db.execute("SELECT changes FROM backup_progress WHERE id=1").fetchone()
         receipt = db.execute(
@@ -208,15 +219,6 @@ def inspect_renewals(certs: set[Path]) -> list[Path]:
     return own
 
 
-def remove_file(path: Path) -> None:
-    path.unlink(missing_ok=True)
-
-
-def remove_tree(path: Path) -> None:
-    if path.is_dir():
-        shutil.rmtree(path)
-
-
 def active(unit: str) -> bool:
     state = command("systemctl", "show", unit, "-p", "ActiveState", "--value").strip()
     if state not in {"active", "inactive", "failed"}:
@@ -224,10 +226,40 @@ def active(unit: str) -> bool:
     return state == "active"
 
 
-def clean_firewall(markers: set[str]) -> None:
-    if not markers or not shutil.which("ufw"):
-        return
+def persisted_rules(markers: set[str]) -> set[str]:
+    stored: set[str] = set()
+    for path in UFW_FILES:
+        if not path.is_file():
+            continue
+        contents = path.read_bytes()
+        # UFW stores tuple comments as hex on current versions, or literal text on older versions.
+        stored.update(m for m in markers if m.encode() in contents or m.encode().hex().encode() in contents)
+    return stored
+
+
+def firewall_status(markers: set[str]) -> str:
+    if not markers:
+        return ""
+    unavailable = "Tagged UFW rules remain stored but inactive. Review and remove those fleet rules before retrying."
+    if not shutil.which("ufw"):
+        if persisted_rules(markers):
+            raise Refuse(unavailable)
+        return ""
     status = command("ufw", "status", "numbered")
+    if status.strip() == "Status: inactive":
+        stored = persisted_rules(markers)
+        for line in command("ufw", "show", "added").splitlines():
+            words = shlex.split(line)
+            if len(words) > 1 and words[-2] == "comment" and words[-1] in markers:
+                stored.add(words[-1])
+        if stored:
+            raise Refuse(unavailable)
+        return ""
+    return status
+
+
+def clean_firewall(markers: set[str]) -> None:
+    status = firewall_status(markers)
     rules = [
         int(m[1])
         for line in status.splitlines()
@@ -235,6 +267,57 @@ def clean_firewall(markers: set[str]) -> None:
     ]
     for number in sorted(rules, reverse=True):
         command("ufw", "--force", "delete", str(number))
+    if persisted_rules(markers):
+        raise Refuse("A tagged rule is still stored by UFW. Review the tagged rules and retry.")
+
+
+def effective_nginx() -> None:
+    try:
+        verify_nginx_runtime()
+    except ValueError as exc:
+        raise Refuse(
+            "The running nginx unit, binary or configuration could not be verified. Nothing will stop it."
+        ) from exc
+
+
+def enabled(unit: str) -> bool:
+    state = command("systemctl", "show", unit, "-p", "UnitFileState", "--value").strip()
+    if state not in {"enabled", "disabled", "static"}:
+        raise Refuse("A service has an uncertain startup state; review it before teardown.")
+    return state == "enabled"
+
+
+def recover_preparation(journal: Retirement, txn: dict[str, Any]) -> None:
+    journal.restore(txn["artifacts"])
+    command("systemctl", "daemon-reload")
+    for unit in txn["units"]:
+        if unit == "nginx":
+            effective_nginx()
+        elif not inspect_unit(unit, EXEC[unit]):
+            raise Refuse("The original unit could not be restored. Inspect the private retirement journal.")
+        if unit in txn["enabled"] and not enabled(unit):
+            command("systemctl", "enable", unit)
+    for u in ("ctld", "netcore", "netagent", "nginx"):
+        if u in txn["active"]:
+            if not active(u):
+                command("systemctl", "start", u)
+            elif u == "nginx":
+                command("systemctl", "reload", "nginx")
+    journal.clear()
+
+
+def finish_committed(journal: Retirement, txn: dict[str, Any]) -> None:
+    try:
+        journal.assert_no_replacement(txn["artifacts"])
+        clean_firewall(set(txn["markers"]))
+        journal.dispose(txn["artifacts"])
+        # A lost SSH reply can be retried; no admin token or people are in this completion receipt.
+        journal.write({}, "complete")
+    except (OSError, Refuse, JournalError) as exc:
+        raise Refuse(
+            "Retirement committed: the fleet has stopped, but cleanup is incomplete. "
+            "Fix the reported cause and run the same teardown again. " + str(exc)
+        ) from exc
 
 
 def teardown(
@@ -245,7 +328,49 @@ def teardown(
     markers: list[str],
     fragments: list[str],
     topology: list[str | int],
-) -> None:
+    *,
+    preflight: bool = False,
+) -> str:
+    scope = json.dumps(
+        [fleet, admin_hash, sorted(cert_names), sorted(markers), sorted(fragments), topology], separators=(",", ":")
+    )
+    journal = Retirement(JOURNALS, scope)
+    # Lock an existing directory; neither successful nor refused preflight creates a file.
+    fd = os.open(JOURNALS, os.O_RDONLY)
+    try:
+        try:
+            fcntl.flock(fd, (fcntl.LOCK_SH if preflight else fcntl.LOCK_EX) | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise Refuse("A teardown is already running on this host. Wait for it and retry.") from exc
+        pending = journal.read() if fleet else None
+        if pending is not None:
+            if pending["phase"] == "complete":
+                if any(os.path.lexists(p) for p in (STATE, CONFIG, *(UNITS / (u + ".service") for u in EXEC))):
+                    raise Refuse("A new controller or unit exists on the retired host. Its installation was kept.")
+                return "complete" if preflight else "retired"
+            if preflight:
+                return "pending"
+            if pending["phase"] == "preparing":
+                recover_preparation(journal, pending)
+                raise Refuse("Recovered the interrupted preparation. The original fleet was kept. Run teardown again.")
+            finish_committed(journal, pending)
+            return "retired"
+        return new_teardown(fleet, admin_hash, generation, cert_names, markers, fragments, topology, journal, preflight)
+    finally:
+        os.close(fd)
+
+
+def new_teardown(
+    fleet: str,
+    admin_hash: str,
+    generation: str,
+    cert_names: list[str],
+    markers: list[str],
+    fragments: list[str],
+    topology: list[str | int],
+    journal: Retirement,
+    preflight: bool,
+) -> str:
     if any(os.path.lexists(p) for p in LEGACY):
         raise Refuse(
             "This VPS also contains an older panel or container installation. Identify it before removing anything."
@@ -256,7 +381,9 @@ def teardown(
             raise Refuse(
                 "This host still contains a controller or managed services. Use their owning fleet for teardown."
             )
-        return  # After node remove the shelf may still contain the empty server. No reason to touch the host.
+        return (
+            "ready" if preflight else "retired"
+        )  # After node remove the shelf may still contain the empty server. No reason to touch the host.
     absolute(CONFIG)
     if not CONFIG.is_file():
         raise Refuse("Could not establish ownership of the controller. Nothing was removed.")
@@ -269,7 +396,7 @@ def teardown(
         raise Refuse("The target is not the controller recorded by this fleet. Nothing was removed.")
     if Path(settings.get("state_dir", str(STATE))) != STATE:
         raise Refuse("This controller uses a custom state directory. Review the installation before teardown.")
-    if generation != "discard" and not generation.isdecimal():
+    if not preflight and generation != "discard" and not generation.isdecimal():
         raise Refuse("A verified backup or explicit discard is required.")
     if not all(re.fullmatch(r"(?:fw-|meridian-v4-)[0-9a-f]{16}", m) for m in markers):
         raise Refuse("The saved fleet has an unrecognized firewall binding.")
@@ -298,6 +425,7 @@ def teardown(
     if list(UNITS.glob("netfwd-*.service")) or list(UNITS.glob("meridian-realm-*.service")):
         raise Refuse("Retire relay roles through the reviewed fleet plan before teardown.")
     renewals = inspect_renewals(certs)
+    effective_nginx()
     inspect_sites(files)
     override = UNITS / "nginx.service.d/restart.conf"
     dropins = command("systemctl", "show", "nginx", "-p", "DropInPaths", "--value").split()
@@ -306,94 +434,92 @@ def teardown(
         and (override.is_symlink() or override.read_text() != "[Service]\nRestart=on-failure\nRestartSec=5\n")
     ):
         raise Refuse("nginx has an operator systemd override. Keep it serving and review the shared installation.")
-    check_database(STATE / "control.db", fleet, topology, generation)
+    check_database(STATE / "control.db", fleet, topology, "preflight" if preflight else generation)
     previously_active = {u for u in [*units, "nginx"] if active(u)}
-    # An interrupted SSH call must leave held files safe, never in a glob nginx serves.
+    startup = {u for u in [*units, "nginx"] if enabled(u)}
     if any(NGINX.glob(".meridian-teardown-*")):
-        raise Refuse(
-            "An interrupted teardown has staged nginx files. Restore them from its private staging directory and retry."
-        )
-    can_remove_stage = False
-    held: list[tuple[Path, Path]] = []
-    stopped: list[str] = []
-    stage = Path(tempfile.mkdtemp(prefix=".meridian-teardown-", dir=NGINX))
-    try:
-        try:
-            command("systemctl", "stop", "ctld")
-            stopped.append("ctld")
-            check_database(STATE / "control.db", fleet, topology, generation)
-            for path in files:
-                dest = stage / path.parent.name / path.name
-                dest.parent.mkdir(mode=0o700, exist_ok=True)
-                path.rename(dest)
-                held.append((path, dest))
-            inspect_sites([])  # a newly enabled operator site must not be stopped
-            command("nginx", "-t")
-            if "nginx" in previously_active:
-                command("systemctl", "reload", "nginx")
-            for u in ("netagent", "netcore"):
-                if u in units:
-                    command("systemctl", "stop", u)
-                    stopped.append(u)
-            command("systemctl", "stop", "nginx")
-            stopped.append("nginx")
-            clean_firewall(set(markers))
-        except BaseException:
-            for path, dest in reversed(held):
-                dest.rename(path)
-            try:
-                if held and "nginx" in previously_active and "nginx" not in stopped:
-                    command("systemctl", "reload", "nginx")
-            finally:
-                for u in reversed(stopped):
-                    if u in previously_active:
-                        command("systemctl", "start", u)
-            can_remove_stage = True
-            raise
-        for u in [*units, "nginx"]:
-            command("systemctl", "disable", u)
-        remove_file(override)
-        for u in units:
-            remove_file(UNITS / (u + ".service"))
-        command("systemctl", "daemon-reload")
-        for cert in certs:
-            remove_file(cert)
-            remove_file(cert.parent / "key.pem")
-        for renewal in renewals:
-            # Revoke only this ACME job and its known key material; other files may be operator records.
+        raise Refuse("An older teardown left staged nginx files. Restore them before retrying.")
+    renewal_files: list[Path] = []
+    for conf in renewals:
+        renewal_files.extend(
+            conf.parent / name
             for name in (
-                renewal.name,
-                renewal.stem + ".cer",
-                renewal.stem + ".key",
-                renewal.stem + ".csr",
-                renewal.stem + ".csr.conf",
+                conf.name,
+                conf.stem + ".cer",
+                conf.stem + ".key",
+                conf.stem + ".csr",
+                conf.stem + ".csr.conf",
                 "ca.cer",
                 "fullchain.cer",
-            ):
-                remove_file(renewal.parent / name)
-            if not any(renewal.parent.iterdir()):
-                renewal.parent.rmdir()
-        for path in RUNTIMES:
-            if path.is_dir():
-                remove_tree(path)
-            else:
-                remove_file(path)
-        can_remove_stage = True
-    finally:
-        # Do not throw away the only copy if rollback itself failed.
-        if can_remove_stage:
-            remove_tree(stage)
+            )
+        )
+    rest = [
+        override,
+        *(UNITS / (u + ".service") for u in units),
+        *(p for cert in certs for p in (cert, cert.parent / "key.pem")),
+        *renewal_files,
+        *RUNTIMES,
+    ]
+    firewall_status(set(markers))  # refusal must not register a new backup device
+    artifacts = journal.plan([*files, *rest])
+    if preflight:
+        return "ready"
+    txn = {
+        "artifacts": artifacts,
+        "units": [*units, "nginx"],
+        "active": sorted(previously_active),
+        "enabled": sorted(startup),
+        "markers": markers,
+    }
+    journal.write(txn, "preparing")
+    try:
+        command("systemctl", "stop", "ctld")
+        check_database(STATE / "control.db", fleet, topology, generation)
+        for path in files:
+            journal.move(path, artifacts[str(path)])
+        inspect_sites([])
+        command("/usr/sbin/nginx", "-c", "/etc/nginx/nginx.conf", "-t")
+        if "nginx" in previously_active:
+            command("systemctl", "reload", "nginx")
+        for unit in ("netagent", "netcore", "nginx"):
+            if unit in txn["units"]:
+                command("systemctl", "stop", unit)
+        for unit in startup:
+            command("systemctl", "disable", unit)
+        for path in dict.fromkeys(rest):
+            if str(path) in artifacts:
+                journal.move(path, artifacts[str(path)])
+        command("systemctl", "daemon-reload")
+        journal.write(txn, "committed")
+    except BaseException:
+        # Atomic rename can succeed even if the connection or subsequent directory fsync fails.
+        # Read the durable boundary rather than trying to revive an already retired fleet.
+        saved = journal.read()
+        if saved and saved["phase"] == "committed":
+            raise Refuse("Retirement committed; rerun the same teardown to finish cleanup.")
+        try:
+            recover_preparation(journal, txn)
+        except (OSError, Refuse, JournalError) as exc:
+            raise Refuse(
+                "Retirement preparation was interrupted. The original files were kept in private staging. "
+                "Fix the cause and rerun the same teardown to recover. " + str(exc)
+            ) from exc
+        raise
+    finish_committed(journal, txn)
+    return "retired"
 
 
 def main() -> None:
     try:
-        fleet, token_hash, generation, certs, markers, fragments, topology = json.loads(sys.argv[1])
-        teardown(fleet, token_hash, generation, certs, markers, fragments, topology)
-    except Refuse as exc:
+        fleet, token_hash, generation, certs, markers, fragments, topology, mode = json.loads(sys.argv[1])
+        result = teardown(
+            fleet, token_hash, generation, certs, markers, fragments, topology, preflight=mode == "preflight"
+        )
+    except (Refuse, JournalError) as exc:
         sys.exit(str(exc))
     except (ValueError, KeyError, TypeError, sqlite3.Error, OSError):
         sys.exit("Could not verify or finish cleanup. Inspect the service and staged files on the VPS, then retry.")
-    print("retired")
+    print(result)
 
 
 if __name__ == "__main__":

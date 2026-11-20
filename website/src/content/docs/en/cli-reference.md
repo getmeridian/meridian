@@ -711,6 +711,8 @@ meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes] [--discard-ba
 
 On the last controller this removes people, settings, subscriptions and the live database. The review shows the last confirmed off-server save and changes since. If needed, Meridian tries to save a verified copy on your managing computer. It checks the database again after stopping the service: a newer edit keeps the database and stops teardown. `--yes` only answers the normal confirmation. If you intend to lose unbacked-up data, pass `--discard-backup` separately. An older service that cannot confirm a save also requires that explicit choice.
 
+If preparation fails, Meridian restores the staged files and the previous service startup settings. If it reports that retirement has committed, the fleet is already stopped: fix the reported cleanup problem and rerun the same command, without adding `--discard-backup`. A small private receipt on the VPS makes this safe even if the SSH reply was lost.
+
 Teardown removes the verified controller, agent, Xray, managed nginx listeners, certificates and tagged firewall rules, then the local fleet configuration. It refuses a shared nginx installation, unrelated certificate renewal, unrecognized unit or legacy panel before deleting anything. SSH hardening, installed packages, unrelated services and untagged firewall rules stay. On a dedicated host, nginx is stopped and disabled so its default HTTP site does not go public after teardown. In a fleet with several servers, retire the other roles through the fleet plan first.
 
 `--yes` skips the confirmation; the role checks still run first. Declining exits `1`. An unknown server name, or zero or several possible targets, exits `2` instead of prompting.

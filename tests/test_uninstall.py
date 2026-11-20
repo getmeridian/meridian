@@ -77,6 +77,10 @@ def test_panel_teardown_local_state_failure_reports_remote_completion(failure_po
 
     with (
         patch("meridian.commands.uninstall.teardown_backup.status", return_value=None),
+        patch(
+            "meridian.provision.uninstall.Uninstall.preflight",
+            return_value=SimpleNamespace(status="ok", detail="ready"),
+        ),
         patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
         patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
         patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
@@ -161,6 +165,10 @@ def test_v4_teardown_of_a_single_server_fleet_removes_everything(tmp_home) -> No
 
     with (
         patch("meridian.commands.uninstall.teardown_backup.status", return_value=None),
+        patch(
+            "meridian.provision.uninstall.Uninstall.preflight",
+            return_value=SimpleNamespace(status="ok", detail="ready"),
+        ),
         patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
         patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
         patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
@@ -289,6 +297,10 @@ def test_unattended_yes_is_not_consent_to_lose_the_live_database():
         patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
         patch("meridian.cluster.ClusterConfig.load", return_value=cluster),
         patch("meridian.commands.teardown_backup.status", return_value=None),
+        patch(
+            "meridian.provision.uninstall.Uninstall.preflight",
+            return_value=SimpleNamespace(status="ok", detail="ready"),
+        ),
         patch("meridian.commands.teardown_backup.pull_snapshot", side_effect=OSError("disk full")),
         patch("meridian.provision.steps.Provisioner") as destructive,
         pytest.raises(typer.Exit) as refusal,
@@ -297,3 +309,27 @@ def test_unattended_yes_is_not_consent_to_lose_the_live_database():
     assert refusal.value.exit_code == 2
     destructive.assert_not_called()
     registry.remove.assert_not_called()
+
+
+def test_remote_preflight_refusal_never_registers_a_backup_device_or_replaces_the_deposit():
+    cluster = _roleless_server_cluster()
+    registry = MagicMock()
+    registry.find.return_value = ServerEntry(id="srv-control", host="198.51.100.1")
+    resolved = SimpleNamespace(ip="198.51.100.1", user="root", conn=MagicMock())
+    with (
+        patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
+        patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
+        patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
+        patch("meridian.cluster.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.teardown_backup.status", return_value=None),
+        patch(
+            "meridian.provision.uninstall.Uninstall.preflight",
+            return_value=SimpleNamespace(status="failed", detail="Stale topology or shared nginx"),
+        ),
+        patch("meridian.commands.teardown_backup.pull_snapshot") as pull,
+        patch("meridian.provision.steps.Provisioner") as cleanup,
+        pytest.raises(typer.Exit),
+    ):
+        run(ip=resolved.ip, yes=True)
+    pull.assert_not_called()
+    cleanup.assert_not_called()
