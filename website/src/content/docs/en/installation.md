@@ -11,16 +11,16 @@ curl -sSf https://getmeridian.org/install.sh | bash
 
 This script:
 1. Installs [uv](https://docs.astral.sh/uv/) if it is not present, with pipx or pip as fallbacks. The uv installer is pinned by version and checked against its SHA-256 before it runs.
-2. Installs `meridian-vpn` from PyPI (set `MERIDIAN_VERSION=4.0.0` to install one exact release)
+2. Installs `meridian-vpn` from PyPI. Set `MERIDIAN_VERSION` to a published version number to install that exact release.
 3. Adds the tool directory to your shell PATH when needed
 4. Creates `/usr/local/bin/meridian` only when passwordless sudo is available
 
 ## Verified install
 
-Every [GitHub release](https://github.com/getmeridian/meridian/releases) attaches `install.sh` and its `SHA256SUMS`. To check the script before running it, download both from the release and verify:
+Choose a published [GitHub release](https://github.com/getmeridian/meridian/releases) with `install.sh` and `SHA256SUMS` attached. Set `VERSION` below to its tag without the leading `v`, then download and verify the files:
 
 ```
-VERSION=4.0.0
+VERSION=4.0.0b18  # example: use the release you chose
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
@@ -34,15 +34,15 @@ To check the copy at getmeridian.org instead, compare `curl -sSf https://getmeri
 
 With uv (recommended):
 ```
-uv tool install 'meridian-vpn>=4.0.0b0'
+uv tool install 'meridian-vpn>=4.0.0b0,<5'
 ```
 
 With pipx:
 ```
-pipx install 'meridian-vpn>=4.0.0b0'
+pipx install 'meridian-vpn>=4.0.0b0,<5'
 ```
 
-Until 4.0 is final, ask for it by version like this. A plain `uv tool install meridian-vpn` (or `pipx install meridian-vpn`) installs the newest stable release (3.17.3 today), which has no web panel and none of the commands in these docs. Avoid `--prerelease allow` and `--pip-args=--pre`: they take pre-releases of every dependency too.
+These commands select Meridian 4, including 4.x prereleases. To install the latest stable release regardless of major version, run `uv tool install meridian-vpn` or `pipx install meridian-vpn`. These guides describe Meridian 4.
 
 ## Update
 
