@@ -2,18 +2,23 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import sqlite3
+from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 from meridian.provision import teardown_host as host
+from meridian.reconciler.fence import FenceRecord
+from meridian.state_fence import HANDED_OVER_UNTIL, SERVICE_HOLDER
 
 MARKER = "fw-0123456789abcdef"
 HASH = "a" * 64
+PLAN_HASH = "b" * 64
 
 
 @pytest.fixture
@@ -32,6 +37,7 @@ def fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
         (path.parent if attr == "CONFIG" else path).mkdir(parents=True, exist_ok=True)
         monkeypatch.setattr(host, attr, path)
     monkeypatch.setattr(host, "JOURNALS", root)
+    monkeypatch.setattr(host, "BOOTSTRAP_FENCE", root / "var/lib/meridian/fence.json")
     monkeypatch.setattr(host, "UFW_FILES", (root / "user.rules", root / "user6.rules"))
     monkeypatch.setattr(host, "verify_nginx_runtime", lambda: None)
     monkeypatch.setattr(host, "RUNTIMES", [host.CONFIG.parent, host.STATE])
@@ -45,7 +51,6 @@ def fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     with sqlite3.connect(db_path) as db:
         db.executescript("""
             CREATE TABLE apply_fence(id INTEGER,record TEXT);
-            INSERT INTO apply_fence VALUES (1,'{"fleet_id":"fleet","generation":1,"plan_hash":"topo"}');
             CREATE TABLE backup_progress(id INTEGER,changes INTEGER);
             INSERT INTO backup_progress VALUES (1,2);
             CREATE TABLE backup_receipts(device_id TEXT,changes INTEGER);
@@ -53,6 +58,7 @@ def fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
             INSERT INTO backup_receipts VALUES ('laptop',2);
             INSERT INTO backup_devices VALUES ('laptop',NULL);
         """)
+        db.execute("INSERT INTO apply_fence VALUES (1, ?)", (json.dumps(asdict(FenceRecord("fleet", 1, PLAN_HASH))),))
     fragment = host.NGINX / "conf.d/meridian-http.conf"
     fragment.parent.mkdir()
     fragment.write_text("# Meridian Proxy Configuration\n# Managed by Meridian\nserver { listen 443; }\n")
@@ -129,10 +135,164 @@ def fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr(host, "command", command)
     ctx.run = lambda gen="2", fleet="fleet", preflight=False: host.teardown(
-        fleet, HASH, gen, [str(own_cert)], [MARKER], [], [1, "topo"], preflight=preflight
+        fleet, HASH, gen, [str(own_cert)], [MARKER], [], [1, PLAN_HASH], preflight=preflight
     )
     ctx.fragment, ctx.cert, ctx.renewal, ctx.database = fragment, own_cert, renewal, db_path
     return ctx
+
+
+@pytest.fixture
+def bootstrap_fence(fixture):
+    path = host.BOOTSTRAP_FENCE
+    path.parent.mkdir(mode=0o700)
+    # Its generation can lag the current database: the SSH file is frozen at handover.
+    record = FenceRecord("fleet", lease_holder=SERVICE_HOLDER, lease_expires_at=HANDED_OVER_UNTIL)
+    path.write_text(json.dumps(asdict(record)))
+    path.chmod(0o600)
+    path.with_suffix(".json.lock").touch(mode=0o600)
+    return path
+
+
+def test_retirement_leaves_the_host_ready_for_a_new_fleet(fixture, bootstrap_fence):
+    lock = bootstrap_fence.with_suffix(".json.lock")
+    lock_inode = lock.stat().st_ino
+    independent = bootstrap_fence.with_name("operator-note")
+    independent.write_text("keep")
+    before = bootstrap_fence.read_bytes()
+    assert fixture.run(preflight=True) == "ready"
+    assert bootstrap_fence.read_bytes() == before
+
+    assert fixture.run() == "retired"
+    assert not bootstrap_fence.exists() and not fixture.database.exists()
+    assert independent.read_text() == "keep" and lock.stat().st_ino == lock_inode
+
+    # Another bootstrap can acquire its fence before its new service or database exists.
+    replacement = json.dumps(asdict(FenceRecord("a-new-fleet"))).encode()
+    bootstrap_fence.write_bytes(replacement)
+    with pytest.raises(host.Refuse):
+        fixture.run("discard")
+    assert bootstrap_fence.read_bytes() == replacement
+
+
+@pytest.mark.parametrize("kind", ["another fleet", "SSH apply in progress", "malformed"])
+def test_refuses_a_foreign_or_unrecognized_bootstrap_fence_even_with_discard(fixture, bootstrap_fence, kind):
+    record = json.loads(bootstrap_fence.read_bytes())
+    if kind == "another fleet":
+        record["fleet_id"] = "another-fleet"
+    if kind == "SSH apply in progress":
+        record["lease_holder"] = "another-manager"
+    before = b"unrecognized contents" if kind == "malformed" else json.dumps(record).encode()
+    bootstrap_fence.write_bytes(before)
+
+    with pytest.raises(host.Refuse):
+        fixture.run("discard", preflight=True)
+    assert bootstrap_fence.read_bytes() == before and fixture.database.is_file()
+    assert not any(c[:2] == ("systemctl", "stop") for c in fixture.calls)
+
+
+def test_teardown_preserves_a_fence_while_an_ssh_writer_holds_its_lock(fixture, bootstrap_fence):
+    before = bootstrap_fence.read_bytes()
+    with bootstrap_fence.with_suffix(".json.lock").open("rb") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        with pytest.raises(host.Refuse):
+            fixture.run("discard")
+    assert bootstrap_fence.read_bytes() == before and fixture.database.is_file()
+    assert not any(c[:2] == ("systemctl", "stop") for c in fixture.calls)
+
+
+@pytest.fixture
+def first_apply(fixture, bootstrap_fence):
+    with sqlite3.connect(fixture.database) as db:
+        db.execute("DELETE FROM apply_fence")
+    bootstrap_fence.write_text(json.dumps(asdict(FenceRecord("fleet", 1, PLAN_HASH))))
+    return bootstrap_fence
+
+
+def test_first_apply_can_be_retired_with_its_released_fence_and_a_current_backup(fixture, first_apply):
+    assert fixture.run(preflight=True) == "ready"
+    # The SSH topology proof does not substitute for a confirmed recovery copy.
+    with sqlite3.connect(fixture.database) as db:
+        db.execute("UPDATE backup_progress SET changes=3")
+    with pytest.raises(host.Refuse):
+        fixture.run("2")
+    assert first_apply.exists() and fixture.database.exists()
+    with sqlite3.connect(fixture.database) as db:
+        db.execute("UPDATE backup_receipts SET changes=3")
+    assert fixture.run("3") == "retired"
+    assert not first_apply.exists() and not fixture.database.exists()
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"fleet_id": "other"},
+        {"generation": 2},
+        {"plan_hash": "c" * 64},
+        {"lease_holder": SERVICE_HOLDER, "lease_expires_at": HANDED_OVER_UNTIL},
+        {"lease_expires_at": HANDED_OVER_UNTIL},
+        "incomplete",
+        "absent",
+    ],
+)
+def test_unproven_first_apply_cannot_retire_even_with_discard(fixture, first_apply, change):
+    record = json.loads(first_apply.read_bytes())
+    if change == "absent":
+        first_apply.unlink()
+    elif change == "incomplete":
+        del record["lease_holder"]
+        first_apply.write_text(json.dumps(record))
+    else:
+        first_apply.write_text(json.dumps(record | change))
+    before = first_apply.read_bytes() if first_apply.exists() else None
+    with pytest.raises(host.Refuse):
+        fixture.run("discard")
+    assert (first_apply.read_bytes() if first_apply.exists() else None) == before
+    assert fixture.database.is_file() and not any(c[:2] == ("systemctl", "stop") for c in fixture.calls)
+
+
+@pytest.mark.parametrize("when", ["preflight", "after stopping"])
+def test_a_service_fence_supersedes_even_an_exact_ssh_copy(fixture, first_apply, monkeypatch, when):
+    def advance():
+        newer = json.dumps(asdict(FenceRecord("fleet", 2, "c" * 64)))
+        with sqlite3.connect(fixture.database) as db:
+            db.execute("INSERT INTO apply_fence VALUES (1, ?)", (newer,))
+
+    if when == "preflight":
+        advance()
+    else:
+        command = host.command
+
+        def run(*args):
+            if args == ("systemctl", "stop", "ctld"):
+                advance()
+            return command(*args)
+
+        monkeypatch.setattr(host, "command", run)
+    with pytest.raises(host.Refuse):
+        fixture.run("discard", preflight=(when == "preflight"))
+    assert fixture.database.is_file() and first_apply.is_file()
+    assert fixture.active == {*host.EXEC, "nginx"}
+
+
+def test_aborted_retirement_keeps_the_bootstrap_fence_visible_and_restores_the_database(
+    fixture, bootstrap_fence, monkeypatch
+):
+    from meridian.provision.teardown_journal import Retirement
+
+    before = bootstrap_fence.read_bytes()
+    write = Retirement.write
+
+    def interrupt(self, data, phase):
+        if phase == "committed":
+            assert bootstrap_fence.read_bytes() == before and not fixture.database.exists()
+            raise OSError("commit interrupted")
+        return write(self, data, phase)
+
+    monkeypatch.setattr(Retirement, "write", interrupt)
+    with pytest.raises(OSError, match="commit interrupted"):
+        fixture.run()
+    assert bootstrap_fence.read_bytes() == before and fixture.database.is_file()
+    assert fixture.active == {*host.EXEC, "nginx"}
 
 
 def test_dedicated_retirement_preserves_unowned_files_and_closes_the_web_server(fixture):

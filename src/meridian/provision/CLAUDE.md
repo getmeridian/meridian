@@ -23,6 +23,7 @@
 - **Legacy stream config yields to V4** — skip `stream.d/meridian.conf` once a `meridian-v4-*` file listens on 443, or `nginx -t` fails on a duplicate listener.
 - **Every apt-get goes through `ensure.run_apt()`** — it waits for unattended-upgrades or cloud-init to release the lock and names the holder; never silence apt's stderr, or a lock reads as an ordinary failure. Install only after a check says something is missing.
 - **Last-controller teardown** checks the packaged nginx process and live fleet before a backup write. A private journal rolls staging back before commit, then resumes removal of only the staged objects after commit. Leave shared services, renewals and untagged rules alone; legacy Docker cleanup belongs to the verified migration.
+- **Keep the SSH apply fence until retirement commits** — after only one deploy, its released record proves the reviewed generation under the writer's lock. Once the service has a fence, that row wins. Remove only the retired marker, preserving the lock inode for the next install.
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
 - **Realm installs only a pinned static musl tarball, run before it replaces anything** — a glibc build that couldn't start once overwrote a working binary; a target without a digest fails.
 - **Firewall follows the effective sshd port**, never an assumed `22/tcp`; recipes never open public ports, compiled tagged rules do.

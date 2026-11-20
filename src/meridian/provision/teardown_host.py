@@ -17,8 +17,10 @@ import re
 import shlex
 import shutil
 import sqlite3
+import stat
 import subprocess
 import sys
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +37,7 @@ CERTBOT = Path("/etc/letsencrypt/renewal")
 DEFAULT_WEBROOT = Path("/usr/share/nginx/html")
 MOUNTS = Path("/proc/self/mountinfo")
 JOURNALS = Path("/var/lib")
+BOOTSTRAP_FENCE = Path("/var/lib/meridian/fence.json")
 UFW_FILES = (Path("/etc/ufw/user.rules"), Path("/etc/ufw/user6.rules"))
 BOOTSTRAP = {
     "conf.d/meridian-http.conf": b"# Meridian Proxy Configuration",
@@ -77,6 +80,72 @@ def command(*args: str) -> str:
 def absolute(path: Path) -> None:
     if path != path.resolve():
         raise Refuse("A managed path is a symbolic link or passes through one; nothing will delete its target.")
+
+
+@contextlib.contextmanager
+def fence_file(path: Path) -> Iterator[int]:
+    absolute(path)
+    parent = path.parent.stat()
+    if parent.st_uid != os.geteuid() or parent.st_mode & 0o022:
+        raise Refuse("The SSH apply fence directory has an unverified owner or permissions. It was kept.")
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_nlink != 1 or st.st_uid != os.geteuid() or st.st_mode & 0o022:
+            raise Refuse("The SSH apply fence or its lock is not a private, owned file. It was kept.")
+        yield fd
+    finally:
+        os.close(fd)
+
+
+@contextlib.contextmanager
+def lock_ssh_fence(*, preflight: bool) -> Iterator[int | None]:
+    # The SSH writer flocks this inode around its compare-and-swap. Never replace the lock,
+    # and never create an object during preflight on an installation without an SSH fence.
+    lock = BOOTSTRAP_FENCE.with_suffix(".json.lock")
+    if not os.path.lexists(lock):
+        if os.path.lexists(BOOTSTRAP_FENCE):
+            raise Refuse("The SSH apply fence is missing its lock. Review it before teardown.")
+        yield None
+        return
+    with fence_file(lock) as fd:
+        try:
+            fcntl.flock(fd, (fcntl.LOCK_SH if preflight else fcntl.LOCK_EX) | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise Refuse("An apply is updating the SSH fence. Wait for it to finish and retry.") from exc
+        yield fd
+
+
+def read_ssh_fence(fleet: str, lock_fd: int | None) -> dict[str, Any] | None:
+    if not os.path.lexists(BOOTSTRAP_FENCE):
+        return None
+    lock = BOOTSTRAP_FENCE.with_suffix(".json.lock")
+    if lock_fd is None or not os.path.samestat(os.fstat(lock_fd), lock.lstat()):
+        raise Refuse("The SSH apply fence lock changed. Nothing will adopt or remove the new fence.")
+    with fence_file(BOOTSTRAP_FENCE) as fd:
+        if os.fstat(fd).st_size > 16384:
+            raise Refuse("The SSH apply fence is unrecognized. It was kept.")
+        try:
+            record = json.loads(os.read(fd, 16385))
+        except (UnicodeError, ValueError, RecursionError) as exc:
+            raise Refuse("The SSH apply fence is unreadable. It was kept.") from exc
+    # The handover record can predate the current DB generation. The live database proves
+    # that generation; this file only has to belong to the retired fleet and have no SSH writer.
+    if not isinstance(record, dict) or record.get("fleet_id") != fleet:
+        raise Refuse("The SSH apply fence does not belong to this fleet. It was kept.")
+    if (
+        set(record) != {"fleet_id", "generation", "plan_hash", "lease_holder", "lease_expires_at"}
+        or type(record["generation"]) is not int
+        or record["generation"] < 0
+        or not isinstance(record["plan_hash"], str)
+    ):
+        raise Refuse("The SSH apply fence is unrecognized. It was kept.")
+    if (record["lease_holder"], record["lease_expires_at"]) not in (
+        ("", ""),
+        ("meridian-control-service", "9999-12-31T00:00:00+00:00"),
+    ):
+        raise Refuse("The SSH apply fence has another holder. Review it before teardown.")
+    return record
 
 
 def known_fragments(recorded: set[str]) -> list[Path]:
@@ -175,18 +244,30 @@ def inspect_unit(unit: str, executable: str) -> bool:
     return True
 
 
-def check_database(path: Path, fleet: str, topology: list[str | int], generation: str) -> None:
+def check_database(path: Path, fleet: str, topology: list[str | int], generation: str, lock_fd: int | None) -> None:
     # Also run after ctld stops: a panel edit or fleet apply during review MUST survive.
     for part in (path, Path(str(path) + "-wal"), Path(str(path) + "-shm"), Path(str(path) + "-journal")):
         if part == path or os.path.lexists(part):
             absolute(part)
             if not part.is_file() or part.stat().st_nlink != 1:
                 raise Refuse("The control database or its journal has an external link. Its data was left alone.")
+    ssh = read_ssh_fence(fleet, lock_fd)
     with contextlib.closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as db:
         fence = db.execute("SELECT record FROM apply_fence WHERE id=1").fetchone()
-        record = json.loads(fence[0]) if fence else {}
+        if fence is not None:
+            record = json.loads(fence[0])  # once the service took ownership, its record always wins
+        elif (
+            ssh
+            and not ssh["lease_holder"]
+            and ssh["generation"] > 0
+            and re.fullmatch(r"[0-9a-f]{64}", ssh["plan_hash"])
+        ):
+            record = ssh  # first apply completed through SSH, before the service could hold its fence
+        else:
+            raise Refuse("Neither the service nor the SSH apply fence proves the reviewed topology. Its data was kept.")
         if (
-            record.get("fleet_id") != fleet
+            not isinstance(record, dict)
+            or record.get("fleet_id") != fleet
             or [record.get("generation"), record.get("plan_hash")] != topology
             or record.get("lease_holder")
         ):
@@ -306,11 +387,25 @@ def recover_preparation(journal: Retirement, txn: dict[str, Any]) -> None:
     journal.clear()
 
 
+def unchanged_ssh_fence(journal: Retirement, txn: dict[str, Any], *, committed: bool = False) -> None:
+    if "ssh_fence" not in txn or (committed and not os.path.lexists(BOOTSTRAP_FENCE)):
+        return  # a previous cleanup may already have staged or disposed the marker
+    if journal.plan([BOOTSTRAP_FENCE]).get(str(BOOTSTRAP_FENCE)) != txn["ssh_fence"]:
+        raise Refuse("The SSH apply fence changed during teardown. Its installation was kept.")
+
+
 def finish_committed(journal: Retirement, txn: dict[str, Any]) -> None:
     try:
         journal.assert_no_replacement(txn["artifacts"])
+        unchanged_ssh_fence(journal, txn, committed=True)
         clean_firewall(set(txn["markers"]))
         journal.dispose(txn["artifacts"])
+        # Keep the bootstrap guard visible throughout reversible staging. Only now can a new
+        # apply see an empty host. Retrying after a lost rename/dispose never touches a new fence.
+        if (signature := txn.get("ssh_fence")) is not None:
+            if os.path.lexists(BOOTSTRAP_FENCE):
+                journal.move(BOOTSTRAP_FENCE, signature)
+            journal.dispose({str(BOOTSTRAP_FENCE): signature})
         # A lost SSH reply can be retried; no admin token or people are in this completion receipt.
         journal.write({}, "complete")
     except (OSError, Refuse, JournalError) as exc:
@@ -337,27 +432,33 @@ def teardown(
     journal = Retirement(JOURNALS, scope)
     # Lock an existing directory; neither successful nor refused preflight creates a file.
     fd = os.open(JOURNALS, os.O_RDONLY)
-    try:
+    with contextlib.ExitStack() as locks:
+        locks.callback(os.close, fd)
         try:
             fcntl.flock(fd, (fcntl.LOCK_SH if preflight else fcntl.LOCK_EX) | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise Refuse("A teardown is already running on this host. Wait for it and retry.") from exc
+        lock_fd = locks.enter_context(lock_ssh_fence(preflight=preflight)) if fleet else None
         pending = journal.read() if fleet else None
         if pending is not None:
             if pending["phase"] == "complete":
-                if any(os.path.lexists(p) for p in (STATE, CONFIG, *(UNITS / (u + ".service") for u in EXEC))):
-                    raise Refuse("A new controller or unit exists on the retired host. Its installation was kept.")
+                if any(
+                    os.path.lexists(p)
+                    for p in (STATE, CONFIG, BOOTSTRAP_FENCE, *(UNITS / (u + ".service") for u in EXEC))
+                ):
+                    raise Refuse("A new controller, unit or SSH apply fence exists on the retired host. It was kept.")
                 return "complete" if preflight else "retired"
             if preflight:
                 return "pending"
             if pending["phase"] == "preparing":
+                unchanged_ssh_fence(journal, pending)
                 recover_preparation(journal, pending)
                 raise Refuse("Recovered the interrupted preparation. The original fleet was kept. Run teardown again.")
             finish_committed(journal, pending)
             return "retired"
-        return new_teardown(fleet, admin_hash, generation, cert_names, markers, fragments, topology, journal, preflight)
-    finally:
-        os.close(fd)
+        return new_teardown(
+            fleet, admin_hash, generation, cert_names, markers, fragments, topology, journal, preflight, lock_fd
+        )
 
 
 def new_teardown(
@@ -370,6 +471,7 @@ def new_teardown(
     topology: list[str | int],
     journal: Retirement,
     preflight: bool,
+    lock_fd: int | None,
 ) -> str:
     if any(os.path.lexists(p) for p in LEGACY):
         raise Refuse(
@@ -434,7 +536,7 @@ def new_teardown(
         and (override.is_symlink() or override.read_text() != "[Service]\nRestart=on-failure\nRestartSec=5\n")
     ):
         raise Refuse("nginx has an operator systemd override. Keep it serving and review the shared installation.")
-    check_database(STATE / "control.db", fleet, topology, "preflight" if preflight else generation)
+    check_database(STATE / "control.db", fleet, topology, "preflight" if preflight else generation, lock_fd)
     previously_active = {u for u in [*units, "nginx"] if active(u)}
     startup = {u for u in [*units, "nginx"] if enabled(u)}
     if any(NGINX.glob(".meridian-teardown-*")):
@@ -461,11 +563,13 @@ def new_teardown(
         *RUNTIMES,
     ]
     firewall_status(set(markers))  # refusal must not register a new backup device
-    artifacts = journal.plan([*files, *rest])
+    artifacts = journal.plan([*files, *rest, BOOTSTRAP_FENCE])
+    fence_signature = artifacts.pop(str(BOOTSTRAP_FENCE), None)
     if preflight:
         return "ready"
-    txn = {
+    txn: dict[str, Any] = {
         "artifacts": artifacts,
+        "ssh_fence": fence_signature,
         "units": [*units, "nginx"],
         "active": sorted(previously_active),
         "enabled": sorted(startup),
@@ -474,7 +578,7 @@ def new_teardown(
     journal.write(txn, "preparing")
     try:
         command("systemctl", "stop", "ctld")
-        check_database(STATE / "control.db", fleet, topology, generation)
+        check_database(STATE / "control.db", fleet, topology, generation, lock_fd)
         for path in files:
             journal.move(path, artifacts[str(path)])
         inspect_sites([])
