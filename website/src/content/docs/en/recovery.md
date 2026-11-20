@@ -23,6 +23,8 @@ If you deployed with a **domain** (`--domain`) and the record is proxied through
 
 If you have a **relay**, clients connecting through it are unaffected as long as the relay itself can still reach the exit.
 
+If a friend cannot open their invitation page but you can open the panel, choose their account in **People** and copy an individual connection that uses the relay, or show its QR code. Send it privately to that person. It works in a compatible app without fetching the invitation page. This individual entry does not refresh; return to the subscription once the page is reachable.
+
 ## Recovery options
 
 ### Add a replacement exit
@@ -112,6 +114,12 @@ You can't accidentally undo another machine's work. The control service keeps a 
 - **"Another machine changed this fleet"**: your copy is out of date. Copy `~/.config/meridian/` from the machine that applied last, then run the command again.
 - **"Another apply is running"**: someone is changing the fleet right now. Wait for them to finish. If that run crashed, its claim expires within 30 minutes; a crashed run on your own machine doesn't block you at all.
 - **"This control server belongs to a different copy of the fleet"**: this `~/.config/meridian/` was never copied from the machine that manages the fleet.
+
+### If a managing computer is lost
+
+From a trusted computer, run `meridian backup devices` and revoke the missing computer with `meridian backup revoke ID`. This protects future copies only. It does not erase existing snapshots or revoke SSH or API access.
+
+If you copied the whole configuration directory to that computer, assume it had the fleet admin credential and any SSH key stored there. First verify a separate administrator key on each server and remove the lost SSH key from every account that accepted it. Revoke scoped API tokens kept on the computer. The shared fleet admin credential cannot be revoked as a device token: restoring a trusted snapshot to a replacement control server issues a new one. Follow the restore procedure above, then update the other managing computers from a trusted copy. If the offline recovery key was on the lost computer too, replace it with `meridian backup recovery-key` and save a fresh encrypted copy.
 
 ## Prepare before a block
 
