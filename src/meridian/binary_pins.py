@@ -1,6 +1,6 @@
 """Pinned server binaries and the newer releases `fleet upgrade` may record.
 
-`config.py` holds this CLI's tested pins. `fleet upgrade` can save a newer
+`config.py` holds this CLI's tested pins. `fleet upgrade --latest` can save a newer
 release in the same major into `ClusterConfig.binary_pins` (version plus the
 sha256 GitHub publishes for each asset), so a fleet takes upstream fixes
 without a Meridian release. A saved pin only ever raises the version: an older

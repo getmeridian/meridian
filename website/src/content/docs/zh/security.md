@@ -28,7 +28,7 @@ Meridian **没有遥测、分析或广告**，也不会上传诊断报告。连�
 | **CLI 安装 → `getmeridian.org`、GitHub 与包来源** | 你下载 `https://getmeridian.org/install.sh`。若 uv 尚未安装，安装器会从 astral-sh/uv 获取固定版本脚本及匹配的二进制归档，然后从通常为 PyPI 的包来源安装 Meridian 与依赖，必要时获取托管 Python。发送脚本、文件、包版本和平台请求。 | 只在运行安装器时发生；已有 uv 会跳过自身的引导下载。 |
 | **更新通知 → PyPI**（`pypi.org/pypi/meridian-vpn/json`） | 普通文本输出的 CLI 调用最多每分钟查询一次软件包发布列表。请求标识包名，不含服务器配置。JSON 输出和 `serve` 命令跳过查询。 | 设置 `MERIDIAN_DISABLE_UPDATE_CHECK=1`，可关闭后台通知；它不会禁用显式的 `meridian update`。 |
 | **`meridian update` → PyPI 和包下载来源** | 查询版本后，通过 uv、pipx 或 pip 安装选定版本及依赖。包管理器向配置的索引发送包名、版本和平台请求，通常访问 PyPI 与 `files.pythonhosted.org`；uv 也可能从 GitHub 下载托管 Python。 | 在需要更新时运行。索引、缓存和离线设置由包管理器控制。 |
-| **`meridian fleet upgrade` → GitHub 发布 API** | 存在中继时，读取 Realm 发布及其公布的 SHA-256。发送公开仓库请求；若设置了 `GITHUB_TOKEN`，也会发送该令牌。 | `meridian fleet upgrade --tested` 保留已测试的固定版本，跳过发布查询；安装仍可能需要下载。 |
+| **`meridian fleet upgrade --latest` → GitHub 发布 API** | 存在中继时，读取 Realm 发布及其公布的 SHA-256。发送公开仓库请求；若设置了 `GITHUB_TOKEN`，也会发送该令牌。 | 不加 `--latest` 就不会查询新版本；安装时可能仍需下载选定版本。 |
 | **国家建议 → IANA 与对应区域互联网注册机构（RIR）的 RDAP 服务** | 添加出口时，先下载 IANA 的 IPv4/IPv6 注册机构映射，再查询服务器 IP 的注册记录。RIR 会获知该 IP，IANA 只收到映射文件请求。 | 为 `deploy` 或 `node add` 指定 `--country` 可跳过查询。setup 向导在没有已保存地区时也会查询建议。 |
 | **本机公网 IP 检测 → `ifconfig.me`、`api.ipify.org` 或 `api64.ipify.org`** | 解析新的 `local` 目标时，先读取本机默认路由的地址；只有该地址为私有地址时（将服务器置于 NAT 之后的云），才向 IP 回显服务查询，失败后尝试备用服务。 | 使用已保存目标或明确的服务器地址，可避免重新检测。 |
 | **品牌图片 → 你指定的图片 URL** | 图片图标在管理电脑上下载一次，随后保存为内嵌图片数据。图片主机会收到请求 URL 和 Meridian user-agent 头。 | 使用 emoji 或已有的内嵌图片数据。浏览器不下载原始图片 URL。 |

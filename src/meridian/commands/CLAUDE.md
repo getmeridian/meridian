@@ -13,6 +13,7 @@
 - Setup is presentation over the resumable draft/runtime. Deploy applies topology, ensures its draft person through the service, verifies, and hands off.
 - JSON uses one `meridian.output/v1` envelope; shared flags and command metadata are registered in `cli_options`, `cli_catalog` and core.
 - Health has four-state evidence: failed checks exit 4, unavailable evidence 3, success 0. Machine deploy has no prompts and supports cooperative cancellation.
+- Relay upgrades use the tested Realm pin or the owner’s newer saved pin. Only `fleet upgrade --latest` looks for a new upstream release.
 ## What's done well
 - CLI and console account paths share service contracts, generation checks and frozen bulk receipts.
 - Secrets appear only in the producing handoff or explicit detail views; confirmations remain readable and content-free events stay typed.

@@ -52,7 +52,7 @@ class Component:
         return self.available and self.status in ("upgrade", "absent")
 
 
-def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
+def run_upgrade(*, yes: bool = False, latest: bool = False) -> None:
     """Resolve targets, compare them with what runs, apply the reviewed plan, then check every server."""
     from meridian.servers import ServerRegistry
 
@@ -60,7 +60,7 @@ def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
     intent = require_intent(cluster)
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
 
-    binaries = _binary_targets(cluster, intent, tested=tested)
+    binaries = _binary_targets(cluster, intent, latest=latest)
     realm_target = binaries["realm"][1].version if binaries else ""
     observed = _observe(cluster, registry, intent, realm_target)
     _render(observed)
@@ -80,7 +80,10 @@ def run_upgrade(*, yes: bool = False, tested: bool = False) -> None:
             hint=newer_service_hint(newest) if newest else "Update this Meridian (meridian update), then retry.",
             hint_type="user",
         )
-    binary_overrides = {name: target for name, (_, target) in binaries.items() if target != UPGRADABLE_BINARIES[name]}
+    # Keep an explicit pin when a relay is temporarily absent from the topology.
+    pins = effective_binary_pins(cluster.binary_pins)
+    pins.update({name: target for name, (_, target) in binaries.items()})
+    binary_overrides = {name: target for name, target in pins.items() if target != UPGRADABLE_BINARIES[name]}
     changes = sum(1 for component in observed if component.behind)
     if not changes:
         if binary_overrides != cluster.binary_pins:
@@ -164,9 +167,9 @@ def _status(running: str, target: str) -> ComponentStatus:
 
 
 def _binary_targets(
-    cluster: ClusterConfig, intent: SetupIntent, *, tested: bool
+    cluster: ClusterConfig, intent: SetupIntent, *, latest: bool = False
 ) -> dict[str, tuple[BinaryPin, BinaryPin]]:
-    """``(pinned, target)`` for each server binary the fleet runs; *tested* asks no one and moves nothing.
+    """``(pinned, target)`` for each server binary the fleet runs; upstream discovery is opt-in.
 
     Realm runs only on relays, so a fleet without relay hops has nothing to upgrade.
     """
@@ -176,7 +179,7 @@ def _binary_targets(
     if not any(isinstance(resource.payload, RealmHopPayload) for resource in compile_topology(intent).resources):
         return {}
     pinned = effective_binary_pins(cluster.binary_pins)
-    if tested:
+    if not latest:
         return {name: (pin, pin) for name, pin in pinned.items()}
     from meridian.github_releases import ReleaseError, latest_binary_release
 

@@ -454,7 +454,7 @@ meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
 meridian fleet language [auto|en|ru|fa|zh] [--yes] [--json]
-meridian fleet upgrade [--tested] [--yes]
+meridian fleet upgrade [--latest | --tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 ```
@@ -465,6 +465,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--limit N` | 100 | `fleet events`：返回 1–2000 条事件 |
 | `--days N` | 30 | `client usage` 或 `fleet usage` 的 UTC 天数，1–730，受已保存保留时间限制 |
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`history`、`routing`、`export`、`import`、`usage`） |
+| `--latest` | | 查找同一主版本的新版 Realm；默认保留已测试或已选择的版本 |
 | `--tested` | | `fleet upgrade`：跳过 GitHub；Realm 保持在已测试的版本或你已升级到的版本 |
 | `--yes`, `-y` | | `fleet upgrade`、`fleet routing`、`fleet import`：跳过确认 |
 | `--dry-run` | | `fleet routing`、`fleet import`：显示变更和审查结果，不应用任何内容 |
@@ -486,7 +487,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 自定义令牌的事件使用 CLI 当前语言显示实际权限名称；兼容预设令牌仍显示其权限范围标签。
 
-**`fleet upgrade`** — 通过一次已审核的应用让集群保持最新。控制服务和每个节点 agent 会升级到当前 Meridian 附带的构建，每个 agent 就地升级并保留其节点身份；要获取更新的构建，请先运行 `meridian update`。中继无需等待 Meridian 更新即可升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。它会显示每台服务器上运行的版本并标为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个版本无法读取，命令会在任何改动之前以退出码 `3` 结束。
+**`fleet upgrade`**: 控制服务和节点 agent 升级到安装的 Meridian 版本，并保留节点身份。 中继默认使用此版本 Meridian 测试过的 Realm，或此集群此前选定的更高版本。只有指定 `--latest` 时才会在 GitHub 上查找同一主版本的新发行版。Meridian 保存所选版本，并按公布的 SHA-256 校验每个归档。 命令先显示版本，确认后应用方案，再运行 `meridian check`。若无法读取版本，会在更改前以退出码 3 停止。
 
 **`fleet routing`** — 从本地拓扑读取当前客户端路由策略，并解释两种选项。`ru-split`（默认）让匹配规则的俄罗斯目的地、私有地址和局域网直连；`full` 让互联网流量通过 VPN，包括俄罗斯目的地，同时保留私有地址和局域网直连。两种策略均保留 QUIC 封锁，以及 Xray JSON 对已识别 BitTorrent 对等连接的直连规则，以减少针对出口服务器的滥用投诉。传入策略即可编辑拓扑、审核、确认，并应用此次审核的内容。没有终端或使用 `--json` 时，更改需要 `--yes`；`--dry-run` 显示审核结果而不应用。JSON 返回 `data.client_routing`、`choices[]` 以及适用的审核和应用结果。应用会在下次刷新订阅或手动刷新后收到策略。网页面板在“设置”中只读显示策略。出口地理封锁单独设置；Base64 链接不携带路由规则。有关格式限制及如何在出口允许俄罗斯目的地，请参见[客户端路由](/zh/split-routing/)。
 

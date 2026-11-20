@@ -277,7 +277,7 @@ meridian relay add 203.0.113.10 --exit 198.51.100.10
 
 ## 升级
 
-控制服务和节点 agent 随 Meridian 一起发布。运行 `meridian update` 之后，再运行 `meridian fleet upgrade`：它会先显示将要改变的内容，然后把控制服务升级到新版本，并就地升级每个 agent，保留每个节点的身份。它还会把中继升级到最新的 Realm 版本，无需等待 Meridian 更新。任何一次 `meridian apply` 也会让控制服务和 agent 跟上已安装的 Meridian 版本。
+`meridian update`, `meridian fleet upgrade`: 控制服务和节点 agent 升级到安装的 Meridian 版本，并保留节点身份。 中继默认使用此版本 Meridian 测试过的 Realm，或此集群此前选定的更高版本。只有指定 `--latest` 时才会在 GitHub 上查找同一主版本的新发行版。Meridian 保存所选版本，并按公布的 SHA-256 校验每个归档。
 
 ## 从 Remnawave 迁移
 

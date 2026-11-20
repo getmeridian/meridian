@@ -454,7 +454,7 @@ meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
 meridian fleet language [auto|en|ru|fa|zh] [--yes] [--json]
-meridian fleet upgrade [--tested] [--yes]
+meridian fleet upgrade [--latest | --tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 ```
@@ -465,6 +465,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--limit N` | 100 | `fleet events`: return 1–2000 events |
 | `--days N` | 30 | UTC days for `client usage` or `fleet usage`, 1–730, capped at the saved retention |
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `history`, `routing`, `export`, `import`, `usage`) |
+| `--latest` | | Look up a newer Realm release in the supported major; the default keeps the tested or selected version |
 | `--tested` | | `fleet upgrade`: skip GitHub; Realm stays on the tested version or what you already upgraded to |
 | `--yes`, `-y` | | `fleet upgrade`, `fleet routing`, `fleet import`: skip the confirmation |
 | `--dry-run` | | `fleet routing`, `fleet import`: show the changes and the review, apply nothing |
@@ -486,7 +487,7 @@ The `active` column counts people with growth in the last report, with its colle
 
 Custom token events show the effective capability labels in your CLI language; compatible preset tokens retain their scope label.
 
-**`fleet upgrade`** — brings the fleet up to date in one reviewed apply. The control service and every node agent move to the build this Meridian ships, and each agent upgrades in place, keeping its node's identity; run `meridian update` first to get newer ones. Relays move to the newest Realm release without waiting for a Meridian update: GitHub's newest release in the tested major, recorded in `cluster.yml` with the sha256 GitHub publishes for each archive, which every relay checks before installing. It shows what each server runs as `current` or `upgrade`, then, after you confirm, applies the reviewed plan and runs `meridian check` on every server. A version that cannot be read stops the command with exit `3` before anything changes.
+**`fleet upgrade`**: The control service and node agents upgrade to the installed Meridian version and keep their identities. Use the Realm version tested with this release, or the newer version already selected for this fleet. Only `--latest` looks up a newer same-major release on GitHub; Meridian records the version and verifies each archive against its published SHA-256. The command shows the versions before it asks you to apply, then runs `meridian check`. An unreadable component stops the upgrade before changes (exit 3).
 
 **`fleet routing`** — reads the current client policy from local topology and explains both choices. `ru-split` (default) sends matched Russian destinations and private/LAN ranges directly; `full` tunnels internet traffic, including Russian destinations, and keeps private/LAN ranges direct. Both retain QUIC blocking and Xray JSON's best-effort BitTorrent direct rule to reduce abuse complaints against exits. Pass a policy to edit the intent, review it, confirm, and apply exactly that review. Without a terminal or with `--json`, a change requires `--yes`; `--dry-run` shows the review without applying it. JSON returns `data.client_routing`, `choices[]`, and the review and apply when present. Apps receive the choice on their next subscription refresh or a manual refresh. The web panel shows it read-only in Settings. Exit geo-blocking stays separate; Base64 links carry no routing rules. See [Client routing](/en/split-routing/) for format limits and how to allow Russian destinations at an exit.
 

@@ -277,7 +277,7 @@ Store it somewhere offline, away from the machines that manage the fleet. CLI ch
 
 ## Upgrades
 
-The control service and the node agent ship with Meridian. After `meridian update`, run `meridian fleet upgrade`: it shows what will change, then moves the control service to the new version and upgrades each agent in place, keeping every node's identity. It also moves relays to the newest Realm release without waiting for a Meridian update. Any `meridian apply` brings the control service and agents up to the installed Meridian too.
+`meridian update`, `meridian fleet upgrade`: The control service and node agents upgrade to the installed Meridian version and keep their identities. Use the Realm version tested with this release, or the newer version already selected for this fleet. Only `--latest` looks up a newer same-major release on GitHub; Meridian records the version and verifies each archive against its published SHA-256.
 
 ## Moving from Remnawave
 

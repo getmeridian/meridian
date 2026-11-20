@@ -29,7 +29,7 @@ Provisions real cloud VMs (Hetzner via `hcloud-python`), deploys Meridian agains
 - **Keep the default SNI** — a bad camouflage target (see `src/meridian/CLAUDE.md`) converges but passes no traffic.
 - **Check the managed certificate without SNI** — `openssl -servername <IP>` routes to the camouflage fallback; use `-noservername`.
 - **Labs live outside the checkout** — some synced folders refuse Unix-socket connects, so Meridian's SSH ControlPath under a repo-local `MERIDIAN_HOME` failed with "Operation not permitted".
-- **`fleet upgrade` on a lab needs `GITHUB_TOKEN`** — the release check exhausts GitHub's unauthenticated limit; export `gh auth token`.
+- **Only `fleet upgrade --latest` looks up new Realm releases** — ordinary upgrades keep the release pin or the owner’s newer selection. A lab that opts in to upstream lookup can hit GitHub’s unauthenticated limit.
 - **Lab profiles pin a key file, so SSH never multiplexes** — keepalives and stall retries still run, but the control-socket reset needs a key-less profile to exercise.
 - **Hetzner images skip apt Recommends** (`00InstallRecommends`) — `small_vps.sh` deletes it and boots with `mem=… maxcpus=1`, so package and memory behaviour match other providers' small VPSes.
 - **`redact.sed` guards every pasted lab log** — add a case to `tests/test_realvm_redact.py` (it runs in CI) for each new secret form; hostnames before `...`, API tokens, IPv6, and hex secret paths once passed through.
