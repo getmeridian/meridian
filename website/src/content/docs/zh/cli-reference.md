@@ -664,7 +664,7 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 `logs` 读取服务器各角色所运行的内容：出口和路由网关在 `node` 下显示 agent（`netagent`）和 Xray（`netcore`），控制服务器在 `panel` 下显示控制服务（`ctld`），二者都显示 nginx 错误日志，中继则显示其 Realm 单元的日志。`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口。
 
-每一行都经过与 `meridian doctor` 相同的脱敏处理：令牌、密码、密钥、UUID、订阅 ID，以及控制服务和连接页面的秘密路径都会被替换为 `[REDACTED]`，因此输出可以安全地粘贴到错误报告中。各行以纯文本打印，并已去除终端控制字符。
+Meridian 会将可识别的令牌、密码、密钥、UUID、订阅 ID 和私有路径替换为 `[REDACTED]`，并删除终端控制字符。主机的 nginx 错误日志可能包含对其他站点的请求，分享前请先检查。需要提交支持报告时，可运行 `meridian doctor`；它会检查 nginx 配置，不读取该日志。
 
 没有集群角色的服务器，或其未运行的 `--component`，会在连接之前以 `2` 退出。无法读取的日志（服务缺失、SSH 连接丢失）会显示为不可用，命令以 `3` 退出。
 

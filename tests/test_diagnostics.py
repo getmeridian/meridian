@@ -194,6 +194,9 @@ def test_doctor_uses_v4_roles_and_redacts_the_final_report() -> None:
         run(ip="198.51.100.20")
 
     rendered = "\n".join(str(call.args[0]) for call in render.call_args_list if call.args)
+    assert "Nginx Configuration" in rendered
+    assert "nginx -t >/dev/null 2>&1" in connection.commands
+    assert not any("/var/log/nginx" in command for command in connection.commands)
     assert "Roles: panel" in rendered
     assert "not expected for this server's configured roles" in rendered
     assert "diagnostic-secret" not in rendered
@@ -309,7 +312,7 @@ def test_doctor_keeps_relay_only_diagnostics_role_specific() -> None:
     commands = [call.args[0] for call in connection.run.call_args_list]
     assert "Roles: relay" in rendered
     assert "Node Logs" not in rendered
-    assert "Nginx Errors" not in rendered
+    assert "Nginx Configuration" not in rendered
     assert "TLS Certificate" not in rendered
     assert "Geo-blocking" not in rendered
     assert any("ss -tlnp sport = :7443" in command for command in commands)

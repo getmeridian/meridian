@@ -18,7 +18,6 @@ from meridian.core.execution import ServerConnection as ServerConnectionLike
 from meridian.core.inputs import validate_hostname_value
 from meridian.core.redaction import redact_diagnostic_text
 from meridian.diagnostics.checks import command_evidence_unavailable
-from meridian.diagnostics.logs import NGINX_ERROR_LOG
 from meridian.facts import ServerFacts
 from meridian.host_runtime import AGENT_UNIT, CONTROL_SERVICE_UNIT, CORE_BINARY, CORE_UNIT
 from meridian.servers import ServerRegistry
@@ -247,10 +246,15 @@ def run(
 
     nginx_expected = bool(roles.intersection({"panel", "exit", "routing-gateway"}))
     if nginx_expected:
-        nginx_cmd = f"tail -10 {shlex.quote(NGINX_ERROR_LOG)} 2>/dev/null"
-        nginx_errors = evidence_conn.run(nginx_cmd, timeout=10).stdout.strip() or "no errors or log not found"
-        nginx_errors = redact_diagnostic_text(nginx_errors, known_secrets)
-        sections.append(("Nginx Errors", f"$ {nginx_cmd}\n{nginx_errors}"))
+        # The host's error log can contain requests from unrelated sites. A shareable
+        # report needs service health, not the log or the contents of a failing configuration.
+        nginx_result = evidence_conn.run("nginx -t >/dev/null 2>&1", timeout=10)
+        nginx_status = "valid"
+        if command_evidence_unavailable(nginx_result.returncode) or getattr(nginx_result, "timed_out", False):
+            nginx_status = "unavailable"
+        elif nginx_result.returncode:
+            nginx_status = "invalid or unreadable; run nginx -t on the server for details"
+        sections.append(("Nginx Configuration", nginx_status))
         cert_port = 8443
         cert_sni = "localhost"
         if deployment is not None and deployment.kind == "v4":

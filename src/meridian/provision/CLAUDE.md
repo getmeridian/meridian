@@ -12,6 +12,7 @@
 ## What's done well
 - **Check before acting** — steps read package, file, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls
+- **Managed nginx listeners own their logging** — disable access logs and send request errors to the null device in each HTTP and stream server. Changing global logs would affect unrelated sites; configuration checks and aggregate service metrics remain available.
 - **nginx `add_header` inheritance** — a child `location` with `add_header` drops the parent's headers; use maps for cache and robots policies and keep page headers together.
 - **acme.sh short-lived IP certificates** need `--days 5` and an explicit renew window; report acme.sh's last lines (its first are timestamps), and name a rate limit's retry time instead of port advice.
 - **Every certificate installs to `host_runtime.certificate_directory()` of its own name** — the panel's domain certificate once shared the IP certificate's directory, so a same-server exit's IP certificate replaced it and renewals kept swapping them.

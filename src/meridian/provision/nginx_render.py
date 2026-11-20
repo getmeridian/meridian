@@ -21,6 +21,12 @@ from meridian.host_runtime import certificate_directory
 NGINX_LOCATION_DIR = "/etc/nginx/meridian-v4-locations"
 
 
+def private_listener_logs(indent: int = 4) -> str:
+    """Per-server only: nginx error messages can contain the full request, even with access logs off."""
+    pad = " " * indent
+    return f"{pad}access_log off;\n{pad}error_log /dev/null emerg;"
+
+
 def render_nginx_stream_config(
     reality_sni: str,
     reality_backend_port: int,
@@ -98,6 +104,7 @@ def render_nginx_stream_config(
         server {{
             listen 443;
             listen [::]:443;
+{private_listener_logs(12)}
             ssl_preread on;
             proxy_pass $meridian_backend;
             # Connect timeout: 1s is fine for localhost backends (xray_reality,
@@ -395,15 +402,14 @@ def render_nginx_server_block(
                 {default_action}
             }}
 
-            # Request paths carry the service secret and subscription tokens; a
-            # seized server must not hold a record of who fetched what.
-            access_log off;
+{private_listener_logs(12)}
         }}
 
         # --- HTTP: ACME challenge{" + redirect" if redirect_http else " only (no redirect)"} ---
         server {{
             listen 80;
             listen [::]:80;
+{private_listener_logs(12)}
             server_name {host};
             server_tokens off;
 

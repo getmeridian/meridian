@@ -5,7 +5,7 @@
 **No CLI rendering** — checks return data and never import console, Rich, or Typer; commands own output.
 **I/O follows perspective** — server health runs through a `ServerConnection`; external checks use bounded sockets and argv-only subprocesses.
 **Flow checks** — `network.py` owns low-level TLS I/O, `tls_probe.py` the stage-timed flow (connect, handshake, bytes until EOF or stall), and `blocking.py` the SNI-vs-IP differential and data-stall checks shared by `test --probe` and `check`.
-**Log tails** — `logs.py` maps roles to their units and nginx's error log and returns redacted tails; a missing source or lost SSH is an error, never an empty log.
+**Log tails** — `logs.py` maps roles to their units and nginx's error log and returns redacted tails; a missing source or lost SSH is an error, never an empty log. The shareable doctor report checks nginx configuration without reading the host-wide error log, which can contain other sites’ requests.
 **Control-service health** — `control_service.py` checks the units and judges each agent from its `NodeStatus`.
 **Setup helpers** — `preflight.py` collects pre-deploy checks; `camouflage.py` runs the pinned RealiTLScanner and picks same-subnet Reality targets.
 

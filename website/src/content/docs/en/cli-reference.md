@@ -664,7 +664,7 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 `logs` reads what the server's roles run: exits and routing gateways show the agent (`netagent`) and Xray (`netcore`) under `node`, the control server shows the control service (`ctld`) under `panel`, both show the nginx error log, and relays show their Realm units' journal. `--user` and `--ssh-port` override the saved SSH user and port.
 
-Every line passes through the same redaction as `meridian doctor`: tokens, passwords, keys, UUIDs, subscription IDs, and the control service's and connection page's secret paths are replaced with `[REDACTED]`, so the output is safe to paste into a bug report. Lines print as plain text with terminal control characters removed.
+Meridian replaces tokens, passwords, keys, UUIDs, subscription IDs and secret paths it recognizes with `[REDACTED]`, and strips terminal control characters. The host’s nginx error log can include requests to other sites. Review log output before sharing it. For a support report, `meridian doctor` checks the nginx configuration without reading that log.
 
 A server without a fleet role, or a `--component` it doesn't run, exits `2` before connecting. A log that can't be read (a missing service, a lost SSH connection) is shown as unavailable and the command exits `3`.
 

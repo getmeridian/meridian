@@ -46,6 +46,18 @@ _ENSURE_SITES_INCLUDE = (
     "/etc/nginx/nginx.conf; }"
 )
 
+# Do not disable a site just because an operator named it "default". Only the unchanged
+# site link installed by Debian/Ubuntu's nginx-common package conflicts with our packaged setup.
+DISABLE_STOCK_NGINX_SITE = (
+    "if [ -L /etc/nginx/sites-enabled/default ] && "
+    '[ "$(readlink -f /etc/nginx/sites-enabled/default)" = /etc/nginx/sites-available/default ]; then '
+    "stock=$(dpkg-query -W -f='${Conffiles}\\n' nginx-common 2>/dev/null | "
+    """awk '$1 == "/etc/nginx/sites-available/default" {print $2}'); """
+    'if [ -n "$stock" ] && printf "%s  %s\\n" "$stock" /etc/nginx/sites-available/default | md5sum --check --status; '
+    "then rm -f /etc/nginx/sites-enabled/default; fi; fi"
+)
+
+
 LEGACY_PROXY_CLEANUP = (
     # Remove the old watchdog first so cron cannot restart haproxy/caddy mid-deploy.
     "rm -f /etc/meridian/health-check.sh; "
@@ -429,7 +441,7 @@ class ConfigureNginx:
                 )
 
         # -- Remove default site (conflicts with our port 80 listener) --
-        conn.run("rm -f /etc/nginx/sites-enabled/default", timeout=15)
+        conn.run(DISABLE_STOCK_NGINX_SITE, timeout=15)
 
         # -- Validate configuration --
         result = conn.run("nginx -t 2>&1", timeout=15)

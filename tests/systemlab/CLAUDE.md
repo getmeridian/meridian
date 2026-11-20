@@ -13,6 +13,7 @@ uv run pytest tests/systemlab/ -q
 **Control memory stays below 160 MiB** — the single-server workload covers cold pinned-geodata explanation, person preview, and 32 fetches across four formats, leaving 96 MiB below MemoryMax.
 
 ## What's done well
+- `uv run python tests/systemlab/scripts/check-nginx-privacy.py LOCAL_EXIT_IMAGE` checks real nginx privacy after a reload in a network-isolated container. Ordinary and failing synthetic requests exercise the managed listeners while an operator site and TCP listener keep their logs.
 - Fresh deploy checks every unit, `fleet status`, a no-op second apply, and that no unit, process, or `/opt` name reveals proxy software.
 - A panel on its own domain (`panel.lab.test`, a compose alias for exit B) runs beside IP-addressed XHTTP and then on a shared domain, proving per-name certificates as clients see them (#110).
 - Delivered documents are executed or checked by real clients (Xray, `mihomo -t`, `sing-box check`) at pinned versions.
