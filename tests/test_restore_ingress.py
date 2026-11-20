@@ -114,6 +114,27 @@ def test_restore_detaches_old_ingress_and_keeps_other_nginx_sites_live(host, par
         assert not any(f[name].exists() for name in ("cert", "key", "renew", "challenge", "enabled"))
 
 
+def test_certificate_retirement_deletes_only_the_matching_acme_entry(host):
+    files, detach, retire = host
+    acme = files["renew"].parent.parent
+    files["renew"].parent.rename(acme / "vpn sample_ecc")
+    records = {
+        "other.example.com_ecc": "Le_RealFullChainPath='/elsewhere/fullchain.pem'",
+        "unrelated_ecc": f"OtherLe_RealFullChainPath='{files['cert']}'",
+    }
+    for name, record in records.items():
+        (acme / name).mkdir()
+        (acme / name / "renew.conf").write_text(record + "\n")
+
+    assert detach().returncode == 0
+    result = retire()
+
+    assert result.returncode == 0, result.stderr
+    assert {p.name for p in acme.iterdir()} == records.keys()
+    for name, record in records.items():
+        assert (acme / name / "renew.conf").read_text() == record + "\n"
+
+
 @pytest.mark.parametrize("variant", ["alias", "inline-key", "comment"])
 def test_still_used_certificate_and_renewal_survive_retiring_the_old_control_ingress(host, variant):
     f, detach, retire = host

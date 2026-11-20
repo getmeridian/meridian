@@ -261,23 +261,3 @@ def test_certificate_retirement_refuses_unexpected_paths() -> None:
     with pytest.raises(ResourceReconcileError, match="Unexpected certificate path"):
         _certificate_driver(conn).retire(_binding("/etc/passwd"))
     assert conn.calls == []
-
-
-def test_certificate_retirement_deletes_only_the_matching_acme_entry(tmp_path) -> None:
-    """Run the real command against a scratch acme.sh home."""
-    acme = tmp_path / "acme"
-    for name, path in (("vpn sample_ecc", _DOMAIN_CERT), ("other.example.com_ecc", "/elsewhere/fullchain.pem")):
-        (acme / name).mkdir(parents=True)
-        (acme / name / f"{name}.conf").write_text(f"Le_Domain='{name}'\nLe_RealFullChainPath='{path}'\n")
-    unrelated = acme / "unrelated_ecc"
-    unrelated.mkdir()
-    (unrelated / "unrelated.conf").write_text(f"OtherLe_RealFullChainPath='{_DOMAIN_CERT}'\n")
-    conn = MockConnection()
-    other = CertificatePayload(server_ref="srv-exit-b", hostname="other.example.com")
-    _certificate_driver(conn, other).retire(_binding(_DOMAIN_CERT, server_ref="srv-exit-b"))
-    # Only the acme.sh home moves; removing the absent certificate files is a no-op.
-    command = conn.calls[0].replace("/root/.acme.sh", str(acme))
-
-    subprocess.run(["bash", "-c", command], check=True)
-
-    assert sorted(path.name for path in acme.iterdir()) == ["other.example.com_ecc", "unrelated_ecc"]
