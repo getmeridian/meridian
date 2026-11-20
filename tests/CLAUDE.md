@@ -22,6 +22,7 @@
 - Schema migration assertions compare with `SCHEMA_VERSION`, not a copied current number.
 - Report freshness uses accepted receipt time; updating a hello must never renew an older runtime report.
 - MockConnection matches substrings; use specific patterns because an unrelated command may contain the same fragment.
+- Run certificate retirement commands on the scratch ingress host; a runner may have its own nginx, TLS files and renewal records.
 - Terminal readers use poll/selectors rather than select's fixed descriptor limit; full suites exhaust that small limit.
 - Pinned Xray blocks private freedom targets by default; loopback revocation tests need an explicit allow before judging traffic.
 - Console scenarios go over stdin, since Linux limits an individual argument's size.

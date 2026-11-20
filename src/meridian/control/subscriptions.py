@@ -100,6 +100,8 @@ def render_subscription(
             subscription_url(public_url, user.short_id),
             moment,
         )
+        if user.status == "active" and not any(endpoint.enabled for endpoint in endpoints):
+            info["user"]["hasUsableConnections"] = False
         if notice is not None:
             info["notice"] = notice.to_data()
         if device_slots is not None:

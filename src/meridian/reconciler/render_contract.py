@@ -16,7 +16,7 @@ _RENDERER_MANIFEST = {
     "control-api": "service-owned-people-v51",
     "control-ui": "service-owned-people-v74",
     "firewall": "ufw-comment-v2",
-    "nginx": "panel-domain-certificate-v13",
+    "nginx": "private-listener-logs-v14",
     "realm": "neutral-systemd-musl-v3",
     "server-baseline": "lean-packages-v4",
     "xray-workload": "gateway-names-v10",

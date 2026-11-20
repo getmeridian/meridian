@@ -15,6 +15,7 @@
 - **Retirement after convergence** — `retirement.py` removes vanished bindings dependents-first (`RETIREMENT_ORDER`) only after the whole plan succeeds; a failed rank stops later ranks and leaves the generation uncommitted. `FORGET_ONLY` names kinds that need no driver `retire()`; every other kind fails closed without one.
 - **Renderer stamps track what each piece deploys** — bump `render_contract.py` whenever deployed bytes or commands change, and every stamp the change reaches (control service, API, subscription, PWA, console); a missed stamp leaves servers running old bytes after an apply.
 ## Pitfalls
+- **A valid certificate does not prove private nginx logging** — adopt the exact old ACME listener without reissuing. Keep a pending comment on changed nginx artifacts until their reload succeeds; an interrupted write to disk is not a running configuration.
 - **Forget only adopted accounts** — `control_user` stays outside `FORGET_ONLY`; vanished pre-upgrade bindings still retire with their saved atomic cut-off.
 - **People query changes reach three stamps** — membership projections and filter controls change service, API, and console bytes together.
 - **Settings re-check profile declarations** — unreviewed writes compare the fingerprint; reviewed replacements use the membership fence, including empty declarations. Save profile-use history before the request, or observations misclassify its empty fingerprint as drift.
@@ -37,4 +38,4 @@
 - **Attest server artifacts against their own inputs** (target, pins, own stamp) — hashing the whole deployment re-runs every server on any edit.
 - **Delete, never mark inactive** — give a kind an idempotent `retire()` (404 = done) before adding it to `RETIREMENT_ORDER`; the one exception is `forget_server()` for an unreachable removed server, on the operator's word.
 - **Commit forgets superseded bindings** — retain the newest remote identity plus active/current-generation records, or cluster.yml grows on every apply; later generations locate resources by name.
-- **Certificates retire through acme.sh records** — delete only unused files; the service holds its domain certificate, or its IP certificate without a domain. Stop and delete agents together with their core, config, keys and state. Stop renamed units and remove old UFW ownership before their replacements bind.
+- **Certificates retire through acme.sh records** — check effective nginx references before touching keys or renewal records; the service holds its domain certificate, or its IP certificate without a domain. Stop and delete agents together with their core, config, keys and state. Stop renamed units and remove old UFW ownership before their replacements bind.

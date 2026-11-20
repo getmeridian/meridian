@@ -11,9 +11,9 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 **No JS** — show the service’s subscription as selectable, escaped text for manual import; protocol credentials never enter the HTML shell.
 **No indexing** — the shell and nginx both say `noindex, nofollow, noarchive`.
 **Catalog** — embedded apps render immediately; a valid shared `apps.json` may replace setup within seconds, preserving platform, app, focus, selection, and disclosures.
-**Account** — refresh same-origin `/info` on open, return, and request; a failed refresh can show an unverified result only in the current document. The status and any suspension warning appear above setup; the same-page link focuses full account details below it. Never save account facts or subscription paths in browser storage.
+**Account** — refresh same-origin `/info` on open, return, and request; a failed refresh can show an unverified result only in the current document. The status and any suspension warning appear above setup; the same-page link focuses full account details below it. An active account with no usable routes shows the existing owner contact instead of setup. Never save account facts or subscription paths in browser storage.
 **Device slots** — show fresh used/allowed counts and the full-slot rule only when `/info` includes them; keep counts in memory.
-**Three-step setup** — show the recommended installer and import action first. Platform and app choices are under “Change app or device” and stay in memory. Manual import shows a selectable URL and the app's menu path. A subscription QR is shown only on request; a Home Screen shortcut reopens the page and does not make personal data available offline.
+**Three-step setup** — show the recommended installer and import action first. Platform and app choices are under “Change app or device” and stay in memory. Manual import shows a selectable URL and the app's menu path. Personal copy/QR are for transfer to one’s own devices; never offer a generic sharing action. A subscription QR is shown only on request; a Home Screen shortcut reopens the page and does not make personal data available offline.
 **i18n** — English markup with `data-t` swaps; `language.js` runs in the head before CSS and picks saved page choice > person/fleet default > browser for `auto` > English, setting lang and dir (Persian is RTL); dates and numbers use Intl.
 **Self-check** — client clock vs server Date, a probe stream, and subscription status; copied reports contain no links, hostnames, UUIDs, or device data.
 **App help** — the collapsed **Not connecting?** panel holds generic app tips (a red ping is not a failure, refresh, update on launch, clock) and fetches nothing.
@@ -26,7 +26,7 @@ Server-hosted PWA; Meridian's only connection-page implementation.
 - **Connection remarks stay verbatim** — translate protocol hints only, and show entries in subscription order.
 
 ## Pitfalls
-- **Routing comes from the subscription** — setup never promises a fixed split policy; raw links carry no routing rules.
+- **Routing comes from the subscription** — setup explains the effective preset against the selected app’s normal format; app-dependent responses and unknown clients make no routing promise. Raw links carry no routing rules.
 - **Nested details CSS** — use `> summary`, and suppress markers with `list-style:none`, `::-webkit-details-marker`, and `::marker`.
 - **SW staleness** — develop with `meridian dev preview --watch`, which disables the worker; every `no-store` request bypasses it.
 - **Catalog parity** — `_PWA_APPS` must match `website/src/data/apps.json` field for field and in order; CI validates.

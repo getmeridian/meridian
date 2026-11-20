@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from datetime import datetime
+from math import ceil
 from typing import Any, Protocol
 
 from meridian.control.errors import ServiceError
@@ -17,7 +19,11 @@ class NodeDocumentComposer(Protocol):
 
 
 def with_users(
-    spec: NodeSpec, users: list[UserRecord], *, profiles: Mapping[str, Sequence[str]] | None = None
+    spec: NodeSpec,
+    users: list[UserRecord],
+    *,
+    profiles: Mapping[str, Sequence[str]] | None = None,
+    offline_expiry: bool = False,
 ) -> list[dict[str, Any]]:
     """Insert one users resource per managed inbound right after the Xray config."""
     resources = [resource.model_dump(mode="json") for resource in spec.resources]
@@ -31,21 +37,31 @@ def with_users(
     policy = spec.access_profiles if profiles is None else profiles
     inserted = [
         users_resource(
-            inbound, [user for user in active if may_use_inbound(user.profiles, policy, inbound.inbound_ref)], config_id
+            inbound,
+            [user for user in active if may_use_inbound(user.profiles, policy, inbound.inbound_ref)],
+            config_id,
+            offline_expiry=offline_expiry,
         )
         for inbound in spec.managed_inbounds
     ]
     return [*resources[: configs[0] + 1], *inserted, *resources[configs[0] + 1 :]]
 
 
-def users_resource(inbound: ManagedInbound, users: list[UserRecord], config_id: str) -> dict[str, Any]:
+def users_resource(
+    inbound: ManagedInbound, users: list[UserRecord], config_id: str, *, offline_expiry: bool = False
+) -> dict[str, Any]:
+    def deadline(user: UserRecord) -> dict[str, int]:
+        if offline_expiry and user.expire_at:
+            return {"expires_unix": ceil(datetime.fromisoformat(user.expire_at).timestamp())}
+        return {}
+
     if inbound.protocol == "hysteria2":
         return {
             "id": users_resource_id(inbound.tag),
             "depends_on": [config_id],
             "kind": "hysteria2_users",
             "inbound_tag": inbound.tag,
-            "users": [{"user_id": user.user_id, "auth": user.uuid} for user in users],
+            "users": [{"user_id": user.user_id, "auth": user.uuid, **deadline(user)} for user in users],
         }
     return {
         "id": users_resource_id(inbound.tag),
@@ -53,5 +69,8 @@ def users_resource(inbound: ManagedInbound, users: list[UserRecord], config_id: 
         "kind": "xray_users",
         "inbound_tag": inbound.tag,
         # An imported UUID keeps its case for Hysteria2; the document wants VLESS UUIDs lowercase.
-        "users": [{"user_id": user.user_id, "uuid": user.uuid.lower(), "flow": inbound.flow} for user in users],
+        "users": [
+            {"user_id": user.user_id, "uuid": user.uuid.lower(), "flow": inbound.flow, **deadline(user)}
+            for user in users
+        ],
     }

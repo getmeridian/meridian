@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import socket
 import threading
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -62,10 +62,12 @@ class NewServer:
         threading.Thread(target=self.server.serve_forever, daemon=True).start()
         cluster.panel.url = f"http://127.0.0.1:{self.server.server_address[1]}"
 
-    def apply(self, cluster: ClusterConfig, intent: SetupIntent) -> None:
+    def apply(self, cluster: ClusterConfig, intent: SetupIntent, before_retirement: Callable[[], None] | None) -> None:
         if self.fail_apply:
             self.fail_apply = False
             raise BackupError("apply failed")
+        if before_retirement:
+            before_retirement()
         self.applies.append(intent)
 
     def close(self) -> None:
@@ -208,6 +210,12 @@ def test_a_failed_apply_resumes_without_loading_the_state_again(
     fleet: tuple[ClusterConfig, Path], new_server: NewServer, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(restore_steps, "service_answers", lambda url, token: False)
+    monkeypatch.setattr(restore_steps, "ssh_answers", lambda entry: True)
+    retired: list[str] = []
+    monkeypatch.setattr(
+        restore_steps, "detach_control_ingress", lambda conn, fleet_id, digest: retired.append(f"{fleet_id}:{digest}")
+    )
+    monkeypatch.setattr(restore_steps, "retire_bootstrap_certificate", lambda conn, name: retired.append(name))
     cluster, snapshot = fleet
     restorer, target = _restorer(cluster)
     review = restorer.review(target, _source(snapshot))
@@ -216,6 +224,7 @@ def test_a_failed_apply_resumes_without_loading_the_state_again(
     with pytest.raises(BackupError, match="apply failed"):
         restorer.run(review, new_server.apply)
     assert ClusterConfig.load().control_restore.step == "installed"  # type: ignore[union-attr]
+    assert retired == []
 
     resumed, target = _restorer(ClusterConfig.load())
     review = resumed.review(target, RestoreSource(snapshot, None))
@@ -224,6 +233,7 @@ def test_a_failed_apply_resumes_without_loading_the_state_again(
     assert review.resume_from == "installed"
     assert new_server.uploads == 1 and len(new_server.applies) == 1
     assert outcome.fleet_epoch == 2
+    assert retired == [f"{FLEET_ID}:{token_sha256(ClusterConfig.load().panel.api_token)}", OLD]
 
 
 def test_a_finished_restore_lets_the_next_one_start_fresh(

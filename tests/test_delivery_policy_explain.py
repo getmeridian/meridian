@@ -34,7 +34,7 @@ from tests.test_delivery_policies import delivery_data
         ("video.example.org:443", "other", "matched", "direct", 4),
         ("198.51.100.10:443", "other", "matched", "direct", 5),
         ("peer.example.org:443", "other", "default", "proxy", None),
-        ("peer.example.org:6881", "bittorrent", "matched", "direct", 9),
+        ("peer.example.org:6881", "bittorrent", "default", "proxy", None),
     ],
 )
 def test_xray_explains_the_name_pass_and_catchall_without_resolving_ips(

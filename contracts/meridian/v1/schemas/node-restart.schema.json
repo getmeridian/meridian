@@ -476,6 +476,7 @@
             "service_failed",
             "xray_api_failed",
             "flow_guard_pending",
+            "offline_expiry_pending",
             "apply_pending",
             "document_not_applied",
             "config_not_installed",

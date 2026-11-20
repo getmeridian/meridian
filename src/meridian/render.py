@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 _PWA_APPS: list[dict[str, Any]] = [
     {
         "name": "Happ",
+        "format": "xray-json",
         "platform": "All platforms",
         "platforms": ["iOS", "Android", "Windows", "macOS", "Linux"],
         "recommended": ["iOS", "Android", "Windows", "macOS", "Linux"],
@@ -82,6 +83,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "FlClashX",
+        "format": "mihomo",
         "platform": "Android, desktop",
         "platforms": ["Android", "Windows", "macOS", "Linux"],
         "recommended": ["Android", "Windows", "macOS", "Linux"],
@@ -113,10 +115,10 @@ _PWA_APPS: list[dict[str, Any]] = [
             "zh": ["如果设备请求 VPN 权限，请允许。", "选择刚导入的配置。", "点击电源按钮连接。"],
         },
         "tun": {
-            "en": "Turn on TUN mode so all apps use this connection.",
-            "ru": "Включите режим TUN, чтобы все приложения использовали это подключение.",
-            "fa": "حالت TUN را روشن کنید تا همهٔ برنامه\u200cها از این اتصال استفاده کنند.",
-            "zh": "开启 TUN 模式，让所有应用都通过此连接上网。",
+            "en": "Turn on TUN mode so this app can route device traffic.",
+            "ru": "Включите режим TUN, чтобы приложение управляло трафиком устройства.",
+            "fa": "حالت TUN را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند.",
+            "zh": "开启 TUN 模式，让应用接管设备流量。",
         },
         "installers": [
             {
@@ -177,6 +179,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "Clash Mi",
+        "format": "mihomo",
         "platform": "All platforms",
         "platforms": ["iOS", "Android", "Windows", "macOS", "Linux"],
         "recommended": ["iOS", "Android", "Windows", "macOS", "Linux"],
@@ -213,14 +216,15 @@ _PWA_APPS: list[dict[str, Any]] = [
             "zh": ["如果设备请求 VPN 权限，请允许。", "选择刚导入的配置。", "点击电源按钮连接。"],
         },
         "tun": {
-            "en": "Turn on TUN mode so all apps use this connection.",
-            "ru": "Включите режим TUN, чтобы все приложения использовали это подключение.",
-            "fa": "حالت TUN را روشن کنید تا همهٔ برنامه\u200cها از این اتصال استفاده کنند.",
-            "zh": "开启 TUN 模式，让所有应用都通过此连接上网。",
+            "en": "Turn on TUN mode so this app can route device traffic.",
+            "ru": "Включите режим TUN, чтобы приложение управляло трафиком устройства.",
+            "fa": "حالت TUN را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند.",
+            "zh": "开启 TUN 模式，让应用接管设备流量。",
         },
     },
     {
         "name": "Throne",
+        "format": "base64",
         "platform": "Desktop",
         "platforms": ["Windows", "macOS", "Linux"],
         "recommended": ["Windows", "macOS", "Linux"],
@@ -254,6 +258,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "ShadowRocket",
+        "format": "base64",
         "platform": "iOS",
         "platforms": ["iOS"],
         "url": "https://apps.apple.com/app/shadowrocket/id932747118",
@@ -268,6 +273,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "Streisand",
+        "format": "xray-json",
         "platform": "iOS",
         "platforms": ["iOS"],
         "url": "https://apps.apple.com/app/streisand/id6450534064",
@@ -282,6 +288,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "v2RayTun",
+        "format": "base64",
         "platform": "iOS",
         "platforms": ["iOS"],
         "url": "https://apps.apple.com/app/v2raytun/id6476628951",
@@ -296,6 +303,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "Stash",
+        "format": "stash",
         "platform": "iOS",
         "platforms": ["iOS"],
         "url": "https://apps.apple.com/us/app/stash-rule-based-proxy/id1596063349",
@@ -332,6 +340,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "v2rayNG",
+        "format": "xray-json",
         "platform": "Android",
         "platforms": ["Android"],
         "url": "https://github.com/2dust/v2rayNG/releases/latest",
@@ -354,6 +363,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "NekoBox",
+        "format": "base64",
         "platform": "Android",
         "platforms": ["Android"],
         "url": "https://github.com/MatsuriDayo/NekoBoxForAndroid/releases/latest",
@@ -368,6 +378,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "FlClash",
+        "format": "mihomo",
         "platform": "Android, desktop",
         "platforms": ["Android", "Windows", "macOS", "Linux"],
         "url": "https://github.com/chen08209/FlClash/releases/latest",
@@ -380,14 +391,15 @@ _PWA_APPS: list[dict[str, Any]] = [
             "zh": "配置文件 → ＋ → URL → 发送",
         },
         "tun": {
-            "en": "Turn on TUN mode so all apps use this connection.",
-            "ru": "Включите режим TUN, чтобы все приложения использовали это подключение.",
-            "fa": "حالت TUN را روشن کنید تا همهٔ برنامه\u200cها از این اتصال استفاده کنند.",
-            "zh": "开启 TUN 模式，让所有应用都通过此连接上网。",
+            "en": "Turn on TUN mode so this app can route device traffic.",
+            "ru": "Включите режим TUN, чтобы приложение управляло трафиком устройства.",
+            "fa": "حالت TUN را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند.",
+            "zh": "开启 TUN 模式，让应用接管设备流量。",
         },
     },
     {
         "name": "sing-box",
+        "format": "singbox",
         "platform": "iOS, Android, macOS",
         "platforms": ["iOS", "Android", "macOS"],
         "url": "https://github.com/SagerNet/sing-box/releases/latest",
@@ -407,6 +419,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "Hiddify",
+        "format": "singbox",
         "platform": "All platforms",
         "platforms": ["iOS", "Android", "Windows", "macOS", "Linux"],
         "url": "https://github.com/hiddify/hiddify-app/releases/latest",
@@ -425,6 +438,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "Karing",
+        "format": "singbox",
         "platform": "All platforms",
         "platforms": ["iOS", "Android", "Windows", "macOS", "Linux"],
         "url": "https://github.com/KaringX/karing/releases/latest",
@@ -443,6 +457,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "V2Box",
+        "format": "xray-json",
         "platform": "iOS, Android",
         "platforms": ["iOS", "Android"],
         "url": "https://apps.apple.com/app/v2box-v2ray-client/id6446814690",
@@ -461,6 +476,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "v2rayN",
+        "format": "xray-json",
         "platform": "Desktop",
         "platforms": ["Windows", "macOS", "Linux"],
         "url": "https://github.com/2dust/v2rayN/releases/latest",
@@ -474,6 +490,7 @@ _PWA_APPS: list[dict[str, Any]] = [
     },
     {
         "name": "Clash Verge Rev",
+        "format": "mihomo",
         "platform": "Desktop",
         "platforms": ["Windows", "macOS", "Linux"],
         "url": "https://github.com/clash-verge-rev/clash-verge-rev/releases/latest",
@@ -486,10 +503,10 @@ _PWA_APPS: list[dict[str, Any]] = [
             "zh": "配置 → 新建 → 远程 → URL → 保存",
         },
         "tun": {
-            "en": "Turn on TUN mode so all apps use this connection.",
-            "ru": "Включите режим TUN, чтобы все приложения использовали это подключение.",
-            "fa": "حالت TUN را روشن کنید تا همهٔ برنامه\u200cها از این اتصال استفاده کنند.",
-            "zh": "开启 TUN 模式，让所有应用都通过此连接上网。",
+            "en": "Turn on TUN mode so this app can route device traffic.",
+            "ru": "Включите режим TUN, чтобы приложение управляло трафиком устройства.",
+            "fa": "حالت TUN را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند.",
+            "zh": "开启 TUN 模式，让应用接管设备流量。",
         },
     },
 ]
@@ -553,6 +570,7 @@ def render_config_json(
     server_icon: str = "",
     color: str = "",
     subscription_url: str = "",
+    routing: str = "",
     exit_countries: list[str] | None = None,
     owner_contact: OwnerContact | None = None,
     notice: RenderedNotice | None = None,
@@ -588,6 +606,8 @@ def render_config_json(
         "apps": _PWA_APPS,
         "generated_at": now,
     }
+    if routing in {"ru-split", "full", "custom", "app-dependent"}:
+        config["routing"] = routing
     if server_name:
         config["server_name"] = server_name
     if server_icon:
@@ -624,6 +644,7 @@ def render_pwa_shell(
     *,
     client_name: str = "",
     subscription_url: str = "",
+    no_connections: bool = False,
     asset_path: str = "../pwa",
     server_name: str = "",
     config_path: str = "config.json",
@@ -643,6 +664,7 @@ def render_pwa_shell(
         "index.html.j2",
         client_name=client_name,
         subscription_url=subscription_url,
+        no_connections=no_connections,
         asset_path=asset_path,
         server_name=server_name,
         config_path=config_path,

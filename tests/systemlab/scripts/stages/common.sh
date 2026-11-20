@@ -32,10 +32,8 @@ all_server_ips() {
     "$GATEWAY_IP"
 }
 
-# The control server's issuance root (Pebble's, fetched by 00-bootstrap) joins every node's
-# CA bundle; agents trust that bundle through a unit drop-in, since Pebble is no WebPKI CA.
+# Pebble's runtime issuance root joins the controller's and each node's CA bundle.
 PEBBLE_ISSUER_CA=/usr/local/share/ca-certificates/pebble-issuer.crt
-AGENT_CA_DROPIN=/etc/systemd/system/netagent.service.d/lab-ca.conf
 
 # A node's agent and core both run, and the agent's latest report is applied and live.
 wait_for_agent() {

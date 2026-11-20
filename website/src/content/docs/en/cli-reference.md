@@ -454,7 +454,7 @@ meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
 meridian fleet language [auto|en|ru|fa|zh] [--yes] [--json]
-meridian fleet upgrade [--tested] [--yes]
+meridian fleet upgrade [--latest | --tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 ```
@@ -465,6 +465,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--limit N` | 100 | `fleet events`: return 1–2000 events |
 | `--days N` | 30 | UTC days for `client usage` or `fleet usage`, 1–730, capped at the saved retention |
 | `--json` | | Emit the result as a `meridian.output/v1` envelope (`status`, `inventory`, `history`, `routing`, `export`, `import`, `usage`) |
+| `--latest` | | Look up a newer Realm release in the supported major; the default keeps the tested or selected version |
 | `--tested` | | `fleet upgrade`: skip GitHub; Realm stays on the tested version or what you already upgraded to |
 | `--yes`, `-y` | | `fleet upgrade`, `fleet routing`, `fleet import`: skip the confirmation |
 | `--dry-run` | | `fleet routing`, `fleet import`: show the changes and the review, apply nothing |
@@ -486,9 +487,9 @@ The `active` column counts people with growth in the last report, with its colle
 
 Custom token events show the effective capability labels in your CLI language; compatible preset tokens retain their scope label.
 
-**`fleet upgrade`** — brings the fleet up to date in one reviewed apply. The control service and every node agent move to the build this Meridian ships, and each agent upgrades in place, keeping its node's identity; run `meridian update` first to get newer ones. Relays move to the newest Realm release without waiting for a Meridian update: GitHub's newest release in the tested major, recorded in `cluster.yml` with the sha256 GitHub publishes for each archive, which every relay checks before installing. It shows what each server runs as `current` or `upgrade`, then, after you confirm, applies the reviewed plan and runs `meridian check` on every server. A version that cannot be read stops the command with exit `3` before anything changes.
+**`fleet upgrade`**: The control service and node agents upgrade to the installed Meridian version and keep their identities. Use the Realm version tested with this release, or the newer version already selected for this fleet. Only `--latest` looks up a newer same-major release on GitHub; Meridian records the version and verifies each archive against its published SHA-256. The command shows the versions before it asks you to apply, then runs `meridian check`. An unreadable component stops the upgrade before changes (exit 3).
 
-**`fleet routing`** — reads the current client policy from local topology and explains both choices. `ru-split` (default) sends matched Russian destinations and private/LAN ranges directly; `full` tunnels internet traffic, including Russian destinations, and keeps private/LAN ranges direct. Both retain QUIC blocking and Xray JSON's best-effort BitTorrent direct rule to reduce abuse complaints against exits. Pass a policy to edit the intent, review it, confirm, and apply exactly that review. Without a terminal or with `--json`, a change requires `--yes`; `--dry-run` shows the review without applying it. JSON returns `data.client_routing`, `choices[]`, and the review and apply when present. Apps receive the choice on their next subscription refresh or a manual refresh. The web panel shows it read-only in Settings. Exit geo-blocking stays separate; Base64 links carry no routing rules. See [Client routing](/en/split-routing/) for format limits and how to allow Russian destinations at an exit.
+**`fleet routing`** — reads the current client policy from local topology and explains both choices. `ru-split` (default) sends matched Russian destinations and private/LAN ranges directly; `full` tunnels internet traffic, including Russian destinations, and keeps private/LAN ranges direct. Both block QUIC. Xray JSON sends recognized BitTorrent peers directly only with `ru-split`. Under `full`, public peers use the VPN. Pass a policy to edit the intent, review it, confirm, and apply exactly that review. Without a terminal or with `--json`, a change requires `--yes`; `--dry-run` shows the review without applying it. JSON returns `data.client_routing`, `choices[]`, and the review and apply when present. Apps receive the choice on their next subscription refresh or a manual refresh. The web panel shows it read-only in Settings. Exit geo-blocking stays separate; Base64 links carry no routing rules. See [Client routing](/en/split-routing/) for format limits and how to allow Russian destinations at an exit.
 
 **`fleet export`** — prints your fleet's reviewed topology as a YAML file you can edit: exits and their protocol paths, relays, gateways, egress pools, routing rules, routes, and access profiles. The file omits people, the subscription title and refresh interval, the public contact, and server billing. Saved servers appear by name, or by address if unnamed. The file starts with `schema: meridian.fleet/v1`. Reality keys, API tokens, client links, and the XHTTP and WSS transport paths stay in Meridian and are not listed. `--json` returns the same document under `data.document`.
 
@@ -663,7 +664,7 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 `logs` reads what the server's roles run: exits and routing gateways show the agent (`netagent`) and Xray (`netcore`) under `node`, the control server shows the control service (`ctld`) under `panel`, both show the nginx error log, and relays show their Realm units' journal. `--user` and `--ssh-port` override the saved SSH user and port.
 
-Every line passes through the same redaction as `meridian doctor`: tokens, passwords, keys, UUIDs, subscription IDs, and the control service's and connection page's secret paths are replaced with `[REDACTED]`, so the output is safe to paste into a bug report. Lines print as plain text with terminal control characters removed.
+Meridian replaces tokens, passwords, keys, UUIDs, subscription IDs and secret paths it recognizes with `[REDACTED]`, and strips terminal control characters. The host’s nginx error log can include requests to other sites. Review log output before sharing it. For a support report, `meridian doctor` checks the nginx configuration without reading that log.
 
 A server without a fleet role, or a `--component` it doesn't run, exits `2` before connecting. A log that can't be read (a missing service, a lost SSH connection) is shown as unavailable and the command exits `3`.
 
@@ -705,10 +706,14 @@ The setup link works once, for 15 minutes; open it to choose the owner's passwor
 Remove Meridian from a server.
 
 ```
-meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
+meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes] [--discard-backup]
 ```
 
-On a single-server deployment, teardown removes everything Meridian created: the control service and its database, the agent and Xray, nginx configuration, certificates, relays, and firewall rules on the server, then the local `cluster.yml` and saved server profile. System packages, SSH hardening, and fail2ban stay, and nginx keeps running if it still serves your own sites. It also removes 3x-ui from Meridian 3.x. In a multi-server fleet, teardown refuses a server that still has a role in the topology.
+On the last controller this removes people, settings, subscriptions and the live database. The review shows the last confirmed off-server save and changes since. If needed, Meridian tries to save a verified copy on your managing computer. It checks the database again after stopping the service: a newer edit keeps the database and stops teardown. `--yes` only answers the normal confirmation. If you intend to lose unbacked-up data, pass `--discard-backup` separately. An older service that cannot confirm a save also requires that explicit choice.
+
+If preparation fails, Meridian restores the staged files and the previous service startup settings. If it reports that retirement has committed, the fleet is already stopped: fix the reported cleanup problem and rerun the same command, without adding `--discard-backup`. A small private receipt on the VPS makes this safe even if the SSH reply was lost.
+
+Teardown removes the verified controller, agent, Xray, managed nginx listeners, certificates and tagged firewall rules, then the local fleet configuration. It refuses a shared nginx installation, unrelated certificate renewal, unrecognized unit or legacy panel before deleting anything. SSH hardening, installed packages, unrelated services and untagged firewall rules stay. On a dedicated host, nginx is stopped and disabled so its default HTTP site does not go public after teardown. In a fleet with several servers, retire the other roles through the fleet plan first.
 
 `--yes` skips the confirmation; the role checks still run first. Declining exits `1`. An unknown server name, or zero or several possible targets, exits `2` instead of prompting.
 
@@ -730,7 +735,7 @@ meridian backup revoke ID
 
 After every command that changes the fleet, Meridian saves the control service's newest snapshot in `snapshots/` beside `cluster.yml` (the newest few are kept). A snapshot holds users, limits, traffic, revisions, API tokens, and a copy of this machine's `cluster.yml` and `servers.json`, so it can rebuild the fleet on a machine with nothing else. It is encrypted to every registered machine's key and to the recovery key, and never carries signing keys, sessions, or the web panel password. A failed save warns and never fails the command that triggered it.
 
-**`backup pull`** — saves a snapshot now. The first pull on a machine creates its key (`device.key`, readable only by you) and registers it with the control service.
+**`backup pull`** — saves a snapshot now. The first pull on a machine creates its key (`device.key`, readable only by you) and registers it with the control service. If this computer’s fleet files are stale and the snapshot cannot rebuild the current fleet, the partial copy is kept under `snapshots/partial/`. It does not replace a full recovery copy or confirm a save. Run the command on the computer that last applied the fleet.
 
 **`backup recovery-key`** — makes the fleet's recovery key, or replaces the existing one after asking, and prints it once. Meridian keeps only its public half, so write it down or print it and keep it offline. The first deploy of a fleet already shows one. Not available with `--json`.
 

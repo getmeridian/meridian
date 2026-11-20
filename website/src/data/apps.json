@@ -1,6 +1,7 @@
 [
   {
     "name": "Happ",
+    "format": "xray-json",
     "platform": "All platforms",
     "platforms": [
       "iOS",
@@ -81,6 +82,7 @@
   },
   {
     "name": "FlClashX",
+    "format": "mihomo",
     "platform": "Android, desktop",
     "platforms": [
       "Android",
@@ -129,10 +131,10 @@
       ]
     },
     "tun": {
-      "en": "Turn on TUN mode so all apps use this connection.",
-      "ru": "Включите режим TUN, чтобы все приложения использовали это подключение.",
-      "fa": "حالت TUN را روشن کنید تا همهٔ برنامه‌ها از این اتصال استفاده کنند.",
-      "zh": "开启 TUN 模式，让所有应用都通过此连接上网。"
+      "en": "Turn on TUN mode so this app can route device traffic.",
+      "ru": "Включите режим TUN, чтобы приложение управляло трафиком устройства.",
+      "fa": "حالت TUN را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند.",
+      "zh": "开启 TUN 模式，让应用接管设备流量。"
     },
     "installers": [
       {
@@ -193,6 +195,7 @@
   },
   {
     "name": "Clash Mi",
+    "format": "mihomo",
     "platform": "All platforms",
     "platforms": [
       "iOS",
@@ -248,14 +251,15 @@
       ]
     },
     "tun": {
-      "en": "Turn on TUN mode so all apps use this connection.",
-      "ru": "Включите режим TUN, чтобы все приложения использовали это подключение.",
-      "fa": "حالت TUN را روشن کنید تا همهٔ برنامه‌ها از این اتصال استفاده کنند.",
-      "zh": "开启 TUN 模式，让所有应用都通过此连接上网。"
+      "en": "Turn on TUN mode so this app can route device traffic.",
+      "ru": "Включите режим TUN, чтобы приложение управляло трафиком устройства.",
+      "fa": "حالت TUN را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند.",
+      "zh": "开启 TUN 模式，让应用接管设备流量。"
     }
   },
   {
     "name": "Throne",
+    "format": "base64",
     "platform": "Desktop",
     "platforms": [
       "Windows",
@@ -304,6 +308,7 @@
   },
   {
     "name": "ShadowRocket",
+    "format": "base64",
     "platform": "iOS",
     "platforms": [
       "iOS"
@@ -324,6 +329,7 @@
   },
   {
     "name": "Streisand",
+    "format": "xray-json",
     "platform": "iOS",
     "platforms": [
       "iOS"
@@ -344,6 +350,7 @@
   },
   {
     "name": "v2RayTun",
+    "format": "base64",
     "platform": "iOS",
     "platforms": [
       "iOS"
@@ -364,6 +371,7 @@
   },
   {
     "name": "Stash",
+    "format": "stash",
     "platform": "iOS",
     "platforms": [
       "iOS"
@@ -405,6 +413,7 @@
   },
   {
     "name": "v2rayNG",
+    "format": "xray-json",
     "platform": "Android",
     "platforms": [
       "Android"
@@ -433,6 +442,7 @@
   },
   {
     "name": "NekoBox",
+    "format": "base64",
     "platform": "Android",
     "platforms": [
       "Android"
@@ -453,6 +463,7 @@
   },
   {
     "name": "FlClash",
+    "format": "mihomo",
     "platform": "Android, desktop",
     "platforms": [
       "Android",
@@ -473,14 +484,15 @@
       "zh": "配置文件 → ＋ → URL → 发送"
     },
     "tun": {
-      "en": "Turn on TUN mode so all apps use this connection.",
-      "ru": "Включите режим TUN, чтобы все приложения использовали это подключение.",
-      "fa": "حالت TUN را روشن کنید تا همهٔ برنامه‌ها از این اتصال استفاده کنند.",
-      "zh": "开启 TUN 模式，让所有应用都通过此连接上网。"
+      "en": "Turn on TUN mode so this app can route device traffic.",
+      "ru": "Включите режим TUN, чтобы приложение управляло трафиком устройства.",
+      "fa": "حالت TUN را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند.",
+      "zh": "开启 TUN 模式，让应用接管设备流量。"
     }
   },
   {
     "name": "sing-box",
+    "format": "singbox",
     "platform": "iOS, Android, macOS",
     "platforms": [
       "iOS",
@@ -508,6 +520,7 @@
   },
   {
     "name": "Hiddify",
+    "format": "singbox",
     "platform": "All platforms",
     "platforms": [
       "iOS",
@@ -536,6 +549,7 @@
   },
   {
     "name": "Karing",
+    "format": "singbox",
     "platform": "All platforms",
     "platforms": [
       "iOS",
@@ -564,6 +578,7 @@
   },
   {
     "name": "V2Box",
+    "format": "xray-json",
     "platform": "iOS, Android",
     "platforms": [
       "iOS",
@@ -589,6 +604,7 @@
   },
   {
     "name": "v2rayN",
+    "format": "xray-json",
     "platform": "Desktop",
     "platforms": [
       "Windows",
@@ -610,6 +626,7 @@
   },
   {
     "name": "Clash Verge Rev",
+    "format": "mihomo",
     "platform": "Desktop",
     "platforms": [
       "Windows",
@@ -629,10 +646,10 @@
       "zh": "配置 → 新建 → 远程 → URL → 保存"
     },
     "tun": {
-      "en": "Turn on TUN mode so all apps use this connection.",
-      "ru": "Включите режим TUN, чтобы все приложения использовали это подключение.",
-      "fa": "حالت TUN را روشن کنید تا همهٔ برنامه‌ها از این اتصال استفاده کنند.",
-      "zh": "开启 TUN 模式，让所有应用都通过此连接上网。"
+      "en": "Turn on TUN mode so this app can route device traffic.",
+      "ru": "Включите режим TUN, чтобы приложение управляло трафиком устройства.",
+      "fa": "حالت TUN را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند.",
+      "zh": "开启 TUN 模式，让应用接管设备流量。"
     }
   }
 ]

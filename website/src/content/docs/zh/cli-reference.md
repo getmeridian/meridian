@@ -454,7 +454,7 @@ meridian fleet notice show [--for NAME] [--json]
 meridian fleet notice set TEXT [--until WHEN] [--for NAME] [--yes] [--json]
 meridian fleet notice clear [--yes] [--json]
 meridian fleet language [auto|en|ru|fa|zh] [--yes] [--json]
-meridian fleet upgrade [--tested] [--yes]
+meridian fleet upgrade [--latest | --tested] [--yes]
 meridian fleet export [--json]
 meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 ```
@@ -465,6 +465,7 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 | `--limit N` | 100 | `fleet events`：返回 1–2000 条事件 |
 | `--days N` | 30 | `client usage` 或 `fleet usage` 的 UTC 天数，1–730，受已保存保留时间限制 |
 | `--json` | | 将结果作为 `meridian.output/v1` 信封发出（`status`、`inventory`、`history`、`routing`、`export`、`import`、`usage`） |
+| `--latest` | | 查找同一主版本的新版 Realm；默认保留已测试或已选择的版本 |
 | `--tested` | | `fleet upgrade`：跳过 GitHub；Realm 保持在已测试的版本或你已升级到的版本 |
 | `--yes`, `-y` | | `fleet upgrade`、`fleet routing`、`fleet import`：跳过确认 |
 | `--dry-run` | | `fleet routing`、`fleet import`：显示变更和审查结果，不应用任何内容 |
@@ -486,9 +487,9 @@ meridian fleet import FILE [--dry-run] [--yes] [--forget-unreachable] [--json]
 
 自定义令牌的事件使用 CLI 当前语言显示实际权限名称；兼容预设令牌仍显示其权限范围标签。
 
-**`fleet upgrade`** — 通过一次已审核的应用让集群保持最新。控制服务和每个节点 agent 会升级到当前 Meridian 附带的构建，每个 agent 就地升级并保留其节点身份；要获取更新的构建，请先运行 `meridian update`。中继无需等待 Meridian 更新即可升级到最新的 Realm 版本：选用 GitHub 上已测试主版本内的最新版本，连同 GitHub 为每个压缩包发布的 sha256 一起记录到 `cluster.yml`，每个中继在安装前都会校验。它会显示每台服务器上运行的版本并标为 `current` 或 `upgrade`，确认后应用已审核的计划，并在每台服务器上运行 `meridian check`。如果某个版本无法读取，命令会在任何改动之前以退出码 `3` 结束。
+**`fleet upgrade`**: 控制服务和节点 agent 升级到安装的 Meridian 版本，并保留节点身份。 中继默认使用此版本 Meridian 测试过的 Realm，或此集群此前选定的更高版本。只有指定 `--latest` 时才会在 GitHub 上查找同一主版本的新发行版。Meridian 保存所选版本，并按公布的 SHA-256 校验每个归档。 命令先显示版本，确认后应用方案，再运行 `meridian check`。若无法读取版本，会在更改前以退出码 3 停止。
 
-**`fleet routing`** — 从本地拓扑读取当前客户端路由策略，并解释两种选项。`ru-split`（默认）让匹配规则的俄罗斯目的地、私有地址和局域网直连；`full` 让互联网流量通过 VPN，包括俄罗斯目的地，同时保留私有地址和局域网直连。两种策略均保留 QUIC 封锁，以及 Xray JSON 对已识别 BitTorrent 对等连接的直连规则，以减少针对出口服务器的滥用投诉。传入策略即可编辑拓扑、审核、确认，并应用此次审核的内容。没有终端或使用 `--json` 时，更改需要 `--yes`；`--dry-run` 显示审核结果而不应用。JSON 返回 `data.client_routing`、`choices[]` 以及适用的审核和应用结果。应用会在下次刷新订阅或手动刷新后收到策略。网页面板在“设置”中只读显示策略。出口地理封锁单独设置；Base64 链接不携带路由规则。有关格式限制及如何在出口允许俄罗斯目的地，请参见[客户端路由](/zh/split-routing/)。
+**`fleet routing`** — 从本地拓扑读取当前客户端路由策略，并解释两种选项。`ru-split`（默认）让匹配规则的俄罗斯目的地、私有地址和局域网直连；`full` 让互联网流量通过 VPN，包括俄罗斯目的地，同时保留私有地址和局域网直连。两者都会阻止 QUIC。 仅在 `ru-split` 下，Xray JSON 才会直连已识别的 BitTorrent 对等节点。`full` 下的公网对等连接通过 VPN。传入策略即可编辑拓扑、审核、确认，并应用此次审核的内容。没有终端或使用 `--json` 时，更改需要 `--yes`；`--dry-run` 显示审核结果而不应用。JSON 返回 `data.client_routing`、`choices[]` 以及适用的审核和应用结果。应用会在下次刷新订阅或手动刷新后收到策略。网页面板在“设置”中只读显示策略。出口地理封锁单独设置；Base64 链接不携带路由规则。有关格式限制及如何在出口允许俄罗斯目的地，请参见[客户端路由](/zh/split-routing/)。
 
 **`fleet export`** — 把集群已审查的拓扑输出为可编辑的 YAML 文件：出口及其协议路径、中继、网关、出口池、路由规则、路由和访问配置。导出文件不包含用户、订阅名称、刷新间隔、公开联系方式、服务器额度或付款信息。已保存的服务器按名称列出，没有名称时使用地址。文件以 `schema: meridian.fleet/v1` 开头。Reality 密钥、API 令牌、客户端链接以及 XHTTP 和 WSS 的传输路径都留在 Meridian 中，不会列出。`--json` 在 `data.document` 下返回同一份文档。
 
@@ -663,7 +664,7 @@ meridian logs [SERVER] [--lines N] [--grep TEXT] [--component NAME]
 
 `logs` 读取服务器各角色所运行的内容：出口和路由网关在 `node` 下显示 agent（`netagent`）和 Xray（`netcore`），控制服务器在 `panel` 下显示控制服务（`ctld`），二者都显示 nginx 错误日志，中继则显示其 Realm 单元的日志。`--user` 和 `--ssh-port` 覆盖保存的 SSH 用户和端口。
 
-每一行都经过与 `meridian doctor` 相同的脱敏处理：令牌、密码、密钥、UUID、订阅 ID，以及控制服务和连接页面的秘密路径都会被替换为 `[REDACTED]`，因此输出可以安全地粘贴到错误报告中。各行以纯文本打印，并已去除终端控制字符。
+Meridian 会将可识别的令牌、密码、密钥、UUID、订阅 ID 和私有路径替换为 `[REDACTED]`，并删除终端控制字符。主机的 nginx 错误日志可能包含对其他站点的请求，分享前请先检查。需要提交支持报告时，可运行 `meridian doctor`；它会检查 nginx 配置，不读取该日志。
 
 没有集群角色的服务器，或其未运行的 `--component`，会在连接之前以 `2` 退出。无法读取的日志（服务缺失、SSH 连接丢失）会显示为不可用，命令以 `3` 退出。
 
@@ -705,10 +706,14 @@ meridian panel [--setup-link]
 从服务器上卸载 Meridian。
 
 ```
-meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
+meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes] [--discard-backup]
 ```
 
-在单服务器部署上，`teardown` 会删除 Meridian 创建的所有内容：服务器上的控制服务及其数据库、agent 和 Xray、nginx 配置、证书、中继和防火墙规则，以及本地的 `cluster.yml` 和已保存的服务器配置。系统软件包、SSH 加固和 fail2ban 会保留；如果 nginx 仍在为你自己的网站提供服务，它也会继续运行。它还会一并清理 Meridian 3.x 留下的 3x-ui。在多服务器集群中，`teardown` 会拒绝卸载仍在拓扑中承担角色的服务器。
+卸载最后一台控制服务器会删除用户、设置、订阅和正在使用的数据库。确认前会显示最近一次已验证的异机备份和此后的变更数。必要时，Meridian 会尝试在管理电脑上保存并验证最新备份。停止服务后会再次检查数据库；如果刚发生过编辑，就保留数据库并中止卸载。`--yes` 只跳过常规确认。只有愿意丢失未备份的数据时才另加 `--discard-backup`。无法确认备份的旧版服务也需要明确选择。
+
+准备阶段失败时，Meridian 会还原暂存文件和服务原有的启动设置。如果提示退役已提交，集群已经停止。修复提示中的清理问题，再次运行同一命令即可，无需添加 `--discard-backup`。VPS 上保留一份私有记录，即使未收到 SSH 回应，也可以安全重试。
+
+仅删除经过验证的控制服务、agent、Xray、托管的 nginx 监听配置、证书、带标记的防火墙规则和本地集群配置。发现其他 nginx 站点、其他证书的续期任务、无法识别的服务或旧面板时，会在删除前停止。SSH 加固、系统包、其他服务及未标记的防火墙规则会保留。在专用主机上会停止 nginx 并禁止其开机启动，避免卸载后公开默认 HTTP 站点。如果集群有多台服务器，先通过集群计划移除其他角色。
 
 `--yes` 跳过确认；角色检查仍先运行。拒绝退出 `1`。未知的服务器名称或零个或多个可能目标退出 `2` 而不是提示。
 
@@ -730,7 +735,7 @@ meridian backup revoke ID
 
 每个修改集群的命令执行之后，Meridian 都会把控制服务的最新快照保存到 `cluster.yml` 旁边的 `snapshots/` 中（保留最近几份）。快照包含用户、限额、流量、修订、API 令牌，以及这台机器的 `cluster.yml` 和 `servers.json` 副本，因此可以在一台什么都没有的机器上重建集群。它加密给每台已注册机器的密钥和恢复密钥，从不包含签名密钥、会话或网页面板密码。保存失败只会给出警告，绝不会让触发它的命令失败。
 
-**`backup pull`** — 立即保存一份快照。机器上的首次 pull 会创建它的密钥（`device.key`，只有你能读取）并向控制服务注册。
+**`backup pull`** — 立即保存一份快照。机器上的首次 pull 会创建它的密钥（`device.key`，只有你能读取）并向控制服务注册。 如果这台电脑上的集群文件已过时，快照不足以重建当前集群，不完整的副本会保存在 `snapshots/partial/`。它不会替换完整的恢复副本，也不计入已确认的保存记录。请在上次执行 `meridian apply` 的电脑上运行此命令。
 
 **`backup recovery-key`** — 生成集群的恢复密钥，或在询问后替换已有的恢复密钥，并只显示一次。Meridian 只保留其公钥部分，所以请写下或打印出来并离线保存。集群首次部署时已经会显示一个。不支持 `--json`。
 

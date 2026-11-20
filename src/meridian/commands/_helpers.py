@@ -165,6 +165,7 @@ def apply_reviewed_intent(
     intent: SetupIntent,
     *,
     failure: str,
+    before_retirement: Callable[[], None] | None = None,
     hint: str,
     expected_plan_hash: str | None = None,
     on_unsaved: Callable[[ReviewedApplyPersistenceError], NoReturn] | None = None,
@@ -179,14 +180,20 @@ def apply_reviewed_intent(
     """
     try:
         with apply_progress(registry=registry) as reporter:
-            result = reviewed_runtime(
+            runtime = reviewed_runtime(
                 registry,
                 cluster,
                 reporter,
                 fence_holder=fence_holder,
                 user_cut_off=user_cut_off,
                 access_review_hash=access_review_hash,
-            ).apply_intent(intent, expected_plan_hash=expected_plan_hash)
+            )
+            if before_retirement is None:
+                result = runtime.apply_intent(intent, expected_plan_hash=expected_plan_hash)
+            else:
+                result = runtime.apply_intent(
+                    intent, expected_plan_hash=expected_plan_hash, before_retirement=before_retirement
+                )
     except MeridianError as exc:
         if on_unsaved is not None and isinstance(exc, ReviewedApplyPersistenceError):
             on_unsaved(exc)

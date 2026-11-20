@@ -11,16 +11,16 @@ curl -sSf https://getmeridian.org/install.sh | bash
 
 此脚本：
 1. 如果没有 [uv](https://docs.astral.sh/uv/)，则安装它，pipx 或 pip 作为后备方案。uv 安装程序按版本固定，并在运行前用 SHA-256 校验。
-2. 从 PyPI 安装 `meridian-vpn`（设置 `MERIDIAN_VERSION=4.0.0` 可安装某个确切版本）
+2. 从 PyPI 安装 `meridian-vpn`。要安装某个指定版本，请将 `MERIDIAN_VERSION` 设为其已发布的版本号。
 3. 必要时将工具目录加入你的 shell PATH
 4. 仅在无密码 sudo 可用时创建 `/usr/local/bin/meridian`
 
 ## 验证安装
 
-每个 [GitHub 发布版本](https://github.com/getmeridian/meridian/releases)都附带 `install.sh` 及其 `SHA256SUMS`。要在运行脚本前检查它，请从发布页下载两者并校验：
+在 [GitHub 发布页](https://github.com/getmeridian/meridian/releases)选择一个附有 `install.sh` 和 `SHA256SUMS` 的版本。在下面的命令中，将 `VERSION` 设为该标签去掉开头 `v` 的版本号，然后下载并校验文件：
 
 ```
-VERSION=4.0.0
+VERSION=4.0.0b19  # 示例：请改为你选择的版本
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
@@ -34,15 +34,15 @@ MERIDIAN_VERSION=$VERSION bash install.sh
 
 使用 uv（推荐）：
 ```
-uv tool install 'meridian-vpn>=4.0.0b0'
+uv tool install 'meridian-vpn>=4.0.0b0,<5'
 ```
 
 使用 pipx：
 ```
-pipx install 'meridian-vpn>=4.0.0b0'
+pipx install 'meridian-vpn>=4.0.0b0,<5'
 ```
 
-在 4.0 正式版发布之前，请像上面这样按版本安装。直接运行 `uv tool install meridian-vpn`（或 `pipx install meridian-vpn`）会安装最新的稳定版（目前为 3.17.3），它没有网页面板，也没有本文档中的命令。不要使用 `--prerelease allow` 或 `--pip-args=--pre`：它们也会安装所有依赖的预发布版。
+以上命令安装 Meridian 4，也允许安装 4.x 的预发布版。如需安装最新稳定版且不限主版本，请运行 `uv tool install meridian-vpn` 或 `pipx install meridian-vpn`。本指南介绍的是 Meridian 4。
 
 ## 更新
 
@@ -68,7 +68,7 @@ Meridian 4 **不是就地升级**。它用自己的控制服务和网页面板�
 - **迁移到 Meridian 4。**
   1. 用 Meridian 4 部署一台新服务器：`meridian deploy NEW_IP`
   2. 把新的连接页面发给你的用户（为每个人运行 `meridian client add NAME`）
-  3. 等所有人都切换完成后，用 `meridian teardown OLD_IP` 卸载旧服务器——Meridian 4 的 `teardown` 也会一并移除 3x-ui
+  3. 所有人都能用新链接连接后，**只有旧 VPS 专用于 Meridian 3.x 时**，才在服务商处删除它。如果还运行其他服务，先保留旧主机，备份数据并分离旧部署。新的 4.x 集群不管理旧主机。
 
 Meridian 4 把自己的状态保存在 `~/.config/meridian/`，从不读取或改动 `~/.meridian/` 中的 3.x 状态，因此两个版本可以共存于同一台机器；只找到 3.x 状态的集群命令会改为提示上述选项。
 

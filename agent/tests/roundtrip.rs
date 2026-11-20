@@ -5,6 +5,8 @@ mod capacity;
 #[path = "roundtrip/commands.rs"]
 mod commands;
 mod common;
+#[path = "roundtrip/offline_expiry.rs"]
+mod offline_expiry;
 #[path = "roundtrip/stats_health.rs"]
 mod stats_health;
 

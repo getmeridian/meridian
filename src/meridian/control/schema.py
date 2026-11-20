@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from meridian.control.access_memberships import MEMBERSHIP_SCHEMA
+from meridian.control.backup_changes import BACKUP_SCHEMA
 from meridian.control.backups import BACKUP_DEVICES_TABLE, BACKUP_STATE_TABLE
 from meridian.control.capacity import CAPACITY_TABLES
 from meridian.control.commands import COMMAND_TABLES
@@ -25,7 +26,7 @@ from meridian.control.tokens import API_TOKENS_TABLE_V4
 from meridian.control.traffic import ACCOUNTING_MIGRATION, DAILY_TABLES, PER_EPOCH_BASELINES
 from meridian.control.user_flow_blocks import FLOW_BLOCKS_TABLE
 
-SCHEMA_VERSION = 26
+SCHEMA_VERSION = 27
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS secrets (name TEXT PRIMARY KEY, value BLOB NOT NULL);
@@ -154,6 +155,7 @@ _MIGRATIONS: tuple[tuple[str | Callable[[Store], None], ...], ...] = (
     PERSON_DELIVERY_POLICY_SCHEMA,
     # 25 -> 26: service-owned names, seeded only by the latest applied revision.
     ("ALTER TABLE users ADD COLUMN display_name TEXT NOT NULL DEFAULT ''", backfill_display_names),
+    BACKUP_SCHEMA,
 )
 
 
@@ -169,6 +171,8 @@ def migrate(store: Store) -> None:
                 store.db.execute(statement)
     # Fresh databases already have the base schema; guarded statements also cover them.
     if store.meta("schema_version") is None:
+        for statement in BACKUP_SCHEMA:
+            store.db.execute(statement)
         for statement in PEOPLE_SCHEMA:
             store.db.execute(statement)
         for statement in MEMBERSHIP_SCHEMA:

@@ -3,7 +3,9 @@ title: Privacy
 description: Choose what device limits and usage history store, and understand what a seized control server reveals.
 ---
 
-Meridian starts with **device limits off** and **usage history off**. You opt in to extra records when you need them. No level stores client IP addresses, connection logs, or request paths.
+Meridian starts with **device limits off** and **usage history off**. You opt in to extra records when you need them. The control service stores no client IP addresses, connection logs, or request paths at any level.
+
+Meridian turns off access logs and discards request and connection errors on its own nginx listeners, including HTTP certificate challenges. Service health and aggregate metrics still work. The host, your provider, and other sites can keep their own logs. After an upgrade, run `meridian apply`: new connections use the new settings. It does not erase older logs or change connections that were already open.
 
 The control service already holds people's accounts and connection credentials, lifetime traffic totals, and last seen. Someone who takes it can read that state. These settings decide which device details and daily records are added to it.
 

@@ -28,6 +28,7 @@
     var attentionBody = h("div", { class: "overview-attention-body" }, h("span", { class: "spinner" }));
     var attentionSlot = h("section", { class: "card overview-attention" }, M.titled("h2", M.t("overview.attention"), M.t("tip.attention")), attentionBody);
     var trafficSlot = h("section", { class: "card overview-traffic", "data-detailed-only": "", hidden: M.mode() !== "detailed" });
+    var backup = M.backupCard();
     var recentSlot = h("section", { class: "card overview-recent", "data-detailed-only": "", hidden: M.mode() !== "detailed" });
     var cache = null, stop, events = [], revisions = [], eventCursor = 0, recentError = null;
     var attentionKey = null, lastTraffic = null, chartKey = null;
@@ -39,11 +40,12 @@
     M.mount(view, h("div", { class: "overview-page" },
       h("div", { class: "page-head" }, h("div", {}, h("h1", { text: M.t("nav.overview") }),
         status), actions),
-      fleetSlot, h("div", { class: "overview-grid" }, attentionSlot,
+      fleetSlot, h("div", { class: "overview-grid" }, h("div", { class: "overview-aside" }, attentionSlot, backup.card),
         h("div", { class: "overview-aside", "data-detailed-only": "", hidden: M.mode() !== "detailed" }, trafficSlot, recentSlot))));
 
     function draw(data) {
       cache = data;
+      backup.draw(data.backup.data);
       M.state.fleet = data.fleet;
       if (M.updateFleetTitle) M.updateFleetTitle();
       var active = data.people.facets.status.active || 0, total = data.people.population;
@@ -192,12 +194,14 @@
           M.api("GET", "api/people?limit=1&expires=7", undefined, options),
           M.api("GET", "api/people?limit=1&quota=90", undefined, options),
           optional(M.api("GET", "api/traffic/daily?days=30", undefined, options)), recent,
-        ]).then(function (items) { return { people: items[0], fleet: items[1], expiring: items[2], quota: items[3], traffic: items[4], recent: items[5] }; });
+          optional(M.api("GET", "api/backup/status", undefined, options)),
+        ]).then(function (items) { return { people: items[0], fleet: items[1], expiring: items[2], quota: items[3], traffic: items[4], recent: items[5], backup: items[6] }; });
       }, draw: draw, warning: function (data) {
         return data.traffic.error && data.traffic.error.code !== "history_off" ? data.traffic.error
           : M.mode() === "detailed" && data.recent ? data.recent.events.error || data.recent.revisions.error : null;
       }, empty: function () {
         attentionKey = chartKey = null;
+        backup.draw(null);
         [fleetSlot, attentionBody, trafficSlot, recentSlot].forEach(function (slot) {
           M.mount(slot, h("p", { class: "muted small", text: M.t("overview.unavailable") }));
         });

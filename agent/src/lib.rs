@@ -16,6 +16,7 @@ mod command_core;
 mod command_host;
 pub mod commands;
 pub mod compose;
+mod expiry;
 pub mod fetch;
 pub mod fsutil;
 pub mod identity;

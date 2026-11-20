@@ -33,6 +33,7 @@ import pyrage
 from pydantic import Field, ValidationError
 from pyrage import x25519
 
+from meridian.control.backup_models import SnapshotSaveProof
 from meridian.core.agent_types import FleetEpoch, FleetId, Timestamp
 from meridian.core.errors import MeridianError
 from meridian.core.models import CoreModel
@@ -41,6 +42,8 @@ SNAPSHOT_FORMAT: Final = "meridian.snapshot/v1"
 MAGIC = b"meridian-snapshot/v1\n"
 HEADER_MEMBER = "header.json"
 DATABASE_MEMBER = "control.db"
+SAVE_PROOF_MEMBER = "save-receipt.json"
+SOURCE_HOST_MEMBER = "source-host"
 # A snapshot is a SQLite file of users, specs, and revisions: far below this.
 MAX_SNAPSHOT_BYTES = 256 * 1024 * 1024
 MAX_HEADER_BYTES = 64 * 1024
@@ -88,6 +91,27 @@ class KeyPair:
 class Snapshot:
     header: SnapshotHeader
     files: dict[str, bytes]
+
+    @property
+    def source_host(self) -> str | None:
+        """Fleet-scoped controller fingerprint, private to the encrypted archive if available."""
+        value = self.files.get(SOURCE_HOST_MEMBER)
+        if value is None:
+            return None
+        if not re.fullmatch(rb"[0-9a-f]{64}", value):
+            raise SnapshotError("The snapshot's source host fingerprint is malformed.")
+        return value.decode("ascii")
+
+    @property
+    def incomplete(self) -> bool:
+        """A modern service explicitly lacked current topology; older complete files have no marker."""
+        return self.files.get(SAVE_PROOF_MEMBER) == b"null"
+
+    @property
+    def save_proof(self) -> SnapshotSaveProof | None:
+        """Available only after age decryption. Older service snapshots carry no receipt."""
+        data = self.files.get(SAVE_PROOF_MEMBER)
+        return SnapshotSaveProof.model_validate_json(data) if data is not None and not self.incomplete else None
 
     @property
     def database(self) -> bytes:

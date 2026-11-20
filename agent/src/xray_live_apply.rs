@@ -18,13 +18,53 @@ pub(crate) struct LiveApply<'a> {
     pub composed: &'a Value,
     pub binary: &'a str,
     pub previous: &'a Value,
+    pub preserve_flows: bool,
     pub changes: &'a [LiveChange],
     pub temporary: &'a Path,
 }
 
 impl Engine<'_> {
+    fn removals_absent(&self, binary: &str, api: &str, change: &LiveChange) -> bool {
+        if change.remove.is_empty() {
+            return true;
+        }
+        let Ok(body) = self.xray_api(
+            binary,
+            &[
+                "api",
+                "inbounduser",
+                &format!("--server={api}"),
+                &format!("-tag={}", change.tag),
+            ],
+        ) else {
+            return false;
+        };
+        let Ok(object) = serde_json::from_str::<serde_json::Map<String, Value>>(&body) else {
+            return false;
+        };
+        // The pinned CLI omits an empty repeated field in its protobuf JSON.
+        match object.get("users") {
+            None => object.is_empty(),
+            Some(Value::Array(users)) => users.iter().all(|u| {
+                u.get("email")
+                    .and_then(Value::as_str)
+                    .is_some_and(|e| !change.remove.iter().any(|s| s == e))
+            }),
+            _ => false,
+        }
+    }
+
     pub(crate) fn apply_live_config(&self, change: LiveApply<'_>) -> Result<bool, Failure> {
-        let pending = |message: String| Failure::new("flow_guard_pending", message);
+        let pending = |message: String| {
+            Failure::new(
+                if change.preserve_flows {
+                    "offline_expiry_pending"
+                } else {
+                    "flow_guard_pending"
+                },
+                message,
+            )
+        };
         let result = (|| {
             let invocation = core_invocation(self.exec).map_err(pending)?;
             match self.guard_live_users(
@@ -54,6 +94,12 @@ impl Engine<'_> {
             // A new instance may have read the old file immediately before this
             // commit. Reconciliation must restart it from the now-current file.
             if core_invocation(self.exec).ok().as_deref() != Some(&invocation) {
+                if change.preserve_flows {
+                    return Err(pending(
+                        "The core changed during local expiry. Retry against its new instance."
+                            .into(),
+                    ));
+                }
                 return Ok(false);
             }
             match self.apply_live(change.binary, &change.spec.api_address, change.changes) {
@@ -66,6 +112,16 @@ impl Engine<'_> {
                             .is_ok()
                     {
                         return Ok(true);
+                    }
+                    if change.preserve_flows {
+                        // A previous attempt may have removed a subset before stopping. An empty
+                        // live intersection confirms expiry even if rmu reported a short count.
+                        if change.changes.iter().all(|c| {
+                            self.removals_absent(change.binary, &change.spec.api_address, c)
+                        }) {
+                            return Ok(true);
+                        }
+                        return Err(pending("Could not confirm local expiry in the running core; retrying without a restart.".into()));
                     }
                     info!("xray api: {message}; restarting xray instead");
                     Ok(false)

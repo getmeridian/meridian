@@ -4,6 +4,7 @@
 
 var TEXT = {
   en: {
+    noConnections: 'Your link is valid, but it has no connections yet. Ask the person who sent it to add one.',
     title: 'Your account', refresh: 'Refresh', checking: 'Checking account…',
     status: 'Status', active: 'Active', disabled: 'Disabled', expired: 'Expired', limited: 'Limited',
     'active.desc': 'Your account is ready to connect.',
@@ -23,6 +24,7 @@ var TEXT = {
     units: ['B', 'KB', 'MB', 'GB', 'TB', 'PB'],
   },
   ru: {
+    noConnections: 'Ссылка действует, но подключений пока нет. Попросите того, кто её прислал, добавить подключение.',
     title: 'Ваш аккаунт', refresh: 'Обновить', checking: 'Проверяем статус…',
     status: 'Статус', active: 'Активен', disabled: 'Отключён', expired: 'Срок истёк', limited: 'Лимит исчерпан',
     'active.desc': 'Всё готово к подключению.',
@@ -43,6 +45,7 @@ var TEXT = {
     units: ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ', 'ПБ'],
   },
   fa: {
+    noConnections: 'پیوند شما معتبر است، اما هنوز اتصالی ندارد. از کسی که آن را فرستاده بخواهید یک اتصال اضافه کند.',
     title: 'حساب شما', refresh: 'به‌روزرسانی', checking: 'در حال بررسی حساب…',
     status: 'وضعیت', active: 'فعال', disabled: 'غیرفعال', expired: 'منقضی‌شده', limited: 'سهمیه تمام شده',
     'active.desc': 'حساب شما آمادهٔ اتصال است.',
@@ -62,6 +65,7 @@ var TEXT = {
     units: ['بایت', 'کیلوبایت', 'مگابایت', 'گیگابایت', 'ترابایت', 'پتابایت'],
   },
   zh: {
+    noConnections: '你的链接有效，但还没有可用连接。请让发给你链接的人添加一个连接。',
     title: '您的账户', refresh: '刷新', checking: '正在检查账户…',
     status: '状态', active: '有效', disabled: '已停用', expired: '已到期', limited: '流量已用完',
     'active.desc': '账户可正常使用，您可以连接。',
@@ -164,6 +168,7 @@ function readInfo(body, status) {
   var schedule = readSchedule(user.accountSchedule);
   if (schedule) answer.schedule = schedule;
   if (!validSnapshot(answer)) throw new Error('account');
+  answer.noConnections = answer.status === 'active' && user.hasUsableConnections === false;
   answer.deviceSlots = readSlots(user.deviceSlots);
   answer.deliveryCapabilities = user.deliveryCapabilities || null;
   return answer;
@@ -184,10 +189,13 @@ function metric(list, label, value, note) {
 function suspension() {
   if (!snapshot) return '';
   if (!snapshot.found) return t('missing');
+  if (snapshot.noConnections) return t('noConnections');
   return snapshot.status === 'active' ? '' : t(snapshot.status + '.desc');
 }
 function applyImportState() {
   var reason = suspension();
+  var setup = document.getElementById('setup-card');
+  if (setup) setup.hidden = Boolean(snapshot && snapshot.noConnections);
   document.querySelectorAll('[data-import]').forEach(function(link) {
     if (reason) link.setAttribute('aria-disabled', 'true');
     else link.removeAttribute('aria-disabled');
@@ -211,6 +219,10 @@ function renderOverview() {
   if (failed) message = (message ? message + ' ' : '') + t('failed');
   warning.textContent = message;
   warning.hidden = !message;
+  var contact = document.getElementById('unavailable-contact');
+  if (contact && window.MeridianContact) {
+    window.MeridianContact.mount(contact, snapshot && snapshot.noConnections && window._meridianConfig.owner_contact, lang());
+  }
 }
 function render() {
   renderOverview();
@@ -231,7 +243,7 @@ function render() {
   heading.appendChild(button); panel.appendChild(heading);
   if (snapshot && snapshot.found) {
     panel.appendChild(element('strong', 'account-status is-' + snapshot.status, t(snapshot.status)));
-    panel.appendChild(element('p', 'muted', t(snapshot.status + '.desc')));
+    if (!snapshot.noConnections) panel.appendChild(element('p', 'muted', t(snapshot.status + '.desc')));
     var list = element('dl', 'account-metrics');
     metric(list, t('period'), bytes(snapshot.used) + ' / ' + (snapshot.limit === '0' ? t('unlimited') : bytes(snapshot.limit)));
     metric(list, t('lifetime'), bytes(snapshot.lifetime));

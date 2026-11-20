@@ -12,6 +12,7 @@
 ## What's done well
 - **Check before acting** — steps read package, file, and unit state first, so a rerun reports `ok`, not `changed`.
 ## Pitfalls
+- **Managed nginx listeners own their logging** — disable access logs and send request errors to the null device in each HTTP and stream server. Changing global logs would affect unrelated sites; configuration checks and aggregate service metrics remain available.
 - **nginx `add_header` inheritance** — a child `location` with `add_header` drops the parent's headers; use maps for cache and robots policies and keep page headers together.
 - **acme.sh short-lived IP certificates** need `--days 5` and an explicit renew window; report acme.sh's last lines (its first are timestamps), and name a rate limit's retry time instead of port advice.
 - **Every certificate installs to `host_runtime.certificate_directory()` of its own name** — the panel's domain certificate once shared the IP certificate's directory, so a same-server exit's IP certificate replaced it and renewals kept swapping them.
@@ -21,7 +22,8 @@
 - **Never `return 444` in HTTPS blocks** — use 403/404, which are less fingerprintable.
 - **Legacy stream config yields to V4** — skip `stream.d/meridian.conf` once a `meridian-v4-*` file listens on 443, or `nginx -t` fails on a duplicate listener.
 - **Every apt-get goes through `ensure.run_apt()`** — it waits for unattended-upgrades or cloud-init to release the lock and names the holder; never silence apt's stderr, or a lock reads as an ordinary failure. Install only after a check says something is missing.
-- **Teardown keeps what the operator may own** — the `meridian` CLI, fail2ban, and nginx while operator config remains; `panel_stack_removal()` is the one list teardown and `migrate` share.
+- **Last-controller teardown** checks the packaged nginx process and live fleet before a backup write. A private journal rolls staging back before commit, then resumes removal of only the staged objects after commit. Leave shared services, renewals and untagged rules alone; legacy Docker cleanup belongs to the verified migration.
+- **Keep the SSH apply fence until retirement commits** — after only one deploy, its released record proves the reviewed generation under the writer's lock. Once the service has a fence, that row wins. Remove only the retired marker, preserving the lock inode for the next install.
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
 - **Realm installs only a pinned static musl tarball, run before it replaces anything** — a glibc build that couldn't start once overwrote a working binary; a target without a digest fails.
 - **Firewall follows the effective sshd port**, never an assumed `22/tcp`; recipes never open public ports, compiled tagged rules do.

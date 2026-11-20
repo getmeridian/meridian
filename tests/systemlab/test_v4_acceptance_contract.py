@@ -144,11 +144,11 @@ def test_controller_trusts_the_local_acme_certificate_chain() -> None:
 
 
 def test_every_agent_trusts_the_local_acme_chain_before_deploy() -> None:
-    """Agents verify the control service against their unit's CA file; Pebble is no WebPKI CA."""
+    """New agent units trust Pebble without an operator override that would prevent teardown."""
     bootstrap = _BOOTSTRAP_PATH.read_text(encoding="utf-8")
     deploy = bootstrap.index('meridian server add "$EXIT_A_IP"')
 
-    assert bootstrap.index("NETAGENT_TLS_CA_FILE=/etc/ssl/certs/ca-certificates.crt") < deploy
+    assert bootstrap.index("systemctl set-environment NETAGENT_TLS_CA_FILE=/etc/ssl/certs/ca-certificates.crt") < deploy
     assert bootstrap.index("for host in $(all_server_ips)", bootstrap.index("Pebble issuance root trusted")) < deploy
 
 

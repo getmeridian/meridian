@@ -437,7 +437,7 @@
   "fleet_routing.current": "Client routing: {policy}",
   "fleet_routing.ru_split": "Send Russian destinations and private/LAN ranges directly; tunnel other traffic.",
   "fleet_routing.full": "Tunnel internet traffic, including Russian destinations; bypass private/LAN ranges.",
-  "fleet_routing.bittorrent": "Both policies retain Xray JSON's best-effort direct rule for detected BitTorrent peers to reduce abuse complaints against exits.",
+  "fleet_routing.bittorrent": "Xray JSON sends recognized BitTorrent peers directly only with ru-split. Under full, public peers use the VPN.",
   "fleet_routing.quic": "Both block QUIC (UDP/443) so apps fall back to TCP.",
   "fleet_routing.base64": "Base64 links carry no routing rules; configure routing in those apps separately.",
   "fleet_routing.exit_policy": "Exit geo-blocking still applies; full changes routing on devices only.",

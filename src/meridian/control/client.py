@@ -11,6 +11,7 @@ import httpx
 
 from meridian.control.access_profile_models import ServiceSettingsWrite
 from meridian.control.account_schedule_models import UserSchedulePreviewRequest
+from meridian.control.backup_models import BackupReceipt, BackupStatus
 from meridian.control.command_models import (
     CommandRequest,
     CutOffPlan,
@@ -642,6 +643,13 @@ class ControlClient:
     def deposit_deployer_state(self, deposit: DeployerStateDeposit) -> None:
         """Keep the deployer's fleet files in the service, so the next snapshot carries them."""
         self._call("PUT", "api/backup/deployer-state", deposit.model_dump(mode="json"))
+
+    def backup_status(self) -> BackupStatus:
+        return BackupStatus.model_validate(self._call("GET", "api/backup/status"))
+
+    def confirm_saved_snapshot(self, receipt: BackupReceipt) -> BackupStatus:
+        response = self._request("POST", "api/backup/receipts", receipt.model_dump(mode="json"), mutation_method="GET")
+        return BackupStatus.model_validate(response.json())
 
     def snapshot(self) -> bytes:
         """The newest snapshot, sealed to every registered backup key (`control.snapshot`)."""

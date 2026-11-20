@@ -7,8 +7,10 @@ from unittest.mock import patch
 
 import pytest
 import typer
+from typer.testing import CliRunner
 
 from meridian.binary_pins import UPGRADABLE_BINARIES, BinaryPin, effective_binary_pins
+from meridian.cli import app
 from meridian.cluster import ClusterConfig
 from meridian.commands import fleet_upgrade
 from meridian.config import REALM_SHA256, REALM_VERSION
@@ -144,20 +146,96 @@ def test_fleets_without_relays_never_ask_github() -> None:
     cluster = ClusterConfig(topology_intent=single_exit_intent())
 
     with patch("meridian.github_releases.latest_binary_release") as latest:
-        assert fleet_upgrade._binary_targets(cluster, single_exit_intent(), tested=False) == {}
+        assert fleet_upgrade._binary_targets(cluster, single_exit_intent(), latest=True) == {}
     latest.assert_not_called()
 
 
-def test_tested_upgrade_skips_github_and_keeps_a_saved_realm() -> None:
+def test_default_upgrade_skips_github_and_keeps_a_saved_realm() -> None:
     cluster = ClusterConfig(binary_pins={"realm": _NEWER})
 
     with patch("meridian.github_releases.latest_binary_release") as latest:
-        assert fleet_upgrade._binary_targets(cluster, _relay_intent(), tested=True) == {"realm": (_NEWER, _NEWER)}
+        assert fleet_upgrade._binary_targets(cluster, _relay_intent()) == {"realm": (_NEWER, _NEWER)}
     latest.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("options", "selected", "upstream", "code"),
+    [
+        ([], None, False, 0),
+        ([], _NEWER, False, 0),
+        (["--tested"], _NEWER, False, 0),
+        (["--latest"], None, True, 0),
+        (["--latest", "--tested"], None, False, 2),
+    ],
+    ids=["release-default", "keeps-owner-selection", "old-flag", "explicit-upstream", "incompatible-flags"],
+)
+def test_public_upgrade_looks_up_realm_only_by_request(
+    tmp_home: Path, options: list[str], selected: BinaryPin | None, upstream: bool, code: int
+) -> None:
+    cluster = ClusterConfig(topology_intent=_relay_intent(), binary_pins={"realm": selected} if selected else {})
+    running = (selected or UPGRADABLE_BINARIES["realm"]).version
+    with (
+        patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
+        patch.object(fleet_upgrade, "_observe_service", return_value=[]),
+        patch.object(fleet_upgrade, "_observe_relays", return_value=[_relay(running)]),
+        patch("meridian.github_releases.latest_binary_release", side_effect=lambda _, pin: pin) as lookup,
+        patch.object(fleet_upgrade, "_apply") as apply,
+        patch.object(fleet_upgrade, "_save_pins") as save,
+    ):
+        result = CliRunner().invoke(app, ["fleet", "upgrade", *options])
+    assert result.exit_code == code, result.output
+    assert lookup.called is upstream
+    save.assert_not_called()
+    apply.assert_not_called()
+
+
+def test_removing_the_last_relay_does_not_erase_an_explicit_version_choice(tmp_home: Path) -> None:
+    cluster = ClusterConfig(topology_intent=single_exit_intent(), binary_pins={"realm": _NEWER})
+    with (
+        patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
+        patch.object(fleet_upgrade, "_observe_service", return_value=[]),
+        patch.object(fleet_upgrade, "_save_pins") as save,
+    ):
+        fleet_upgrade.run_upgrade(yes=True)
+    save.assert_not_called()
 
 
 def _relay(running: str) -> fleet_upgrade.RelayRealm:
     return fleet_upgrade.RelayRealm("srv-r", "relay", running)
+
+
+def test_a_relay_ahead_of_the_saved_pin_is_never_silently_downgraded(tmp_home: Path) -> None:
+    cluster = ClusterConfig(topology_intent=_relay_intent())
+    with (
+        patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
+        patch.object(fleet_upgrade, "_observe_service", return_value=[]),
+        patch.object(fleet_upgrade, "_observe_relays", return_value=[_relay(_NEWER.version)]),
+        patch.object(fleet_upgrade, "_save_pins") as save,
+        patch.object(fleet_upgrade, "_apply") as apply,
+    ):
+        result = CliRunner().invoke(app, ["fleet", "upgrade", "--yes"])
+    assert result.exit_code == 2 and "nothing was downgraded" in " ".join(result.output.split())
+    save.assert_not_called()
+    apply.assert_not_called()
+
+
+def test_an_upstream_version_already_running_needs_consent_before_it_becomes_the_fleet_pin(tmp_home: Path) -> None:
+    cluster = ClusterConfig(topology_intent=_relay_intent())
+    with (
+        patch.object(fleet_upgrade, "load_topology_cluster", return_value=cluster),
+        patch("meridian.github_releases.latest_binary_release", return_value=_NEWER),
+        patch.object(fleet_upgrade, "_observe_service", return_value=[]),
+        patch.object(fleet_upgrade, "_observe_relays", return_value=[_relay(_NEWER.version)]),
+        patch.object(fleet_upgrade, "confirm", return_value=False),
+        patch.object(fleet_upgrade, "_save_pins") as save,
+        patch.object(fleet_upgrade, "_apply") as apply,
+    ):
+        with pytest.raises(typer.Exit):
+            fleet_upgrade.run_upgrade(latest=True)
+        save.assert_not_called()
+        fleet_upgrade.run_upgrade(latest=True, yes=True)
+        save.assert_called_once_with(cluster, {"realm": _NEWER})
+        apply.assert_not_called()
 
 
 def test_a_newer_realm_is_confirmed_saved_and_applied() -> None:

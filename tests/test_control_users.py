@@ -189,6 +189,31 @@ def test_enforcement_expires_active_users_once_their_time_passes(service: Contro
     assert _delivered(service) == []
 
 
+def test_offline_deadlines_follow_negotiation_and_renewal(service: ControlService) -> None:
+    _with_node(service)
+    alice = service.put_user("alice")
+    bob = service.put_user("bob")
+    service.update_user("alice", UserUpdate(expire_at=FUTURE))
+
+    def accounts() -> dict[str, dict]:
+        doc = service.poll("main", _poll())["desired"]
+        users = next(item for item in doc["resources"] if item["id"] == users_resource_id(TAG))["users"]
+        return {item["user_id"]: item for item in users}
+
+    assert "expires_unix" not in accounts()[alice.user_id]
+    service.node_seen("main", "new", capabilities=["offline_user_expiry"])
+    assert accounts()[alice.user_id]["expires_unix"] == int(datetime.fromisoformat(FUTURE).timestamp())
+    assert "expires_unix" not in accounts()[bob.user_id]
+    with pytest.raises(ServiceError) as stale:
+        service.poll("main", _poll(), recheck=lambda: True, capabilities=())
+    assert stale.value.status == 401
+    new_expiry = "2098-03-14T07:30:00.7Z"
+    service.update_user("alice", UserUpdate(expire_at=new_expiry))
+    assert accounts()[alice.user_id]["expires_unix"] == int(datetime.fromisoformat(new_expiry).timestamp()) + 1
+    service.node_seen("main", "old", capabilities=[])
+    assert "expires_unix" not in accounts()[alice.user_id]
+
+
 def test_setting_a_past_expiry_expires_at_once(service: ControlService) -> None:
     service.put_user("alice")
 

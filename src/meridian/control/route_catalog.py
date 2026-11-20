@@ -20,6 +20,7 @@ from meridian.control.api_models import (
     OpenApiDocument,
     SnapshotResponse,
 )
+from meridian.control.backup_routes import BACKUP_ROUTES
 from meridian.control.command_routes import node_command_routes
 from meridian.control.delivery_policy_routes import DELIVERY_POLICY_ROUTES
 from meridian.control.metrics_export import METRICS_CONTENT_TYPE, MetricsText
@@ -353,6 +354,7 @@ API_ROUTES: tuple[ApiRoute, ...] = (
     *PERSON_ROUTES,
     *PEOPLE_ROUTES,
     *ACCESS_PROFILE_ROUTES,
+    *BACKUP_ROUTES,
     *DELIVERY_POLICY_ROUTES,
     *RESPONSE_RULE_ROUTES,
     route(

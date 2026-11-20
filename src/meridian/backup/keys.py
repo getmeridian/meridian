@@ -84,6 +84,11 @@ def write_private(path: Path, text: str | bytes, *, exclusive: bool = False) -> 
         os.chmod(temporary, 0o600)
         if not exclusive:
             os.replace(temporary, path)
+            directory = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(directory)  # a receipt must survive a reboot after the rename
+            finally:
+                os.close(directory)
             return True
         try:
             os.link(temporary, path)  # never replaces: fails if the file appeared meanwhile

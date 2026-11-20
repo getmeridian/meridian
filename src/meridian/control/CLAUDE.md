@@ -12,6 +12,7 @@ Owner console assets: `ui/CLAUDE.md`. Formats: `formats/CLAUDE.md`.
 - Revisions record secret-free reviewed intent and hashes; the service stores apply-fence CAS state without making deployer lease decisions.
 - Profile declarations and compiled grants save with reviewed settings; memberships and private delivery overrides use the shared policy resolver.
 - People query cursors share SQL predicates and stable row versions. Bulk previews stay bounded in memory; receipts are durable and undo checks person versions, enforcement and node/grant identity.
+- Backup freshness counts transactions changing durable owner data, never telemetry or same-value retries. Only an active device’s verified off-server save confirms a snapshot at the committed topology generation. Exporting alone never confirms a save; confirmations do not survive restore.
 - Node documents compose from current accounts and specs, sign once per changed content, and use negotiated protocol capabilities and generation-bound flow-block receipts.
 - Cut-offs are atomic with account changes and release only after the revoking revision applies. VLESS streams require a core restart, with disclosed fleet reconnects.
 - Traffic grows once per accepted counter epoch/sequence. Node totals survive node deletion; person totals do not. Account schedules share one injected UTC clock and directional period baselines.

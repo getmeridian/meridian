@@ -70,13 +70,29 @@ with ControlClient(cluster.panel.url, cluster.panel.api_token) as client:
 PYEOF
 pass "client remove retired the service user and kept the others"
 
-meridian teardown "$EXIT_B_IP" --yes
+# The controller and exit containers share a kernel: a saved copy here is not off-server.
+TEARDOWN_LOG=/tmp/meridian-single-teardown.log
+if COLUMNS=160 meridian teardown "$EXIT_B_IP" --yes >"$TEARDOWN_LOG" 2>&1; then
+  echo "teardown accepted a recovery copy on the same host" >&2
+  exit 1
+fi
+cat "$TEARDOWN_LOG"
+grep -Fq 'no current off-server recovery copy' "$TEARDOWN_LOG"
+test -f "$MERIDIAN_HOME/cluster.yml"
+ssh root@"$EXIT_B_IP" systemctl is-active --quiet ctld
+pass "teardown refused the same-host copy and kept the controller running"
+
+meridian teardown "$EXIT_B_IP" --yes --discard-backup
 test ! -e "$MERIDIAN_HOME/cluster.yml"
 ssh root@"$EXIT_B_IP" '
-  test ! -e /opt/ctld && test ! -e /usr/local/bin/netagent && test ! -e /usr/local/lib/netagent
-  test ! -e /etc/systemd/system/ctld.service && test ! -e /etc/systemd/system/netagent.service
-  ! systemctl is-active --quiet ctld && ! systemctl is-active --quiet netagent && ! systemctl is-active --quiet netcore
-  ! ls /etc/nginx/stream.d/meridian-v4-*.conf >/dev/null 2>&1
+  set -eu
+  for path in /opt/ctld /usr/local/bin/netagent /usr/local/lib/netagent /var/lib/meridian/fence.json \
+    /etc/systemd/system/ctld.service /etc/systemd/system/netagent.service /etc/nginx/stream.d/meridian-v4-*.conf; do
+    if [ -e "$path" ] || [ -L "$path" ]; then echo "Teardown left $path" >&2; exit 1; fi
+  done
+  for unit in ctld netagent netcore; do
+    if systemctl is-active --quiet "$unit"; then echo "Teardown left $unit running" >&2; exit 1; fi
+  done
 '
 pass "teardown removed the deployment and local fleet state"
 

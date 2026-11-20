@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import shutil
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -102,8 +102,10 @@ class NewServer:
     def __init__(self) -> None:
         self.applied: list[str] = []
 
-    def apply(self, cluster: ClusterConfig, intent: SetupIntent) -> None:
+    def apply(self, cluster: ClusterConfig, intent: SetupIntent, before_retirement: Callable[[], None] | None) -> None:
         refuse_servers_claimed_elsewhere([NEW, HOP])
+        if before_retirement:
+            before_retirement()
         self.applied.append(config.CONTEXT)
 
 

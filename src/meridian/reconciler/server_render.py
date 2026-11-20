@@ -16,7 +16,7 @@ from meridian.compiler.models import (
 from meridian.config import RELAY_BINARY_PATH
 from meridian.core.errors import MeridianError
 from meridian.host_runtime import certificate_directory
-from meridian.provision.nginx_render import NGINX_LOCATION_DIR
+from meridian.provision.nginx_render import NGINX_LOCATION_DIR, private_listener_logs
 
 
 class ServerArtifactError(MeridianError):
@@ -191,6 +191,7 @@ def _render_stream(
         strip_server = (
             "server {\n"
             f"    listen 127.0.0.1:{payload.fallback_strip_port} proxy_protocol;\n"
+            f"{private_listener_logs()}\n"
             f"    proxy_pass {_endpoint(payload.fallback_server_name, 443)};\n"
             "    proxy_connect_timeout 5s;\n"
             "    proxy_timeout 30m;\n"
@@ -217,6 +218,7 @@ def _render_stream(
         "server {\n"
         f"    listen {payload.listener_port};\n"
         f"    listen [::]:{payload.listener_port};\n"
+        f"{private_listener_logs()}\n"
         "    ssl_preread on;\n"
         f"    proxy_pass ${variable};\n"
         + ("    proxy_protocol on;\n" if payload.forward_client_ip else "")
@@ -257,7 +259,7 @@ def _render_http(
         f"    server_name {payload.tls_hostname};\n"
         "    server_tokens off;\n"
         "    absolute_redirect off;\n"
-        "    access_log off;\n"
+        f"{private_listener_logs()}\n"
         f"    ssl_certificate {certificate_dir}/fullchain.pem;\n"
         f"    ssl_certificate_key {certificate_dir}/key.pem;\n"
         + "\n".join(locations)

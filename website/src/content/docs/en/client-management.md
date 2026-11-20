@@ -237,7 +237,9 @@ With `--json`, pass `--yes`. The new links appear only in that command's output.
 
 `meridian client remove NAME` removes the client permanently: their links stop working and their connection page stops responding. A fleet keeps at least one client.
 
-Disable, expiry, quota suspension, removal, and credential replacement block new TCP streams and UDP associations for the affected identity, including new streams on an already authenticated Hysteria2 QUIC or VLESS mux connection. Other people keep their sessions. The person view and `GET /api/users/{username}/flow-blocks` report each node: `blocked`, `pending_node`, or `agent_too_old`. Pending nodes can keep serving their previous configuration until they receive and apply the change; this includes control-service outages. Update an old agent with `meridian apply`. Events record the node and outcome without addresses or device data.
+Disable, expiry, quota suspension, removal, and credential replacement block new TCP streams and UDP associations for the affected identity, including new streams on an already authenticated Hysteria2 QUIC or VLESS mux connection. Other people keep their sessions. The person view and `GET /api/users/{username}/flow-blocks` report each node: `blocked`, `pending_node`, or `agent_too_old`. Other changes, such as a manual suspension, take effect on an exit when it receives them.
+
+An updated exit enforces the last expiry it received even if the control service is unreachable. It refuses new streams when that time arrives. Existing transfers and other people’s sessions continue. An offline exit learns about a renewal only after it reconnects. Fleet-wide quota totals can lag during an outage. Update an old agent with `meridian apply`. Events record the node and outcome without addresses or device data.
 
 A TCP flow dispatched before revocation, a Hysteria2 UDP association, or a VLESS XUDP association may continue until it ends. The pinned core has no per-user close operation. **`--cut-off`** on `client remove`, `client reissue`, or `client rotate-credentials` waits for the credential change to apply. The review lists each node: a core restart reconnects everyone using any Xray inbound or bridge on that node; an inbound reset reconnects users of the listed inbounds. If a reset fails, the fallback core restart reconnects every inbound and bridge on that node. VLESS nodes use a core restart; Hysteria2-only nodes reset the affected inbounds. JSON reports `done`, `core_restart`, `failed`, or `timed_out` under `data.cut_off`. The wait is up to five minutes; failures exit `4`, timeouts `3`. The web panel offers the same choice for removal, reissue, and rotation of service-owned people.
 
@@ -270,7 +272,7 @@ Xray JSON subscriptions (Happ and other Xray-based apps) send recognized BitTorr
 
 ## Where client data lives
 
-Client accounts (keys, status, limits, traffic) live in the control service's database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the control service's API, and the service serves connection pages directly from its database. After every change, your machine saves an encrypted snapshot of that database (see [Backups](/en/deploy/#backups)).
+Client accounts (keys, status, limits, traffic) live in the control service's database on your control server. The list of clients Meridian manages is part of your topology in `~/.config/meridian/cluster.yml`. Client commands use the control service's API, and the service serves connection pages directly from its database. Run `meridian backup pull` on a managing computer to save an encrypted copy including the latest panel edits (see [Backups](/en/deploy/#backups)).
 
 ## Web panel
 
@@ -399,6 +401,9 @@ Read **OpenAPI 3.1** from `GET /api/openapi.json`, or the generated `contracts/m
 
 | Operation | Purpose |
 |---|---|
+| `GET /api/backup/status` | Read the current change count and last confirmed managing-device save. |
+| `POST /api/backup/download` | Prepare an encrypted copy for existing keys. The owner panel asks for recent identity confirmation. |
+| `POST /api/backup/receipts` | Confirm a verified local save; requires a registered device and the proof from its snapshot. |
 | `GET /api/users/{username}/flow-blocks` | Per-node evidence for blocking new flows; no connection addresses or device data |
 | `GET /api/users` | Every person |
 | `GET /api/traffic` | Traffic totals per person |

@@ -239,7 +239,9 @@ meridian client reissue alice
 
 `meridian client remove NAME` 永久删除客户端：他们的链接停止工作，他们的连接页面不再可用。集群至少保持一个客户端。
 
-禁用、到期、达到流量上限、删除用户及更换连接凭据，会阻止已撤销身份的新 TCP 数据流和 UDP 会话，包括已认证的 Hysteria2 QUIC 连接或 VLESS mux 连接上的新数据流。其他用户的会话保持连接。用户详情页和 `GET /api/users/{username}/flow-blocks` 按节点返回 `blocked`、`pending_node` 或 `agent_too_old`。尚未确认的节点在收到并应用变更前可能继续使用旧配置；控制服务不可用时也如此。使用 `meridian apply` 更新旧节点 agent。事件只记录节点和结果，不记录连接地址或设备数据。
+禁用、到期、达到流量上限、删除用户及更换连接凭据，会阻止已撤销身份的新 TCP 数据流和 UDP 会话，包括已认证的 Hysteria2 QUIC 连接或 VLESS mux 连接上的新数据流。其他用户的会话保持连接。用户详情页和 `GET /api/users/{username}/flow-blocks` 按节点返回 `blocked`、`pending_node` 或 `agent_too_old`。手动停用等其他变更在出口收到后生效。
+
+更新后的出口节点即使无法连接控制服务，也会在上次收到的到期时间拒绝新连接。已经开始的传输和其他人的连接不受影响。离线期间续期，要等出口重新连上控制服务后才会生效。断网期间，集群总流量可能无法及时汇总。使用 `meridian apply` 更新旧节点 agent。事件只记录节点和结果，不记录连接地址或设备数据。
 
 撤销前开始的 TCP 流、Hysteria2 UDP 会话或 VLESS XUDP 会话，可能继续直到结束。固定版本的核心没有关闭单个用户会话的接口。`client remove`、`client reissue` 和 `client rotate-credentials` 的 **`--cut-off`** 会等待凭据变更应用。确认时会逐个节点说明范围：核心重启会让使用该节点任意 Xray 入站或桥接连接的所有用户重连；入站重置只影响列出的入站。如果重置失败，回退的核心重启会影响该节点所有入站与桥接连接。VLESS 节点使用核心重启；仅使用 Hysteria2 的节点重置相关入站。JSON 在 `data.cut_off` 下返回 `done`、`core_restart`、`failed` 或 `timed_out`。最多等待五分钟；失败退出码为 `4`，超时为 `3`。网页面板为在面板中添加的用户提供相同的删除、重新签发与凭据轮换选择。
 
@@ -272,7 +274,7 @@ Xray JSON 订阅（Happ 及其他基于 Xray 的应用）会把识别出的 BitT
 
 ## 客户端数据存放在哪里
 
-客户端账户（密钥、状态、限额、流量）保存在控制服务器上控制服务的数据库中。Meridian 管理的客户端列表保存在本地 `~/.config/meridian/cluster.yml` 的拓扑配置中。客户端命令调用控制服务的 API，控制服务直接根据数据库提供连接页面。每次变更后，你的机器都会保存一份该数据库的加密快照（见[备份](/zh/deploy/#备份)）。
+客户端账户（密钥、状态、限额、流量）保存在控制服务器上控制服务的数据库中。Meridian 管理的客户端列表保存在本地 `~/.config/meridian/cluster.yml` 的拓扑配置中。客户端命令调用控制服务的 API，控制服务直接根据数据库提供连接页面。要保存包含最新面板更改的加密副本，请在管理电脑上运行 `meridian backup pull`（见[备份](/zh/deploy/#备份)）。
 
 ## 网页面板
 
@@ -400,6 +402,9 @@ scrape_configs:
 
 | 操作 | 用途 |
 |---|---|
+| `GET /api/backup/status` | 读取当前更改计数以及管理设备上次确认保存的记录。 |
+| `POST /api/backup/download` | 为已注册的密钥生成加密副本。面板要求所有者近期确认过身份。 |
+| `POST /api/backup/receipts` | 确认管理设备已验证并保存快照；需要注册的设备和快照内的凭证。 |
 | `GET /api/users/{username}/flow-blocks` | 按节点返回阻止新数据流的结果；不含连接地址或设备数据 |
 | `GET /api/users` | 所有用户 |
 | `GET /api/traffic` | 每个用户的流量总计 |

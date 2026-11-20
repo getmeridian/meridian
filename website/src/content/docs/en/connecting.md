@@ -40,7 +40,7 @@ Your personal link contains `/sub/` and is also your subscription URL. Open it i
 
 ## Turn on VPN (TUN) mode
 
-Most apps run either as a proxy or as a VPN. As a proxy only, some apps bypass the connection, and websites in your browser can sometimes see your real IP address (a WebRTC leak). Turn on the app's **VPN** or **TUN** mode so all traffic goes through the connection. To confirm, open any leak-check site: the address it shows should differ from your usual one.
+In proxy mode, some apps can bypass the VPN. Turn on **VPN** or **TUN** mode to let your VPN app handle device traffic. The routing rules still decide which destinations connect directly. The connection page describes the profile when you choose an app. Individual server links carry no routing rules.
 
 ## The entries in your app
 

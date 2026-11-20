@@ -23,6 +23,8 @@ If you deployed with a **domain** (`--domain`) and the record is proxied through
 
 If you have a **relay**, clients connecting through it are unaffected as long as the relay itself can still reach the exit.
 
+If a friend cannot open their invitation page but you can open the panel, choose their account in **People** and copy an individual connection that uses the relay, or show its QR code. Send it privately to that person. It works in a compatible app without fetching the invitation page. This individual entry does not refresh; return to the subscription once the page is reachable.
+
 ## Recovery options
 
 ### Add a replacement exit
@@ -83,7 +85,9 @@ If the control server is gone (deleted, seized, or blocked for good), rebuild it
 meridian restore --to 198.51.100.30
 ```
 
-Every machine that manages the fleet saves an encrypted snapshot of the control service after each change, so the newest one is already on your machine. Restore reviews what it will do, installs the control service on the new server from that snapshot, and applies the fleet: every exit's agent enrolls with the new server, and clients keep their accounts, limits, and traffic.
+CLI changes save an encrypted snapshot on the computer that ran the command. Changes made in the panel can be newer than that copy. On Overview, check when a managing device last confirmed a save and how many changes came afterwards. To keep the current state, run `meridian backup pull` on a separate computer or download the encrypted copy from the panel. Save the file away from the VPS and keep the recovery key separately. Starting a browser download does not update the confirmed save.
+
+Restore reviews what it will do, installs the control service on the new server from that snapshot, and applies the fleet: every exit's agent enrolls with the new server, and clients keep their accounts, limits, and traffic.
 
 Restore uses the fleet files on this machine when they are at least as new as the copy inside the snapshot, and the snapshot's copy otherwise.
 
@@ -95,7 +99,7 @@ Before it touches the new server, restore refuses two kinds of snapshot, even wi
 On a machine that didn't have this fleet's files, Meridian keeps the ones it read from the snapshot even if you stop at the review, so the next run starts from the same point.
 
 - **Links**: on a bare IP, every subscription URL contains the control server's address, so each link changes; restore prints everyone's new link to send, including people you added in the web panel. With a domain, links stay the same once you point its DNS record at the new server; the review names the records.
-- **Old server**: restore refuses while the old control server still answers, because two control services would split the fleet. If it answers but you no longer trust it (seized, for example), pass `--force`.
+- **Old server**: restore refuses while the old control server still answers, because two control services would split the fleet. If it answers but you no longer trust it (seized, for example), pass `--force`. If a reachable old server cannot safely retire its web configuration, fix the reported problem and run the same restore command again. The replacement keeps the data already restored.
 - **Keys**: the new server gets a new fleet authority and new signing keys, so a seized server can't sign anything your nodes accept. The restored web panel has no owner yet, so restore ends with a one-time setup link for choosing a new password (if it expires unused, `meridian panel` prints another). It then lists other computers' backup keys and offers to revoke any you no longer hold, such as a lost laptop's.
 - **Another machine**: on a machine without the fleet, copy the snapshot file over and run `meridian restore --to NEW_IP --snapshot FILE`; without this machine's own backup key, it asks for the recovery key. The snapshot carries the fleet's own files; that machine still needs SSH access to the new server and to your exits.
 
@@ -110,6 +114,12 @@ You can't accidentally undo another machine's work. The control service keeps a 
 - **"Another machine changed this fleet"**: your copy is out of date. Copy `~/.config/meridian/` from the machine that applied last, then run the command again.
 - **"Another apply is running"**: someone is changing the fleet right now. Wait for them to finish. If that run crashed, its claim expires within 30 minutes; a crashed run on your own machine doesn't block you at all.
 - **"This control server belongs to a different copy of the fleet"**: this `~/.config/meridian/` was never copied from the machine that manages the fleet.
+
+### If a managing computer is lost
+
+From a trusted computer, run `meridian backup devices` and revoke the missing computer with `meridian backup revoke ID`. This protects future copies only. It does not erase existing snapshots or revoke SSH or API access.
+
+If you copied the whole configuration directory to that computer, assume it had the fleet admin credential and any SSH key stored there. First verify a separate administrator key on each server and remove the lost SSH key from every account that accepted it. Revoke scoped API tokens kept on the computer. The shared fleet admin credential cannot be revoked as a device token: restoring a trusted snapshot to a replacement control server issues a new one. Follow the restore procedure above, then update the other managing computers from a trusted copy. If the offline recovery key was on the lost computer too, replace it with `meridian backup recovery-key` and save a fresh encrypted copy.
 
 ## Prepare before a block
 

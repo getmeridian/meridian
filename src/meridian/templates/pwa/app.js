@@ -15,6 +15,14 @@ window.meridianPwaAssetPath = ASSET_PATH;
  * ----------------------------------------------------------------------- */
 var T = {
   en: {
+    'route.full': 'Internet connections use the VPN; your local network stays direct.',
+    'route.split': 'Matched Russian destinations and your local network connect directly. Other internet traffic uses the VPN.',
+    'route.peers': 'Matched Russian destinations, local addresses and recognized BitTorrent peers connect directly. Other internet traffic uses the VPN.',
+    'route.suffix': 'Local addresses and names ending in .ru, .su or .рф connect directly. Other internet traffic uses the VPN.',
+    'route.custom': 'The owner set routing rules for this profile. Check them in your app after importing.',
+    'route.raw': 'These links contain no routing rules. Set routing in your app.',
+    'route.unknown': 'Which traffic uses the VPN depends on the profile your app imports. Check its routing settings.',
+    'transfer.private': 'Use this link only on your own devices. Anyone with it can use your VPN.',
     'conns.show': 'Show all {n}',
     'conns.less': 'Show fewer',
     'install.other': 'Other install options',
@@ -60,6 +68,14 @@ var T = {
     language: 'Language', close: 'Close', copy: 'Copy', 'qr.code': 'QR code',
   },
   ru: {
+    'route.full': 'Интернет-трафик идёт через VPN, а локальная сеть доступна напрямую.',
+    'route.split': 'Российские ресурсы, подходящие под правила, и локальная сеть доступны напрямую. Остальной трафик идёт через VPN.',
+    'route.peers': 'Российские ресурсы, подходящие под правила, локальная сеть и распознанные пиры BitTorrent доступны напрямую. Остальной трафик идёт через VPN.',
+    'route.suffix': 'Локальные адреса и домены .ru, .su и .рф доступны напрямую. Остальной трафик идёт через VPN.',
+    'route.custom': 'Владелец задал для этого профиля свои правила. После импорта их можно посмотреть в приложении.',
+    'route.raw': 'В этих ссылках нет правил маршрутизации. Настройте их в приложении.',
+    'route.unknown': 'Какая часть трафика пойдёт через VPN, зависит от полученного профиля. Проверьте настройки маршрутизации в приложении.',
+    'transfer.private': 'Ссылка только для ваших устройств. У кого она есть, тот может пользоваться вашим VPN.',
     'conns.show': 'Показать все ({n})',
     'conns.less': 'Свернуть',
     'install.other': 'Другие варианты установки',
@@ -120,14 +136,13 @@ var T = {
     'ping.red': 'Красный или «n/a» пинг в приложении не значит, что подключение сломано. Приложение проверяет связь своим способом, и эта проверка может не пройти, хотя VPN работает. Просто подключитесь и откройте любой сайт.',
     'sub.refresh': 'Приложение также само регулярно обновляет подписку. Чтобы обновить её прямо сейчас, потяните список вниз или откройте в приложении список подписок (или профилей) и нажмите «Обновить».',
     'sub.launch': 'Если в приложении есть настройка вроде «обновлять подписку при запуске» или «автообновление», включите её.',
-    'tip.webrtc': 'Если приложение работает только в режиме прокси, сайты в браузере иногда могут увидеть ваш настоящий IP-адрес (утечка WebRTC). Чтобы защититься от этого, включите в приложении режим VPN (TUN) — тогда весь трафик пойдёт через защищённое соединение. Проверить это можно на любом сайте проверки IP: адрес должен отличаться от вашего обычного.',
+    'tip.webrtc': 'Включите режим VPN (TUN), чтобы приложение управляло трафиком устройства. Какие адреса доступны напрямую, по-прежнему зависит от правил маршрутизации.',
     router: 'Роутер',
     'router.desc': 'Как подключить сразу всю домашнюю сеть',
     selfcheck: 'Проверить соединение',
     'selfcheck.desc': 'Три быстрые проверки с вашего устройства: точность часов, передача данных и доступность подписки. Перед запуском выключите VPN, чтобы проверить саму сеть.',
     'selfcheck.run': 'Запустить проверку',
     'show.qr': 'Показать QR-код',
-    'share.page': 'Поделиться страницей',
     copied: 'Скопировано',
     'page_title': 'Настройка подключения',
     'error.title': 'Настройка подключения',
@@ -140,11 +155,10 @@ var T = {
     'step.install': 'Установите приложение',
     'app.get': 'Скачать',
     'step.add': 'Добавьте подключение',
-    'step.add.desc': 'По этой подписке приложение загрузит список серверов.',
     'qr.title': 'Подключаете телефон?',
     'qr.desc': 'Нажмите «Показать QR-код» и отсканируйте его в VPN-приложении на телефоне.',
     conns: 'Отдельные подключения',
-    'conns.desc': 'Они уже входят в подписку выше. Используйте их по отдельности, только если подписка не подошла.',
+    'conns.desc': 'Отдельные ссылки не содержат правил маршрутизации. Какой трафик пойдёт через VPN, решает приложение.',
     'proto.reality': 'Основной — самый быстрый',
     'proto.xhttp': 'Сложнее заблокировать',
     'proto.hysteria2': 'UDP — для медленной или нестабильной сети',
@@ -152,6 +166,14 @@ var T = {
     'open.short': 'Открыть',
   },
   fa: {
+    'route.full': 'ترافیک اینترنت از VPN می‌گذرد؛ اتصال به شبکهٔ محلی مستقیم است.',
+    'route.split': 'مقصدهای روسیِ منطبق با قوانین و شبکهٔ محلی مستقیم وصل می‌شوند. بقیهٔ ترافیک اینترنت از VPN می‌گذرد.',
+    'route.peers': 'مقصدهای روسیِ منطبق، نشانی‌های محلی و همتایان شناسایی‌شدهٔ BitTorrent مستقیم وصل می‌شوند. بقیهٔ ترافیک اینترنت از VPN می‌گذرد.',
+    'route.suffix': 'نشانی‌های محلی و دامنه‌های ‎.ru، ‎.su و ‎.рф مستقیم وصل می‌شوند. بقیهٔ ترافیک اینترنت از VPN می‌گذرد.',
+    'route.custom': 'صاحب سرور برای این پروفایل قوانین مسیریابی تعیین کرده است. پس از وارد کردن، آن‌ها را در برنامه بررسی کنید.',
+    'route.raw': 'این پیوندها قانون مسیریابی ندارند. مسیریابی را در برنامه تنظیم کنید.',
+    'route.unknown': 'اینکه چه ترافیکی از VPN می‌گذرد به پروفایلی بستگی دارد که برنامه دریافت می‌کند. تنظیمات مسیریابی برنامه را بررسی کنید.',
+    'transfer.private': 'این پیوند را فقط در دستگاه‌های خودتان استفاده کنید. هرکس آن را داشته باشد می‌تواند از VPN شما استفاده کند.',
     'conns.show': 'نمایش همهٔ {n} اتصال',
     'conns.less': 'نمایش کمتر',
     'install.other': 'روش‌های دیگر نصب',
@@ -212,14 +234,13 @@ var T = {
     'ping.red': 'پینگ قرمز یا «n/a» در برنامه به معنی خراب بودن اتصال نیست. برنامه با آزمون مخصوص خودش می‌سنجد و ممکن است آن آزمون شکست بخورد، در حالی که اتصال کار می‌کند. فقط وصل شوید و یک وب‌سایت را باز کنید.',
     'sub.refresh': 'برنامه اشتراک را خودش هم به‌طور منظم به‌روز می‌کند. برای به‌روزرسانی فوری، فهرست را به پایین بکشید یا فهرست اشتراک‌ها (یا پروفایل‌ها) را در برنامه باز کنید و «به‌روزرسانی» را بزنید.',
     'sub.launch': 'اگر برنامه گزینه‌ای مثل «به‌روزرسانی اشتراک هنگام اجرا» یا «به‌روزرسانی خودکار» دارد، آن را روشن کنید.',
-    'tip.webrtc': 'اگر برنامه فقط در حالت پراکسی کار کند، گاهی وب‌سایت‌ها در مرورگر می‌توانند نشانی IP واقعی شما را ببینند (نشت WebRTC). برای جلوگیری از این، حالت VPN (یا TUN) را در برنامه روشن کنید تا همهٔ ترافیک از مسیر اتصال عبور کند. می‌توانید با هر سرویس بررسی نشت، تأیید کنید که نشانی نمایش‌داده‌شده با نشانی همیشگی شما فرق دارد.',
+    'tip.webrtc': 'حالت VPN (TUN) را روشن کنید تا برنامه ترافیک دستگاه را مسیریابی کند. قوانین مسیریابی همچنان تعیین می‌کنند چه مقصدهایی مستقیم وصل شوند.',
     router: 'روتر',
     'router.desc': 'کل شبکهٔ خانگی را متصل کنید: راهنمای راه‌اندازی',
     selfcheck: 'بررسی اتصال من',
     'selfcheck.desc': 'سه آزمون سریع از همین دستگاه و همین شبکه: ساعت، جریان داده و اشتراک. ابتدا VPN را خاموش کنید تا آزمون شبکهٔ واقعی شما را ببیند.',
     'selfcheck.run': 'شروع بررسی',
     'show.qr': 'نمایش کد QR',
-    'share.page': 'اشتراک\u200Cگذاری این صفحه',
     copied: '\u06A9\u067E\u06CC \u0634\u062F',
     'page_title': 'تنظیم اتصال',
     'error.title': 'تنظیم اتصال',
@@ -232,11 +253,10 @@ var T = {
     'step.install': 'یک برنامه نصب کنید',
     'app.get': 'دریافت',
     'step.add': 'اتصال خود را اضافه کنید',
-    'step.add.desc': 'برنامه فهرست سرورها را از این اشتراک می‌گیرد.',
     'qr.title': 'گوشی را تنظیم می‌کنید؟',
     'qr.desc': 'اسکنر کد QR را در برنامهٔ VPN گوشی باز کنید. سپس کد را اینجا نمایش دهید و آن را اسکن کنید.',
     conns: 'همهٔ اتصال‌ها',
-    'conns.desc': 'این‌ها از قبل در برنامهٔ شما هستند. فقط در صورت نیاز از یکی از آن‌ها جداگانه استفاده کنید.',
+    'conns.desc': 'پیوندهای جداگانه قانون مسیریابی ندارند. برنامه تعیین می‌کند چه ترافیکی از VPN بگذرد.',
     'proto.reality': 'سریع‌ترین — اول این را امتحان کنید',
     'proto.xhttp': 'تشخیصش سخت‌تر است',
     'proto.hysteria2': 'UDP — برای شبکه‌های کند یا ناپایدار',
@@ -244,6 +264,14 @@ var T = {
     'open.short': 'باز کردن',
   },
   zh: {
+    'route.full': '互联网流量通过 VPN，本地网络直连。',
+    'route.split': '匹配规则的俄罗斯目的地和本地网络直连，其他互联网流量通过 VPN。',
+    'route.peers': '匹配规则的俄罗斯目的地、本地地址和已识别的 BitTorrent 对等连接直连，其他互联网流量通过 VPN。',
+    'route.suffix': '本地地址及以 .ru、.su 或 .рф 结尾的域名直连，其他互联网流量通过 VPN。',
+    'route.custom': '服务器所有者为此配置设置了路由规则。导入后可在应用中查看。',
+    'route.raw': '这些链接不包含路由规则。请在应用中设置路由。',
+    'route.unknown': '哪些流量通过 VPN 取决于应用导入的配置。请查看应用中的路由设置。',
+    'transfer.private': '仅在自己的设备上使用此链接。拿到它的人都可以使用你的 VPN。',
     'conns.show': '显示全部 {n} 个连接',
     'conns.less': '收起部分连接',
     'install.other': '其他安装方式',
@@ -304,14 +332,13 @@ var T = {
     'ping.red': '应用里的延迟显示红色或“n/a”，并不代表连接坏了。应用用自己的方式测试，这种测试可能失败，而连接其实可用。直接连接，然后打开一个网站试试。',
     'sub.refresh': '应用也会定期自动刷新订阅。如需立即刷新，请下拉列表，或在应用中打开订阅（或配置）列表并点击“更新”。',
     'sub.launch': '如果应用有“启动时更新订阅”或“自动更新”之类的设置，请开启。',
-    'tip.webrtc': '如果应用只以代理模式运行，浏览器中的网站有时可能获知您的真实 IP 地址（WebRTC 泄漏）。要避免这种情况，请在应用中开启 VPN（TUN）模式，让所有流量都经过连接。您可以用任意泄漏检测服务确认：显示的地址应与您平时的地址不同。',
+    'tip.webrtc': '开启 VPN（TUN）模式，让应用接管设备流量。哪些目的地直连仍由路由规则决定。',
     router: '路由器',
     'router.desc': '让整个家庭网络都能连接：设置指南',
     selfcheck: '检查我的连接',
     'selfcheck.desc': '从此设备和网络进行三项快速检查：时钟、数据传输和订阅。请先关闭 VPN，让检查看到您真实的网络环境。',
     'selfcheck.run': '开始检查',
     'show.qr': '显示二维码',
-    'share.page': '分享此页面',
     copied: '已复制',
     'page_title': '连接设置',
     'error.title': '连接设置',
@@ -324,11 +351,10 @@ var T = {
     'step.install': '安装应用',
     'app.get': '获取',
     'step.add': '添加您的连接',
-    'step.add.desc': '应用会通过这个订阅获取服务器列表。',
     'qr.title': '要设置手机吗？',
     'qr.desc': '打开手机 VPN 应用的扫码功能，然后在这里显示二维码，用手机扫描。',
     conns: '所有连接',
-    'conns.desc': '它们已经在您的应用里了。只有需要时才单独使用某一个。',
+    'conns.desc': '单个连接链接不包含路由规则。哪些流量通过 VPN 由应用决定。',
     'proto.reality': '最快 — 请先试这个',
     'proto.xhttp': '更难被发现',
     'proto.hysteria2': 'UDP — 适合缓慢或丢包的网络',
@@ -533,14 +559,6 @@ function buildDeepLink(template, subUrl, name) {
   });
 }
 
-function sharePageUrl() {
-  if (navigator.share) {
-    navigator.share({ title: '', url: location.href }).catch(function() {});
-  } else {
-    copyToClipboard(location.href);
-  }
-}
-
 /* -----------------------------------------------------------------------
  * Clock skew detection
  * ----------------------------------------------------------------------- */
@@ -675,7 +693,6 @@ var ICON_PLUS = svg('<path d="M12 5v14M5 12h14"/>', 16);
 var ICON_LIST = svg('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>', 18);
 var ICON_HELP = svg('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>', 18);
 var ICON_ROUTER = svg('<rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 17.5h.01M10 17.5h.01M15 14V9M8.5 8.5a6 6 0 0 1 13 0M11.5 10.5a3 3 0 0 1 7 0"/>', 18);
-var ICON_SHARE = svg('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/>', 15);
 var ICON_CHEVRON = svg('<path d="m9 18 6-6-6-6"/>', 16);
 
 /* -----------------------------------------------------------------------
@@ -702,7 +719,7 @@ function renderPage(config) {
 
   html += '<div class="account-overview" id="account-overview" hidden><a class="account-jump" href="#account-panel">' +
     '<span id="account-jump-label"></span>' + ICON_CHEVRON + '</a><span id="account-signal" role="status"></span>' +
-    '<p id="account-warning" hidden></p></div>';
+    '<p id="account-warning" hidden></p><div id="unavailable-contact" hidden></div></div>';
   html += '<section class="notice owner-notice" id="owner-notice" aria-live="polite" hidden></section>';
 
   /* iOS "Open" falls back to the first recommended iOS app */
@@ -710,7 +727,7 @@ function renderPage(config) {
   iosFallbackUrl = iosApps.length ? appUrl(iosApps[0], 'iOS') : '';
 
   var subUrl = config.subscription_url || '';
-  html += renderSetup(config.apps, platform, subUrl, config.server_name || 'Meridian', config.subscription_qr_b64);
+  html += renderSetup(config.apps, platform, subUrl, config.server_name || 'Meridian', config.subscription_qr_b64, config.routing);
 
   html += '<section class="card account" id="account-panel" tabindex="-1" aria-labelledby="account-heading" hidden></section>';
   html += '<div class="panels">';
@@ -730,13 +747,6 @@ function renderPage(config) {
   html += '<button class="btn btn-primary btn-sm" data-action="install" data-t="install.btn">Add shortcut</button>';
   html += '<button class="install-dismiss" data-action="dismiss" data-t-aria="close" aria-label="Close">&times;</button>';
   html += '</div>';
-
-  if (navigator.share) {
-    html += '<div class="foot">';
-    html += '<button class="btn btn-ghost btn-sm" data-action="share-page">' + ICON_SHARE;
-    html += '<span data-t="share.page">Share this page</span></button>';
-    html += '</div>';
-  }
 
   app.innerHTML = html;
 
@@ -925,12 +935,16 @@ function renderPickers(apps, platform, chosen) {
   return html + '</select></label></div>';
 }
 
+function privateTransfer() {
+  return '<p class="muted" data-t="transfer.private">' + escapeHtml(text('transfer.private')) + '</p>';
+}
+
 function renderManualImport(app, subUrl, direct) {
   var menu = app && app.manual && app.manual[currentLang];
   var body = '<p class="muted">' + escapeHtml(text('manual.desc').replace('{name}', app ? app.name : text('app.choice'))) + '</p>';
   body += '<p class="manual-path">' + escapeHtml(menu || text('manual.generic')) + '</p>';
   body += '<textarea class="manual-url" data-ui-key="manual-url" data-action="select-text" data-t-aria="sub.label" aria-label="Subscription URL" dir="ltr" readonly rows="2">' + escapeHtml(subUrl) + '</textarea>';
-  body += renderSubUrl(subUrl, true);
+  body += renderSubUrl(subUrl, true) + privateTransfer();
   var label = '<span data-t="manual.import">Import manually</span>';
   return direct ? '<div class="manual-import manual-direct"><strong>' + label + '</strong>' + body + '</div>' :
     renderDisclosure(label, body, 'manual-import', 'manual-import');
@@ -946,7 +960,17 @@ function renderConnectSteps(app, mobile) {
   return html + '</ol></div></div>';
 }
 
-function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
+function routingText(policy, app) {
+  var format = app && app.format;
+  if (policy === 'app-dependent' || !format) return text('route.unknown');
+  if (format === 'base64') return text('route.raw');
+  if (['xray-json', 'mihomo', 'stash', 'singbox'].indexOf(format) < 0) return text('route.unknown');
+  if (policy === 'full' || policy === 'custom') return text('route.' + policy);
+  if (policy === 'ru-split') return text(format === 'xray-json' ? 'route.peers' : format === 'singbox' ? 'route.suffix' : 'route.split');
+  return text('route.unknown');
+}
+
+function renderSetup(apps, platform, subUrl, serverName, subQrB64, routing) {
   var key = PLATFORM_KEYS[platform] || 'Linux';
   var mobile = platform === 'ios' || platform === 'android';
   var chosen = chooseApp(apps, key);
@@ -965,11 +989,11 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
   if (subUrl) {
     html += '<div class="step"><span class="step-num">2</span><div class="step-body">';
     html += '<h2 data-t="step.add">Add your connection</h2>';
-    html += '<p class="muted" data-t="step.add.desc">Your app uses this subscription to load the server list.</p>';
+    html += '<p class="muted" id="import-routing">' + escapeHtml(routingText(routing, chosen)) + '</p>';
     html += '<p class="muted import-status" id="import-status" role="status" hidden></p>';
     var button = chosen && chosen.deeplink ? renderImportButton(chosen, subUrl, serverName, true) : '';
     html += '<div class="import-actions">' + button + renderManualImport(chosen, subUrl, !button) + '</div>';
-    if (hasQr && mobile) html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-inline'), 'subscription-qr');
+    if (hasQr && mobile) html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-inline') + privateTransfer(), 'subscription-qr');
     html += '</div></div>';
     html += renderConnectSteps(chosen, mobile);
   }
@@ -978,7 +1002,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
     html += '<aside class="setup-qr"><span class="transfer-mark" aria-hidden="true">' + ICON_QR + '</span>';
     html += '<strong data-t="qr.title">Setting up a phone?</strong>';
     html += '<span data-t="qr.desc">Open the QR scanner in your phone’s VPN app, then show the code here and scan it.</span>';
-    html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-aside'), 'desktop-qr') + '</aside>';
+    html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-aside') + privateTransfer(), 'desktop-qr') + '</aside>';
   }
   return html + '</section>';
 }
@@ -994,7 +1018,7 @@ function updateSetup(config) {
   var focusKey = active && old.contains(active) && active.getAttribute('data-ui-key');
   var selection = focusKey && typeof active.selectionStart === 'number' ? [active.selectionStart, active.selectionEnd] : null;
   var holder = document.createElement('div');
-  holder.innerHTML = renderSetup(config.apps, selectedPlatform, config.subscription_url || '', config.server_name || 'Meridian', config.subscription_qr_b64);
+  holder.innerHTML = renderSetup(config.apps, selectedPlatform, config.subscription_url || '', config.server_name || 'Meridian', config.subscription_qr_b64, config.routing);
   var fresh = holder.firstElementChild;
   old.parentNode.replaceChild(fresh, old);
   fresh.querySelectorAll('[data-disclosure]').forEach(function(el) { el.open = !!open[el.dataset.disclosure]; });
@@ -1056,7 +1080,7 @@ function renderConnections(config, platform, open) {
   var html = '<details id="connections-panel" class="panel"' + (open ? ' open' : '') + '><summary>';
   html += '<span class="panel-icon">' + ICON_LIST + '</span>';
   html += '<span class="panel-text"><strong data-t="conns">All connections</strong>';
-  html += '<span data-t="conns.desc">Already in your app. Use one directly only if you need to.</span></span>';
+  html += '<span data-t="conns.desc">Individual links contain no routing rules. Your app chooses which traffic uses the VPN.</span></span>';
   html += '<span class="count">' + formatCount(count) + '</span><span class="panel-chevron">' + ICON_CHEVRON + '</span>';
   html += '</summary><div class="panel-body conn-list">' + rows + '</div></details>';
   return html;
@@ -1095,7 +1119,7 @@ function renderTrouble() {
   html += '<li data-t="ping.desc">Check automatic time sync on your device, then try another connection option above.</li>';
   html += '<li data-t="sub.refresh">Your app also refreshes the subscription regularly on its own. To refresh it now, pull the list down, or open the subscription (or profile) list in the app and tap Update.</li>';
   html += '<li data-t="sub.launch">If your app has a setting like “update subscription on launch” or “auto-update”, turn it on.</li>';
-  html += '<li data-t="tip.webrtc">Websites in your browser can sometimes see your real IP address (a WebRTC leak) when your app runs as a proxy only. To avoid it, turn on the app\'s VPN (TUN) mode so all traffic goes through the connection. You can confirm with any leak-check service: the address it shows should differ from your usual one.</li>';
+  html += '<li data-t="tip.webrtc">Turn on VPN (TUN) mode to let the app route device traffic. Its routing rules still decide which destinations connect directly.</li>';
   html += '<li><strong data-t="apps.update">Keep your app updated</strong> ';
   html += '<span data-t="apps.update.desc">New versions fix connection problems and keep up with new blocking. Turn on automatic updates in your app store, or check the download page now and then.</span></li>';
   html += '<li data-t="ping.link">Ask the server owner to run meridian test.</li>';
@@ -1273,8 +1297,6 @@ document.addEventListener('click', function(e) {
     dismissCopyFallback();
   } else if (action === 'toggle-qr') {
     toggleQr(target);
-  } else if (action === 'share-page') {
-    sharePageUrl();
   } else if (action === 'open-ios') {
     e.preventDefault();
     var iosIdx = target.getAttribute('data-ios-idx');

@@ -31,6 +31,7 @@ pub const CAPABILITIES: &[&str] = &[
     "xray_users",
     "hysteria2_users",
     "user_flow_blocking",
+    "offline_user_expiry",
     "binary_pins",
     "traffic_stats",
     "capacity_telemetry",

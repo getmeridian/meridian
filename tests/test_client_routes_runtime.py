@@ -133,10 +133,14 @@ def _running_xray(
         ("SOCKS", b"ordinary non-BitTorrent TCP payload", 1),
         ("HTTP", b"ordinary non-BitTorrent TCP payload", 1),
     ],
-    ids=["socks-bittorrent-direct", "http-bittorrent-direct", "socks-other-vpn", "http-other-vpn"],
+    ids=["socks-bittorrent", "http-bittorrent", "socks-other-vpn", "http-other-vpn"],
 )
-def test_tcp_handshake_uses_direct_while_other_traffic_uses_vpn(xray_binary, tmp_path, inbound, payload, expected):
-    with _running_xray(xray_binary, tmp_path, socket.SOCK_STREAM) as (ports, peers, _):
+@pytest.mark.parametrize("preset", ["ru-split", "full"])
+def test_public_peer_and_ordinary_tcp_follow_preset(xray_binary, tmp_path, inbound, payload, expected, preset):
+    policy = resolve_delivery_policy(DeliveryPolicySettings(client_routing=preset))
+    if preset == "full":
+        expected = 1
+    with _running_xray(xray_binary, tmp_path, socket.SOCK_STREAM, policy=policy) as (ports, peers, _):
         with socket.create_connection(("127.0.0.1", ports[inbound]), timeout=3) as client:
             # A domain avoids the private-IP bypass. The final rule matches
             # before IPIfNonMatch DNS lookup; freedom redirects to loopback.
@@ -203,7 +207,7 @@ def test_foreign_domains_never_reach_the_plain_dns_servers(xray_binary, tmp_path
         ("video.example.org", b"ordinary payload", 0),
         ("peer.example.org", b"ordinary payload", 1),
         ("127.0.0.1", b"ordinary payload", 0),
-        ("peer.example.org", _HANDSHAKE, 0),
+        ("peer.example.org", _HANDSHAKE, 1),
     ],
     ids=["blocked-name", "direct-name", "tunnel-fallthrough", "lan-ip", "bittorrent"],
 )

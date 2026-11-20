@@ -21,7 +21,7 @@ from meridian.compiler.models import (
     make_resource,
 )
 from meridian.provision.steps import StepResult
-from meridian.reconciler import render_contract
+from meridian.reconciler import nginx_challenge, render_contract
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceReconcileError,
@@ -374,6 +374,65 @@ def test_certificate_rejects_unavailable_openssl_evidence(returncode: int) -> No
 
     with pytest.raises(ResourceReconcileError, match="certificate validation evidence is unavailable"):
         driver.observe(action, None)
+
+
+@pytest.mark.parametrize("first_reload_exit", [0, 1, 255])
+def test_current_certificate_adopts_private_listener_only_after_reload(first_reload_exit: int) -> None:
+    driver, action, conn = _certificate_case()
+    path = nginx_challenge.ACME_CHALLENGE_PATH
+    files = {path: nginx_challenge.LEGACY_CHALLENGE}
+    conn.get_text.side_effect = lambda p, **_: _result(stdout=files.get(p, "certificate"))
+    reloads = [first_reload_exit, 0]
+
+    def save(p, content, **_):
+        files[p] = content
+        return _result()
+
+    def run(cmd, **_):
+        if cmd.startswith("openssl x509"):
+            return _result(stdout="Certificate will not expire\nDNS:vpn.example.test\n")
+        if "reload-or-restart" in cmd:
+            assert files[path] == nginx_challenge.PENDING_CHALLENGE
+            return _result(returncode=reloads.pop(0))
+        return _result()
+
+    conn.put_text.side_effect = save
+    conn.run.side_effect = run
+    assert not observation_converges(action, driver.observe(action, None))
+    with patch("meridian.reconciler.server_drivers.IssueTLSCert") as issue:
+        if first_reload_exit:
+            error = UnknownResourceOutcome if first_reload_exit == 255 else ResourceReconcileError
+            with pytest.raises(error):
+                driver.apply(action, None)
+            assert not observation_converges(action, driver.observe(action, None))
+        driver.apply(action, None)
+        issue.assert_not_called()
+    assert files[path] == nginx_challenge.PRIVATE_CHALLENGE
+    assert observation_converges(action, driver.observe(action, None))
+
+
+def test_valid_certificate_does_not_take_over_an_operators_challenge_site() -> None:
+    driver, action, conn = _certificate_case()
+    conn.get_text.side_effect = lambda p, **_: _result(
+        stdout="server { access_log /operator/access.log; }" if p == nginx_challenge.ACME_CHALLENGE_PATH else "cert"
+    )
+    conn.run.return_value = _result(stdout="Certificate will not expire\nDNS:vpn.example.test\n")
+    assert observation_converges(action, driver.observe(action, None))
+    with pytest.raises(ResourceReconcileError, match="unrecognized ACME"):
+        nginx_challenge.enable_challenge(conn, action, reload_command="reload")
+    conn.put_text.assert_not_called()
+
+
+def test_an_edited_meridian_challenge_is_never_silently_adopted() -> None:
+    driver, action, conn = _certificate_case()
+    old = nginx_challenge.LEGACY_CHALLENGE + "# Operator edited the managed file.\n"
+    conn.get_text.side_effect = lambda p, **_: _result(
+        stdout=old if p == nginx_challenge.ACME_CHALLENGE_PATH else "cert"
+    )
+    conn.run.return_value = _result(stdout="Certificate will not expire\nDNS:vpn.example.test\n")
+    with pytest.raises(ResourceReconcileError, match="customized"):
+        driver.observe(action, None)
+    conn.put_text.assert_not_called()
 
 
 def _nginx_observation_case() -> tuple[NginxArtifactDriver, ResourceAction, MagicMock]:

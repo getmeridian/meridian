@@ -11,16 +11,16 @@ curl -sSf https://getmeridian.org/install.sh | bash
 
 این اسکریپت:
 1. اگر [uv](https://docs.astral.sh/uv/) موجود نباشد آن را نصب می‌کند، pipx یا pip را به‌عنوان جایگزین استفاده می‌کند. نصب‌کنندهٔ uv با نسخه pin شده و پیش از اجرا با SHA-256 بررسی می‌شود.
-2. `meridian-vpn` را از PyPI نصب می‌کند (برای نصب یک نسخهٔ دقیق، `MERIDIAN_VERSION=4.0.0` را تنظیم کنید)
+2. بستهٔ `meridian-vpn` را از PyPI نصب می‌کند. برای نصب یک انتشار مشخص، شمارهٔ نسخهٔ منتشرشده را در `MERIDIAN_VERSION` قرار دهید.
 3. در صورت نیاز پوشه ابزار را به PATH شل اضافه می‌کند
 4. فقط وقتی sudo بدون گذرواژه در دسترس باشد `/usr/local/bin/meridian` را ایجاد می‌کند
 
 ## نصب تأییدشده
 
-هر [release در GitHub](https://github.com/getmeridian/meridian/releases) فایل `install.sh` و `SHA256SUMS` آن را پیوست می‌کند. برای بررسی اسکریپت پیش از اجرا، هر دو را از release دانلود کنید و تأیید کنید:
+از [انتشارهای GitHub](https://github.com/getmeridian/meridian/releases) نسخه‌ای را انتخاب کنید که `install.sh` و `SHA256SUMS` را به پیوست دارد. در مثال زیر، برچسب انتشار را بدون `v` ابتدایی در `VERSION` قرار دهید و سپس فایل‌ها را دانلود و بررسی کنید:
 
 ```
-VERSION=4.0.0
+VERSION=4.0.0b19  # نمونه: نسخه‌ای را که انتخاب کردید وارد کنید
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
@@ -34,15 +34,15 @@ MERIDIAN_VERSION=$VERSION bash install.sh
 
 با uv (توصیه شده):
 ```
-uv tool install 'meridian-vpn>=4.0.0b0'
+uv tool install 'meridian-vpn>=4.0.0b0,<5'
 ```
 
 با pipx:
 ```
-pipx install 'meridian-vpn>=4.0.0b0'
+pipx install 'meridian-vpn>=4.0.0b0,<5'
 ```
 
-تا وقتی نسخهٔ نهایی 4.0 منتشر نشده، آن را مثل بالا با نسخه درخواست کنید. فرمان سادهٔ `uv tool install meridian-vpn` (یا `pipx install meridian-vpn`) جدیدترین نسخهٔ پایدار (اکنون 3.17.3) را نصب می‌کند که پنل وب و فرمان‌های این مستندات را ندارد. از `--prerelease allow` و `--pip-args=--pre` استفاده نکنید؛ این گزینه‌ها نسخه‌های pre-release همهٔ وابستگی‌ها را هم نصب می‌کنند.
+این فرمان‌ها Meridian 4 را نصب می‌کنند و نسخه‌های پیش‌انتشار 4.x را هم می‌پذیرند. برای نصب آخرین نسخهٔ پایدار، بدون محدود کردن نسخهٔ اصلی، `uv tool install meridian-vpn` یا `pipx install meridian-vpn` را اجرا کنید. این راهنما برای Meridian 4 است.
 
 ## به‌روزرسانی
 
@@ -68,7 +68,7 @@ Meridian 4 **ارتقای درجا نیست**. پنل 3x-ui با سرویس کن
 - **مهاجرت به Meridian 4.**
   1. یک سرور تازه با Meridian 4 مستقر کنید: `meridian deploy NEW_IP`
   2. صفحه‌های اتصال جدید را به کاربران بدهید (`meridian client add NAME` برای هر نفر)
-  3. پس از اینکه همه منتقل شدند، سرور قدیمی را با `meridian teardown OLD_IP` پاک کنید — دستور `teardown` در Meridian 4 پنل 3x-ui را هم حذف می‌کند
+  3. پس از آنکه همه با لینک جدید متصل شدند، سرور قدیمی را در پنل میزبان حذف کنید، **فقط اگر آن VPS مختص Meridian 3.x بود**. اگر سرویس دیگری هم دارد، آن را روشن نگه دارید تا از داده‌ها نسخهٔ پشتیبان بگیرید و نصب قدیمی را از سرویس‌های دیگر جدا کنید. ناوگان جدید 4.x مالک سرور قدیمی نیست.
 
 Meridian 4 وضعیت خودش را در `~/.config/meridian/` نگه می‌دارد و وضعیت 3.x در `~/.meridian/` را هرگز نمی‌خواند و تغییر نمی‌دهد، پس هر دو نسخه می‌توانند روی یک ماشین کنار هم باشند؛ دستورهای fleet که فقط وضعیت 3.x را پیدا کنند، این گزینه‌ها را توضیح می‌دهند.
 

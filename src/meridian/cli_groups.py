@@ -448,28 +448,27 @@ def fleet_events_cmd(
 @fleet_app.command("upgrade")
 def fleet_upgrade_cmd(
     yes: Yes = False,
-    tested: bool = typer.Option(
-        False,
-        "--tested",
-        help="Skip GitHub: Realm stays on the tested version or what you already upgraded to",
-    ),
+    latest: bool = typer.Option(False, "--latest", help="Look up a newer Realm release in the supported major"),
+    tested: bool = typer.Option(False, "--tested", help="Keep the tested or already selected Realm version (default)"),
 ) -> None:
     """Bring the control service, node agents, and Realm up to date
 
     The control service and every node agent move to the versions this
     Meridian installs (run `meridian update` first for newer ones); agents
-    upgrade in place and keep their identity. With relays, Realm moves to the
-    newest release in the tested major on GitHub, pinned by the sha256 GitHub
-    publishes. Shows what each server runs, applies the reviewed plan, then
+    upgrade in place and keep their identity. Relays use this release’s tested
+    Realm version or the newer version you previously selected. Only --latest
+    looks up a newer release on GitHub. Shows what each server runs, applies the reviewed plan, then
     runs `meridian check`.
 
     [dim]Examples:[/dim]
       [cyan]meridian fleet upgrade[/cyan]
-      [cyan]meridian fleet upgrade --tested --yes[/cyan]
+      [cyan]meridian fleet upgrade --latest[/cyan]
     """
     from meridian.commands.fleet_upgrade import run_upgrade
 
-    run_upgrade(yes=yes, tested=tested)
+    if latest and tested:
+        raise typer.BadParameter("Choose either --latest or --tested.")
+    run_upgrade(yes=yes, latest=latest)
 
 
 @api_app.command("schemas")

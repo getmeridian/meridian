@@ -25,12 +25,20 @@ from meridian.provision.nginx import InstallNginx
 from meridian.provision.steps import ProvisionContext
 from meridian.provision.tls import IssueTLSCert, certificate_inspection_command, certificate_names_host
 from meridian.reconciler import server_retirement as retirement
+from meridian.reconciler.nginx_challenge import (
+    LEGACY_CHALLENGE,
+    PENDING_CHALLENGE,
+    adopt_challenge_logging,
+    enable_challenge,
+    read_challenge,
+)
 from meridian.reconciler.resources import (
     ResourceAction,
     ResourceApplyReceipt,
     ResourceDrivers,
     ResourceObservation,
     ResourceReconcileError,
+    observation_converges,
     payload_of,
 )
 from meridian.reconciler.server_evidence import (
@@ -307,8 +315,11 @@ class CertificateDriver(retirement.CertificateRetirement):
         result = conn.run(certificate_inspection_command(payload.hostname), timeout=15)
         valid = assertion_matches(action.resource.logical_id, result, "certificate validation")
         named = certificate_names_host(result.stdout, payload.hostname)
-        matches = valid and named
+        pending_reload = valid and named and read_challenge(conn, action) in (LEGACY_CHALLENGE, PENDING_CHALLENGE)
+        matches = valid and named and not pending_reload
         mismatches = [] if valid else ["the certificate expires within a day"]
+        if pending_reload:
+            mismatches.append("the managed ACME HTTP-01 listener needs private logging")
         if not named:
             mismatches.append(f"the certificate does not name {payload.hostname}")
         return build_observation(
@@ -328,6 +339,10 @@ class CertificateDriver(retirement.CertificateRetirement):
     ) -> ResourceApplyReceipt:
         payload = _payload(action, CertificatePayload)
         conn = self.context.connection(payload.server_ref)
+        if adopt_challenge_logging(conn, action, reload_command=NGINX_ENABLE_AND_RELOAD):
+            observed = self.observe(action, binding)
+            if observation_converges(action, observed):
+                return ResourceApplyReceipt(remote_id=observed.remote_id)
         installed = InstallNginx().run(
             conn,
             ProvisionContext(
@@ -337,41 +352,7 @@ class CertificateDriver(retirement.CertificateRetirement):
         )
         if installed.status == "failed":
             raise ResourceReconcileError(f"Could not install nginx: {installed.detail}")
-        challenge_path = retirement.ACME_CHALLENGE_PATH
-        challenge = (
-            "# Managed by Meridian v4 for ACME HTTP-01.\n"
-            "server {\n"
-            "    listen 80 default_server;\n"
-            "    listen [::]:80 default_server;\n"
-            "    server_name _;\n"
-            "    location /.well-known/acme-challenge/ { root /var/www/acme; }\n"
-            "    location / { return 404; }\n"
-            "}\n"
-        )
-        written = ensure_file_content(
-            conn,
-            challenge_path,
-            challenge,
-            mode="644",
-            create_parent=True,
-        )
-        if not written.ok:
-            _raise_if_timeout(action, written.result)
-            raise ResourceReconcileError(f"Could not configure ACME challenge listener: {written.detail}")
-        enabled_path = challenge_path.replace("/sites-available/", "/sites-enabled/")
-        linked = conn.run(
-            f"rm -f /etc/nginx/sites-enabled/default && "
-            f"ln -sfn {shlex.quote(challenge_path)} {shlex.quote(enabled_path)}",
-            timeout=15,
-        )
-        validation = conn.run("nginx -t 2>&1", timeout=15)
-        if linked.returncode != 0 or validation.returncode != 0:
-            _raise_if_timeout(action, linked)
-            raise ResourceReconcileError("Could not start the ACME HTTP-01 challenge listener.")
-        reload_result = conn.run(NGINX_ENABLE_AND_RELOAD, timeout=30)
-        if reload_result.returncode != 0:
-            _raise_if_timeout(action, reload_result)
-            raise ResourceReconcileError("Could not start the ACME HTTP-01 challenge listener.")
+        enable_challenge(conn, action, reload_command=NGINX_ENABLE_AND_RELOAD)
         cert_dir = certificate_directory(payload.hostname)
         bare_ip = is_ip(payload.hostname)
         result = IssueTLSCert(
@@ -490,10 +471,12 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
             legacy = conn.get_text(self._LEGACY_STREAM_PATH, timeout=15)
             legacy_content = legacy.stdout if legacy.returncode == 0 else None
         enabled = ""
+        # Keep a syntactically inert marker until tested bytes are active. A lost SSH reply must
+        # not let a matching file on disk stand in for a successful reload of the running nginx.
         written = ensure_file_content(
             conn,
             path,
-            expected,
+            expected + "# Meridian: awaiting nginx reload.\n",
             mode="644",
             create_parent=True,
         )
@@ -536,6 +519,10 @@ class NginxArtifactDriver(retirement.NginxArtifactRetirement):
                 self._restore_file(conn, self._LEGACY_STREAM_PATH, legacy_content)
             conn.run(NGINX_ENABLE_AND_RELOAD, timeout=30)
             raise ResourceReconcileError(f"nginx reload failed for {path}.")
+        active = ensure_file_content(conn, path, expected, mode="644")
+        if not active.ok:
+            _raise_if_timeout(action, active.result)
+            raise ResourceReconcileError(f"Could not confirm the loaded nginx artifact {path}; retry the apply.")
         # Reload hands new listeners over asynchronously; observing at once can miss the port
         # on a busy 1 vCPU server. A port that never comes up is the observation's to report.
         conn.run(listener_wait_command(payload.listener_port), timeout=20)

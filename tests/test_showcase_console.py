@@ -44,6 +44,7 @@ def test_demo_opens_people_and_navigates_the_real_screens_without_api_requests(d
 def test_demo_mutations_preserve_current_contracts_and_reset_with_a_new_document(demo: Path) -> None:
     result = run_console("showcase-mutations", data={"directory": str(demo)})
     validate_recordings(result["responses"])
+    assert result["unsavedCounts"] == [0, 1, 1, 2]
     assert result["edited"] == "Literal <b>demo note</b>"
     assert result["devices"] == 0
     assert result["notice"] == "Hello Luma"

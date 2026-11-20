@@ -1,7 +1,7 @@
 # backup — Never lose a fleet with its control server
 
 ## Design decisions
-- **Every managing device holds the service's state** — after a run that changed (or may have changed) a control-service fleet, `commands/backup.pull_after_mutations()` pulls the newest snapshot into the context's `snapshots/`; `ControlClient` reports each mutating request through `add_mutation_listener()`. A failed pull warns and never changes the command's outcome.
+- **A managing device pulls after its own CLI changes** — after a run that changed (or may have changed) a control-service fleet, `commands/backup.pull_after_mutations()` pulls the newest snapshot into the context's `snapshots/`; `ControlClient` reports each mutating request through `add_mutation_listener()`. A failed pull warns and never changes the command's outcome.
 - **One key per fleet context** — `keys.py` keeps an age X25519 identity in `device.key` (0600) beside `cluster.yml`, registered on first pull. A revoked key is never re-registered silently, a malformed file is an error, and a new key is linked in exclusively, so two first pulls at once share one key instead of sealing a snapshot to a lost one.
 - **A pull is also a deposit** — `pull.py` sends this machine's `cluster.yml` (admin token blanked) and `servers.json` first, so a snapshot plus the recovery key can rebuild the fleet on an empty machine.
 - **Recovery key shown once** — the first `deploy` prints it on the terminal only (never in JSON); `backup recovery-key` replaces it after confirmation. Only the public half is stored anywhere.
@@ -10,6 +10,7 @@
 - **Bare-IP links move; domain links don't** — without a control domain every subscription URL changes and the end prints each new link; a domain fleet keeps its URLs once DNS moves.
 
 ## What's done well
+- A verified snapshot is written and synced before the CLI sends the receipt sealed inside it. The receipt names the version saved, never newer panel edits. A CLI on a control host does not claim an off-server save.
 - The pull's own client never reports its writes, so a pull cannot trigger another.
 
 ## Pitfalls
@@ -19,6 +20,7 @@
 - **Restore keeps profile declarations reviewed** — compare the snapshot fingerprint before staging or target registration; unstamped snapshots need the same compiled grants, and checkpoints pin declarations through every resume.
 - **Retained local intent inherits profile history** — OR the deposited cluster's effective usage into the local flag; matching legacy maps adopt a fingerprint under their unchanged access hash, while fingerprinted restores keep the runtime's declaration fence.
 - **A copy behind the snapshot's deposited generation must not restore** — its intent would retire what newer applies added; it restores into a fresh context, and the stale one gets `superseded.json` and refuses changes.
+- A reachable replaced controller releases only its marked bootstrap nginx files and service after verifying the replacement. Retry uses the recorded original host; certificates still used by another nginx site keep their renewal.
 - **Refuse while the old control server answers** — two services at once split the fleet; only `--force` overrides.
 - **Open the control service's firewall rules before its bootstrap** — restore installs before the plan runs, and a fresh server's SSH-only firewall kept the ACME challenge out.
 - **Mark the new server's fence.json handed over** — otherwise an apply during an outage takes the lease over SSH around the service.

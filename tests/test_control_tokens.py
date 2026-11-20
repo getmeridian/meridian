@@ -150,6 +150,9 @@ ROUTE_SAMPLES = {
         {"cluster_yml": "version: 3\n", "servers_json": "[]", "generation": 0},
     ),
     "snapshot": ("/api/backup/snapshot", None),
+    "get_backup_status": ("/api/backup/status", None),
+    "record_backup_save": ("/api/backup/receipts", {"device_id": "123456abcdef", "changes": 0, "proof": "a" * 64}),
+    "download_backup": ("/api/backup/download", None),
     "owner_status": ("/api/owner", None),
     "issue_setup_link": ("/api/owner/setup-link", {}),
 }

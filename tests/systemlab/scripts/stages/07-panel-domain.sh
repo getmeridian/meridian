@@ -76,7 +76,7 @@ assert_tls_checks
 meridian plan >/dev/null
 pass "XHTTP and Hysteria2 moved onto the panel's domain, and the unused IP certificate was retired"
 
-meridian teardown "$EXIT_B_IP" --yes
+meridian teardown "$EXIT_B_IP" --yes --discard-backup
 test ! -e "$MERIDIAN_HOME/cluster.yml"
 meridian server add "$EXIT_B_IP" --name exit-b
 python3 "$SYSTEMLAB_ROOT/scripts/write-intent.py" "$INTENT_PATH"
