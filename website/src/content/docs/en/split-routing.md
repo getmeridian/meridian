@@ -11,11 +11,11 @@ The catch: Russian websites don't open while the VPN is on. Users have to discon
 
 ## The solution: split routing on the device
 
-Split routing sends Russian traffic **directly** from the device and everything else through the VPN:
+For web browsing with the default split policy, the app opens matched Russian sites **directly** through your usual provider. Other public sites use the VPN:
 
 ```
-Russian sites   → Device → Direct → Internet (local ISP)
-Everything else → Device → VPN → VPS → Internet
+Matched Russian sites → Device → Direct → Internet (local ISP)
+Other public sites → Device → VPN → VPS → Internet
 ```
 
 You get both:
