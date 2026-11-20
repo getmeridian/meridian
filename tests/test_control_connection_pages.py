@@ -71,6 +71,20 @@ def test_browser_gets_html_and_apps_keep_configs(page_fleet: tuple[str, ControlC
     assert info.json()["user"]["username"] == "guest"
 
 
+def test_empty_grant_is_distinct_from_a_suspension(page_fleet: tuple[str, ControlClient, UserRecord]) -> None:
+    url, client, person = page_fleet
+    info = f"{url}/sub/{person.sub_token}/info"
+    assert "hasUsableConnections" not in httpx.get(info).json()["user"]
+    client.delete_endpoint("main")
+    empty = httpx.get(info).json()["user"]
+    assert empty["userStatus"] == "ACTIVE" and empty["hasUsableConnections"] is False
+    shell = httpx.get(f"{url}/sub/{person.sub_token}", headers={"Accept": "text/html"}).text
+    assert "Your link is valid" in shell and "<textarea" not in shell
+    client.update_user(person.username, UserUpdate(status="disabled"))
+    suspended = httpx.get(info).json()["user"]
+    assert suspended["userStatus"] == "DISABLED" and "hasUsableConnections" not in suspended
+
+
 def test_browser_pages_and_info_never_register_devices(page_fleet: tuple[str, ControlClient, UserRecord]) -> None:
     url, client, person = page_fleet
     client.set_privacy(PrivacySettings(device_limits="full"))

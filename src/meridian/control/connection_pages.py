@@ -76,6 +76,7 @@ class ConnectionPages:
             server_icon=settings.server_icon,
             color=settings.color,
             subscription_url=canonical,
+            no_connections=info["user"].get("hasUsableConnections") is False,
             exit_countries=settings.exit_countries,
             owner_contact=settings.owner_contact,
             notice=RenderedNotice.model_validate(info["notice"]) if "notice" in info else None,

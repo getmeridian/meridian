@@ -122,6 +122,23 @@ const cases = {
       assert.equal(browser.document.querySelector('.account-metric').querySelector('dd').textContent, expected);
     }
   },
+  test_empty_grant_can_recover_without_reissuing_or_sharing: async function(data) {
+    data.info.user.hasUsableConnections = false;
+    const browser = createBrowser(data.config, data.catalog, { info: data.info });
+    browser.context.navigator.share = async function () { throw Error('unexpected sharing'); };
+    await browser.start();
+    const doc = browser.document;
+    assert.ok(doc.getElementById('setup-card').hidden);
+    assert.match(doc.getElementById('account-warning').textContent, /link is valid.*no connections/);
+    assert.doesNotMatch(doc.getElementById('account-panel').textContent, /ready to connect/);
+    delete data.info.user.hasUsableConnections;
+    browser.fire('click', doc.querySelector('[data-action="account-refresh"]'));
+    await browser.flush();
+    assert.ok(!doc.getElementById('setup-card').hidden);
+    assert.ok(doc.querySelector('[data-import]') && doc.querySelector('[data-ui-key="manual-url"]'));
+    assert.match(doc.querySelector('[data-disclosure="manual-import"]').textContent, /only on your own devices/);
+    assert.ok(!doc.querySelector('[data-action="share-page"]'));
+  },
   test_account_not_found_is_verified_and_disables_import: async function(data) {
     let missing = false;
     const browser = createBrowser(data.config, data.catalog, { fetch(url) {

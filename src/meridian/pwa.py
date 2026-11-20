@@ -79,6 +79,7 @@ def generate_client_files(
     server_icon: str = "",
     color: str = "",
     subscription_url: str = "",
+    no_connections: bool = False,
     exit_countries: list[str] | None = None,
     owner_contact: OwnerContact | None = None,
     notice: RenderedNotice | None = None,
@@ -97,6 +98,7 @@ def generate_client_files(
         "index.html": render_pwa_shell(
             client_name=client_name,
             subscription_url=subscription_url,
+            no_connections=no_connections,
             server_name=server_name,
             asset_path=asset_path,
             config_path=f"{page_path}/config.json" if page_path else "config.json",

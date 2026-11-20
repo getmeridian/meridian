@@ -315,7 +315,6 @@ svg{flex-shrink:0}
 /* ===================================================================
  * FOOTER, TOAST, LOADING
  * =================================================================== */
-.foot{display:flex;justify-content:center;padding:24px 0 4px}
 .toast{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(6px);
   background:var(--tx);color:var(--bg);padding:9px 18px;
@@ -369,7 +368,7 @@ svg{flex-shrink:0}
 @media print {
   body{background:#fff !important;color:#000 !important}
   .card,.panels{box-shadow:none !important;border-color:#ccc}
-  .topbar,.install-banner,.foot,.btn{display:none !important}
+  .topbar,.install-banner,.btn{display:none !important}
 }
 
 /* Account information */

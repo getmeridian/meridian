@@ -15,6 +15,7 @@ window.meridianPwaAssetPath = ASSET_PATH;
  * ----------------------------------------------------------------------- */
 var T = {
   en: {
+    'transfer.private': 'Use this link only on your own devices. Anyone with it can use your VPN.',
     'conns.show': 'Show all {n}',
     'conns.less': 'Show fewer',
     'install.other': 'Other install options',
@@ -60,6 +61,7 @@ var T = {
     language: 'Language', close: 'Close', copy: 'Copy', 'qr.code': 'QR code',
   },
   ru: {
+    'transfer.private': 'Ссылка только для ваших устройств. У кого она есть, тот может пользоваться вашим VPN.',
     'conns.show': 'Показать все ({n})',
     'conns.less': 'Свернуть',
     'install.other': 'Другие варианты установки',
@@ -127,7 +129,6 @@ var T = {
     'selfcheck.desc': 'Три быстрые проверки с вашего устройства: точность часов, передача данных и доступность подписки. Перед запуском выключите VPN, чтобы проверить саму сеть.',
     'selfcheck.run': 'Запустить проверку',
     'show.qr': 'Показать QR-код',
-    'share.page': 'Поделиться страницей',
     copied: 'Скопировано',
     'page_title': 'Настройка подключения',
     'error.title': 'Настройка подключения',
@@ -152,6 +153,7 @@ var T = {
     'open.short': 'Открыть',
   },
   fa: {
+    'transfer.private': 'این پیوند را فقط در دستگاه‌های خودتان استفاده کنید. هرکس آن را داشته باشد می‌تواند از VPN شما استفاده کند.',
     'conns.show': 'نمایش همهٔ {n} اتصال',
     'conns.less': 'نمایش کمتر',
     'install.other': 'روش‌های دیگر نصب',
@@ -219,7 +221,6 @@ var T = {
     'selfcheck.desc': 'سه آزمون سریع از همین دستگاه و همین شبکه: ساعت، جریان داده و اشتراک. ابتدا VPN را خاموش کنید تا آزمون شبکهٔ واقعی شما را ببیند.',
     'selfcheck.run': 'شروع بررسی',
     'show.qr': 'نمایش کد QR',
-    'share.page': 'اشتراک\u200Cگذاری این صفحه',
     copied: '\u06A9\u067E\u06CC \u0634\u062F',
     'page_title': 'تنظیم اتصال',
     'error.title': 'تنظیم اتصال',
@@ -244,6 +245,7 @@ var T = {
     'open.short': 'باز کردن',
   },
   zh: {
+    'transfer.private': '仅在自己的设备上使用此链接。拿到它的人都可以使用你的 VPN。',
     'conns.show': '显示全部 {n} 个连接',
     'conns.less': '收起部分连接',
     'install.other': '其他安装方式',
@@ -311,7 +313,6 @@ var T = {
     'selfcheck.desc': '从此设备和网络进行三项快速检查：时钟、数据传输和订阅。请先关闭 VPN，让检查看到您真实的网络环境。',
     'selfcheck.run': '开始检查',
     'show.qr': '显示二维码',
-    'share.page': '分享此页面',
     copied: '已复制',
     'page_title': '连接设置',
     'error.title': '连接设置',
@@ -533,14 +534,6 @@ function buildDeepLink(template, subUrl, name) {
   });
 }
 
-function sharePageUrl() {
-  if (navigator.share) {
-    navigator.share({ title: '', url: location.href }).catch(function() {});
-  } else {
-    copyToClipboard(location.href);
-  }
-}
-
 /* -----------------------------------------------------------------------
  * Clock skew detection
  * ----------------------------------------------------------------------- */
@@ -675,7 +668,6 @@ var ICON_PLUS = svg('<path d="M12 5v14M5 12h14"/>', 16);
 var ICON_LIST = svg('<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>', 18);
 var ICON_HELP = svg('<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/>', 18);
 var ICON_ROUTER = svg('<rect x="2" y="14" width="20" height="7" rx="2"/><path d="M6 17.5h.01M10 17.5h.01M15 14V9M8.5 8.5a6 6 0 0 1 13 0M11.5 10.5a3 3 0 0 1 7 0"/>', 18);
-var ICON_SHARE = svg('<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="m16 6-4-4-4 4M12 2v13"/>', 15);
 var ICON_CHEVRON = svg('<path d="m9 18 6-6-6-6"/>', 16);
 
 /* -----------------------------------------------------------------------
@@ -702,7 +694,7 @@ function renderPage(config) {
 
   html += '<div class="account-overview" id="account-overview" hidden><a class="account-jump" href="#account-panel">' +
     '<span id="account-jump-label"></span>' + ICON_CHEVRON + '</a><span id="account-signal" role="status"></span>' +
-    '<p id="account-warning" hidden></p></div>';
+    '<p id="account-warning" hidden></p><div id="unavailable-contact" hidden></div></div>';
   html += '<section class="notice owner-notice" id="owner-notice" aria-live="polite" hidden></section>';
 
   /* iOS "Open" falls back to the first recommended iOS app */
@@ -730,13 +722,6 @@ function renderPage(config) {
   html += '<button class="btn btn-primary btn-sm" data-action="install" data-t="install.btn">Add shortcut</button>';
   html += '<button class="install-dismiss" data-action="dismiss" data-t-aria="close" aria-label="Close">&times;</button>';
   html += '</div>';
-
-  if (navigator.share) {
-    html += '<div class="foot">';
-    html += '<button class="btn btn-ghost btn-sm" data-action="share-page">' + ICON_SHARE;
-    html += '<span data-t="share.page">Share this page</span></button>';
-    html += '</div>';
-  }
 
   app.innerHTML = html;
 
@@ -925,12 +910,16 @@ function renderPickers(apps, platform, chosen) {
   return html + '</select></label></div>';
 }
 
+function privateTransfer() {
+  return '<p class="muted" data-t="transfer.private">' + escapeHtml(text('transfer.private')) + '</p>';
+}
+
 function renderManualImport(app, subUrl, direct) {
   var menu = app && app.manual && app.manual[currentLang];
   var body = '<p class="muted">' + escapeHtml(text('manual.desc').replace('{name}', app ? app.name : text('app.choice'))) + '</p>';
   body += '<p class="manual-path">' + escapeHtml(menu || text('manual.generic')) + '</p>';
   body += '<textarea class="manual-url" data-ui-key="manual-url" data-action="select-text" data-t-aria="sub.label" aria-label="Subscription URL" dir="ltr" readonly rows="2">' + escapeHtml(subUrl) + '</textarea>';
-  body += renderSubUrl(subUrl, true);
+  body += renderSubUrl(subUrl, true) + privateTransfer();
   var label = '<span data-t="manual.import">Import manually</span>';
   return direct ? '<div class="manual-import manual-direct"><strong>' + label + '</strong>' + body + '</div>' :
     renderDisclosure(label, body, 'manual-import', 'manual-import');
@@ -969,7 +958,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
     html += '<p class="muted import-status" id="import-status" role="status" hidden></p>';
     var button = chosen && chosen.deeplink ? renderImportButton(chosen, subUrl, serverName, true) : '';
     html += '<div class="import-actions">' + button + renderManualImport(chosen, subUrl, !button) + '</div>';
-    if (hasQr && mobile) html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-inline'), 'subscription-qr');
+    if (hasQr && mobile) html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-inline') + privateTransfer(), 'subscription-qr');
     html += '</div></div>';
     html += renderConnectSteps(chosen, mobile);
   }
@@ -978,7 +967,7 @@ function renderSetup(apps, platform, subUrl, serverName, subQrB64) {
     html += '<aside class="setup-qr"><span class="transfer-mark" aria-hidden="true">' + ICON_QR + '</span>';
     html += '<strong data-t="qr.title">Setting up a phone?</strong>';
     html += '<span data-t="qr.desc">Open the QR scanner in your phone’s VPN app, then show the code here and scan it.</span>';
-    html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-aside'), 'desktop-qr') + '</aside>';
+    html += renderDisclosure('<span data-t="show.qr">Show QR code</span>', renderQr(subQrB64, 'qr-aside') + privateTransfer(), 'desktop-qr') + '</aside>';
   }
   return html + '</section>';
 }
@@ -1273,8 +1262,6 @@ document.addEventListener('click', function(e) {
     dismissCopyFallback();
   } else if (action === 'toggle-qr') {
     toggleQr(target);
-  } else if (action === 'share-page') {
-    sharePageUrl();
   } else if (action === 'open-ios') {
     e.preventDefault();
     var iosIdx = target.getAttribute('data-ios-idx');

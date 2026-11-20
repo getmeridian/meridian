@@ -29,15 +29,17 @@
   </div>
 <noscript>
   {% set copy = {
-    'en': ('Your subscription link', 'Copy this link into your VPN app as a subscription.', 'Use the personal link you received as the subscription URL in your VPN app.'),
-    'ru': ('Ваша ссылка на подписку', 'Скопируйте ссылку и добавьте её как подписку в VPN-приложение.', 'Добавьте полученную личную ссылку в VPN-приложение как подписку.'),
-    'fa': ('پیوند اشتراک شما', 'این پیوند را کپی کنید و به‌عنوان اشتراک در برنامهٔ VPN خود وارد کنید.', 'پیوند شخصی‌ای را که دریافت کردید به‌عنوان اشتراک در برنامهٔ VPN خود وارد کنید.'),
-    'zh': ('你的订阅链接', '复制此链接，在 VPN 应用中添加订阅。', '在 VPN 应用中添加订阅时，粘贴你收到的个人链接。')
+    'en': ('Your subscription link', 'Copy this link into your VPN app as a subscription.', 'Use the personal link you received as the subscription URL in your VPN app.', 'Your link is valid, but it has no connections yet. Ask the person who sent it to add one.'),
+    'ru': ('Ваша ссылка на подписку', 'Скопируйте ссылку и добавьте её как подписку в VPN-приложение.', 'Добавьте полученную личную ссылку в VPN-приложение как подписку.', 'Ссылка действует, но подключений пока нет. Попросите того, кто её прислал, добавить подключение.'),
+    'fa': ('پیوند اشتراک شما', 'این پیوند را کپی کنید و به‌عنوان اشتراک در برنامهٔ VPN خود وارد کنید.', 'پیوند شخصی‌ای را که دریافت کردید به‌عنوان اشتراک در برنامهٔ VPN خود وارد کنید.', 'پیوند شما معتبر است، اما هنوز اتصالی ندارد. از کسی که آن را فرستاده بخواهید یک اتصال اضافه کند.'),
+    'zh': ('你的订阅链接', '复制此链接，在 VPN 应用中添加订阅。', '在 VPN 应用中添加订阅时，粘贴你收到的个人链接。', '你的链接有效，但还没有可用连接。请让发给你链接的人添加一个连接。')
   }[lang] %}
   <section class="card manual-setup" aria-labelledby="manual-setup-title">
     <p class="manual-brand">{{ server_name or 'Meridian' }}</p>
     <h1 id="manual-setup-title">{{ copy[0] }}</h1>
-    {% if subscription_url %}
+    {% if no_connections %}
+    <p>{{ copy[3] }}</p>
+    {% elif subscription_url %}
     <p id="manual-setup-help">{{ copy[1] }}</p>
     <textarea class="manual-url" readonly rows="3" dir="ltr" aria-labelledby="manual-setup-title" aria-describedby="manual-setup-help">{{ subscription_url }}</textarea>
     {% else %}

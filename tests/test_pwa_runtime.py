@@ -208,6 +208,7 @@ def test_suspended_account_also_dims_individual_imports(page_data: dict[str, obj
         "test_account_formats_persian_numbers_and_calendar",
         "test_account_keeps_binary_quotas_and_uses_familiar_local_units",
         "test_account_not_found_is_verified_and_disables_import",
+        "test_empty_grant_can_recover_without_reissuing_or_sharing",
     ],
 )
 def test_locale_and_account_boundaries(page_data: dict[str, object], case: str) -> None:
