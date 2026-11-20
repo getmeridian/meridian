@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from typing import cast
 from unittest.mock import MagicMock
@@ -215,7 +216,9 @@ def test_the_servers_own_ip_as_sni_takes_the_no_sni_route(address: str, expected
 
     rendered = render_nginx_artifact("nginx:srv-exit:stream:443", payload, {**ADDRESSES, "srv-exit": address})
 
-    routes = dict(line.split() for line in rendered.splitlines() if line.startswith("    ") and line.endswith(";"))
+    mapping = re.search(r"^map \$ssl_preread_server_name [^\n]+ \{\n([^}]+)\n\}", rendered, re.MULTILINE)
+    assert mapping, "The stream listener must select an upstream from the SNI map."
+    routes = dict(line.split() for line in mapping[1].strip().splitlines())
     if expected is None:
         assert not any(key.startswith('"') and key != '""' for key in routes)
     else:
