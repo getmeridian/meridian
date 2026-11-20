@@ -68,7 +68,7 @@ Your 3.x servers keep working. You have two choices:
 - **Move to Meridian 4.**
   1. Deploy a fresh server with Meridian 4: `meridian deploy NEW_IP`
   2. Give your users their new connection pages (`meridian client add NAME` for each person)
-  3. Once everyone has switched, tear down the old server with `meridian teardown OLD_IP` — Meridian 4's teardown also removes 3x-ui
+  3. After everyone connects through the new link, retire the old VPS at the provider **only if it was dedicated to Meridian 3.x**. On a shared VPS, keep it running until you have backed up and separated the old installation from your other services. The new 4.x fleet does not own the old host.
 
 Meridian 4 keeps its own state in `~/.config/meridian/` and never reads or changes 3.x state in `~/.meridian/`, so both versions can live on one machine; fleet commands that find only 3.x state explain these options instead.
 
