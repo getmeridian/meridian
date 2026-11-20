@@ -20,7 +20,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 Выберите [релиз на GitHub](https://github.com/getmeridian/meridian/releases) с файлами `install.sh` и `SHA256SUMS`. В примере ниже укажите в `VERSION` тег этого релиза без начальной `v`, затем скачайте и проверьте файлы:
 
 ```
-VERSION=4.0.0b18  # пример: укажите выбранный релиз
+VERSION=4.0.0b19  # пример: укажите выбранный релиз
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # на macOS: shasum -a 256 -c SHA256SUMS

@@ -20,7 +20,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 از [انتشارهای GitHub](https://github.com/getmeridian/meridian/releases) نسخه‌ای را انتخاب کنید که `install.sh` و `SHA256SUMS` را به پیوست دارد. در مثال زیر، برچسب انتشار را بدون `v` ابتدایی در `VERSION` قرار دهید و سپس فایل‌ها را دانلود و بررسی کنید:
 
 ```
-VERSION=4.0.0b18  # نمونه: نسخه‌ای را که انتخاب کردید وارد کنید
+VERSION=4.0.0b19  # نمونه: نسخه‌ای را که انتخاب کردید وارد کنید
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
