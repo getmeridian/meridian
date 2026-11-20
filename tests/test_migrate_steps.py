@@ -221,7 +221,7 @@ def test_stopping_the_panel_keeps_it_from_returning_on_reboot() -> None:
     assert command.index("ctlsvc-web") < command.index("ctlsvc-db")
 
 
-def test_panel_removal_reuses_teardowns_commands_and_checks_nothing_is_left() -> None:
+def test_panel_removal_checks_nothing_is_left() -> None:
     conn = MockConnection()
     conn.when("docker ps -a --format", stdout="ctlsvc-db\n/opt/remnawave\n")
 
@@ -284,10 +284,10 @@ def test_node_removal_failure_stops_the_migration_with_dockers_reason() -> None:
         remove_node_runtime(conn)
 
 
-def test_teardown_removes_the_panel_stack_but_never_the_migration_backup() -> None:
+def test_native_teardown_never_removes_another_panel_stack_or_its_migration_backup() -> None:
     conn = MockConnection()
 
     Uninstall().run(conn, ProvisionContext(ip="198.51.100.12"))
 
-    assert all(command in conn.calls for command in panel_stack_removal())
+    assert not any(command in conn.calls for command in panel_stack_removal())
     assert not any(SERVER_BACKUP_ROOT in call or "/var/backups" in call for call in conn.calls)

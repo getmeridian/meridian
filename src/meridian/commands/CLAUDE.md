@@ -21,6 +21,7 @@
 - Edit title, refresh, contact and server billing through the control service without SSH. Review against the live version, and never use local seed values as current billing information.
 
 ## Pitfalls
+- Last-controller teardown reviews the live backup receipt; ordinary confirmation never authorizes discarding unconfirmed data.
 - An account lookup must read current service names; topology names and full `list_users()` reads miss panel renames or widen the read needlessly.
 - People tokens cannot read fleet health; account writes check the authenticated API version header without requiring broader rights.
 - Gate people mutations before prompts and batch writes; account refusals keep their hint and exit 2, while per-name failures use a failed envelope with outcomes.

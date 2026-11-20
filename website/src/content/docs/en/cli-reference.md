@@ -706,10 +706,12 @@ The setup link works once, for 15 minutes; open it to choose the owner's passwor
 Remove Meridian from a server.
 
 ```
-meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes]
+meridian teardown [SERVER] [--user USER] [--ssh-port PORT] [--yes] [--discard-backup]
 ```
 
-On a single-server deployment, teardown removes everything Meridian created: the control service and its database, the agent and Xray, nginx configuration, certificates, relays, and firewall rules on the server, then the local `cluster.yml` and saved server profile. System packages, SSH hardening, and fail2ban stay, and nginx keeps running if it still serves your own sites. It also removes 3x-ui from Meridian 3.x. In a multi-server fleet, teardown refuses a server that still has a role in the topology.
+On the last controller this removes people, settings, subscriptions and the live database. The review shows the last confirmed off-server save and changes since. If needed, Meridian tries to save a verified copy on your managing computer. It checks the database again after stopping the service: a newer edit keeps the database and stops teardown. `--yes` only answers the normal confirmation. If you intend to lose unbacked-up data, pass `--discard-backup` separately. An older service that cannot confirm a save also requires that explicit choice.
+
+Teardown removes the verified controller, agent, Xray, managed nginx listeners, certificates and tagged firewall rules, then the local fleet configuration. It refuses a shared nginx installation, unrelated certificate renewal, unrecognized unit or legacy panel before deleting anything. SSH hardening, installed packages, unrelated services and untagged firewall rules stay. On a dedicated host, nginx is stopped and disabled so its default HTTP site does not go public after teardown. In a fleet with several servers, retire the other roles through the fleet plan first.
 
 `--yes` skips the confirmation; the role checks still run first. Declining exits `1`. An unknown server name, or zero or several possible targets, exits `2` instead of prompting.
 

@@ -6,6 +6,7 @@ import typer
 
 from meridian import config
 from meridian.cluster import ClusterConfig
+from meridian.commands import teardown_backup
 from meridian.commands._helpers import load_cluster, load_topology_cluster
 from meridian.commands.resolve import (
     ensure_server_connection,
@@ -61,6 +62,7 @@ def run(
     yes: bool = False,
     *,
     ssh_port: int = 0,
+    discard_backup: bool = False,
 ) -> None:
     """Uninstall Meridian from a server."""
     registry = ServerRegistry(config.SERVER_PROFILES_FILE)
@@ -72,6 +74,7 @@ def run(
     cluster = load_cluster()
     if cluster.is_configured and cluster.topology_intent is None:
         load_topology_cluster()  # refuses with rebuild guidance
+    control_in_target = False
     if cluster.topology_intent is not None:
         try:
             saved_server = registry.find(resolved.ip)
@@ -85,6 +88,7 @@ def run(
             )
         references = _topology_references(cluster, saved_server)
         entire_fleet = deployment_server_refs(cluster.topology_intent) == {saved_server.id}
+        control_in_target = entire_fleet and "control plane" in references
         if references and not entire_fleet:
             hint = "Remove those roles in `meridian setup`, apply the reviewed topology, then retry teardown."
             if cluster.topology_intent.control.backend == "remnawave":
@@ -98,20 +102,34 @@ def run(
                 hint=hint,
                 hint_type="user",
             )
-    is_panel_host = bool(cluster.panel.server_ip) and cluster.panel.server_ip == resolved.ip
+    is_panel_host = control_in_target
+    if is_panel_host and not cluster.runs_control_service:
+        fail(
+            "This controller uses the previous panel and cannot confirm a Meridian recovery copy.",
+            hint="Keep its database backup and retire it with the release that deployed it, or migrate first.",
+            hint_type="user",
+        )
+    if discard_backup and not is_panel_host:
+        fail("--discard-backup only applies to this fleet’s last control server.", hint_type="user")
+    current = teardown_backup.status(cluster) if is_panel_host else None
 
     # Confirm only after proving that ownership and dependency guards permit
     # the selected teardown.
     err_console.print()
     warn(f"This will remove Meridian from {resolved.ip}.")
-    warn("Docker and system packages will NOT be touched.")
-    if not yes and not confirm("Continue?"):
+    if is_panel_host:
+        teardown_backup.show_review(current, discard=discard_backup)
+    info("System packages, SSH hardening, and services outside this fleet stay in place.")
+    if not yes and not confirm("Remove Meridian from this server?", default=False):
         info("Cancelled.")
         raise typer.Exit(1)
     err_console.print()
 
     resolved = ensure_server_connection(resolved)
 
+    generation = (
+        teardown_backup.confirmed_generation(cluster, current) if is_panel_host and not discard_backup else None
+    )
     info(f"Removing Meridian from {resolved.ip}...")
     err_console.print()
 
@@ -122,9 +140,10 @@ def run(
     ctx = ProvisionContext(
         ip=resolved.ip,
         user=resolved.user,
+        cluster=cluster,
     )
 
-    provisioner = Provisioner([Uninstall()])
+    provisioner = Provisioner([Uninstall(controller=is_panel_host, generation=generation, discard=discard_backup)])
     results = provisioner.run(resolved.conn, ctx, renderer=RichStepRenderer())
 
     failed = [r for r in results if r.status == "failed"]

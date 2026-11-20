@@ -76,6 +76,7 @@ def test_panel_teardown_local_state_failure_reports_remote_completion(failure_po
     backup_error = OSError("disk full") if failure_point == "backup" else None
 
     with (
+        patch("meridian.commands.uninstall.teardown_backup.status", return_value=None),
         patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
         patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
         patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
@@ -86,7 +87,7 @@ def test_panel_teardown_local_state_failure_reports_remote_completion(failure_po
         pytest.raises(typer.Exit) as exc_info,
     ):
         provisioner.return_value.run.return_value = [SimpleNamespace(status="changed", detail="")]
-        run(ip=resolved.ip, yes=True)
+        run(ip=resolved.ip, yes=True, discard_backup=True)
 
     assert exc_info.value.exit_code == 3
     provisioner.return_value.run.assert_called_once()
@@ -159,6 +160,7 @@ def test_v4_teardown_of_a_single_server_fleet_removes_everything(tmp_home) -> No
     provisioner.return_value.run.return_value = [SimpleNamespace(status="changed", detail="")]
 
     with (
+        patch("meridian.commands.uninstall.teardown_backup.status", return_value=None),
         patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
         patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
         patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
@@ -166,7 +168,7 @@ def test_v4_teardown_of_a_single_server_fleet_removes_everything(tmp_home) -> No
         patch.object(cluster, "backup"),
         patch("meridian.provision.steps.Provisioner", provisioner),
     ):
-        run(ip=resolved.ip, yes=True)
+        run(ip=resolved.ip, yes=True, discard_backup=True)
 
     provisioner.return_value.run.assert_called_once()
     assert not (tmp_home / "cluster.yml").exists()
@@ -222,4 +224,76 @@ def test_cluster_without_topology_is_refused_before_ssh() -> None:
 
     assert exc_info.value.exit_code == 2
     ensure_connection.assert_not_called()
+    registry.remove.assert_not_called()
+
+
+@pytest.mark.parametrize("case", ["older service", "local only", "incomplete", "concurrent change", "confirmed"])
+def test_teardown_requires_a_current_off_server_save(case):
+    from meridian.commands import teardown_backup
+    from meridian.control.backup_models import BackupStatus
+
+    def backup(changes, saved, complete=True):
+        return BackupStatus(
+            changes=changes,
+            last_saved_changes=saved,
+            last_saved_at="2026-11-01T10:00:00Z" if saved is not None else None,
+            has_deployer_state=complete,
+            has_recovery_key=True,
+        )
+
+    before = None if case == "older service" else backup(3, 2)
+    after = {
+        "older service": None,
+        "local only": backup(3, None),
+        "incomplete": backup(3, 3, False),
+        "concurrent change": backup(4, 3),
+        "confirmed": backup(3, 3),
+    }[case]
+    cluster = ClusterConfig()
+    with (
+        patch.object(teardown_backup, "pull_snapshot", return_value=SimpleNamespace(receipt="unavailable")) as pull,
+        patch.object(teardown_backup, "status", return_value=after),
+    ):
+        if case == "confirmed":
+            assert teardown_backup.confirmed_generation(cluster, before) == 3
+        else:
+            with pytest.raises(typer.Exit):
+                teardown_backup.confirmed_generation(cluster, before)
+        pull.assert_called_once()
+
+
+def test_current_saved_copy_does_not_require_access_to_the_original_laptop():
+    from meridian.commands import teardown_backup
+    from meridian.control.backup_models import BackupStatus
+
+    confirmed = BackupStatus(
+        changes=8,
+        last_saved_changes=8,
+        last_saved_at="2026-11-01T10:00:00Z",
+        has_deployer_state=True,
+        has_recovery_key=True,
+    )
+    with patch.object(teardown_backup, "pull_snapshot") as pull:
+        assert teardown_backup.confirmed_generation(ClusterConfig(), confirmed) == 8
+    pull.assert_not_called()
+
+
+def test_unattended_yes_is_not_consent_to_lose_the_live_database():
+    cluster = _roleless_server_cluster()
+    registry = MagicMock()
+    registry.find.return_value = ServerEntry(id="srv-control", host="198.51.100.1")
+    resolved = SimpleNamespace(ip="198.51.100.1", user="root", conn=MagicMock())
+    with (
+        patch("meridian.commands.uninstall.ServerRegistry", return_value=registry),
+        patch("meridian.commands.uninstall.resolve_server", return_value=resolved),
+        patch("meridian.commands.uninstall.ensure_server_connection", return_value=resolved),
+        patch("meridian.cluster.ClusterConfig.load", return_value=cluster),
+        patch("meridian.commands.teardown_backup.status", return_value=None),
+        patch("meridian.commands.teardown_backup.pull_snapshot", side_effect=OSError("disk full")),
+        patch("meridian.provision.steps.Provisioner") as destructive,
+        pytest.raises(typer.Exit) as refusal,
+    ):
+        run(ip=resolved.ip, yes=True)
+    assert refusal.value.exit_code == 2
+    destructive.assert_not_called()
     registry.remove.assert_not_called()

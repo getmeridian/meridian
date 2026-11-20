@@ -753,11 +753,17 @@ def teardown_cmd(
     user: User = "",
     yes: Yes = False,
     ssh_port: SshPort = 0,
+    discard_backup: bool = typer.Option(
+        False,
+        "--discard-backup",
+        help="Permanently remove the last controller even without a current off-server backup",
+    ),
 ) -> None:
     """Remove Meridian from a server
 
     A single-server deployment is removed completely, including the local
-    configuration. In a multi-server fleet, a server that still has a role is
+    configuration. A verified off-server backup is required unless you explicitly discard it.
+    In a multi-server fleet, a server that still has a role is
     refused; remove it with [cyan]meridian node remove[/cyan] first.
 
     [dim]Examples:[/dim]
@@ -766,7 +772,7 @@ def teardown_cmd(
     """
     from meridian.commands.uninstall import run
 
-    run(ip, user, yes, ssh_port=ssh_port)
+    run(ip, user, yes, ssh_port=ssh_port, discard_backup=discard_backup)
 
 
 @app.command("update", rich_help_panel=ADVANCED)

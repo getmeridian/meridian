@@ -144,7 +144,7 @@ The agent is a static binary for x86-64 and ARM64 servers. Meridian upgrades it 
 
 ## Teardown
 
-`meridian teardown IP` removes the control service, the agent and Xray, Meridian's nginx files, certificates, Realm services, and firewall rules (plus 3x-ui from Meridian 3.x). System packages stay. On a single-server deployment it also removes the local `cluster.yml`. In a multi-server fleet it refuses servers that still have a role.
+On the last controller, `meridian teardown IP` checks a confirmed off-server backup before deleting the live fleet database. It only removes verified Meridian resources and refuses ambiguous shared installations; it does not remove 3.x deployments.
 
 ## File locations
 

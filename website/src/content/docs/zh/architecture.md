@@ -144,7 +144,7 @@ agent 是适用于 x86-64 和 ARM64 服务器的静态程序。新版本带来�
 
 ## 卸载
 
-`meridian teardown IP` 移除控制服务、agent 和 Xray、Meridian 的 nginx 文件、证书、Realm 服务和防火墙规则（加上 Meridian 3.x 的 3x-ui）。系统包保留。在单服务器部署中它也移除本地 `cluster.yml`。在多服务器集群中它拒绝仍有角色的服务器。
+在最后一台控制服务器上，`meridian teardown IP` 会先验证异机备份，再删除正在使用的数据库。它仅删除经过验证的 Meridian 资源；共享资源归属不明时会停止，也不会删除 3.x 部署。
 
 ## 文件位置
 
