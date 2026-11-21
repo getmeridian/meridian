@@ -29,6 +29,7 @@
 - Quote every `conn.run()` interpolation with `shlex.quote()`, and validate every rendered hostname, SNI, port and path.
 - Keep Reality public/private/short-ID material atomic and preserve keys through server replacement.
 - A one-time SSH password reaches only a trusted host key; sudo must pass `sudo -n true` first, and ControlPath must fit Unix socket limits.
+- Before changing SSH authentication, prove a fresh public-key login: a reused master or an empty-password login can succeed without a key.
 - Local mode follows the saved machine profile, never the outbound address a VPN can share.
 - Build shared links with `PanelConfig.subscription_url()`; admin paths never travel in end-user URLs.
 - Use IP-addressed DoH for exits and gateways; gateway IP/country routes need `IPOnDemand` before the catch-all.

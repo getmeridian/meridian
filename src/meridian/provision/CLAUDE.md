@@ -27,6 +27,7 @@
 - **One unit per `systemctl` call when a unit may be absent** — multi-unit `disable --now` aborts on a missing unit and stops nothing.
 - **Realm installs only a pinned static musl tarball, run before it replaces anything** — a glibc build that couldn't start once overwrote a working binary; a target without a digest fails.
 - **Firewall follows the effective sshd port**, never an assumed `22/tcp`; recipes never open public ports, compiled tagged rules do.
+- **SSH hardening verifies the effective defaults** — a provider can omit or shadow the drop-in include. Load only the managed file before global defaults; enabling a wildcard or editing another file can change ports and conditional access.
 - **Baseline checks exit 1 for absence** — a missing `ufw` or `docker` exits 127, which observation treats as unavailable evidence.
 - **fail2ban reads sshd from the journal** — Debian 12 has no `auth.log`.
 - **"Installed" means `install ok installed`** — `dpkg-query -W` also lists removed packages.

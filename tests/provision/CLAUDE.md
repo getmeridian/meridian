@@ -21,3 +21,4 @@ This catches regressions where a step stops checking state before acting.
 - **Mock rule order** — first matching pattern wins. Register more specific patterns (and failures) before shared stubs such as `test_common.py`'s `_ufw()`.
 - **Unmatched commands succeed** — don't stub `rc=0` for commands that only need to succeed; a stub that matches too broadly (`"systemctl reload nginx"` inside an install-cert command) hides the path under test.
 - **Provision context stays typed** — add explicit `ProvisionContext` fields for inter-step data; pipeline contract tests catch missing or misspelled fields.
+- **Test SSH hardening with the effective configuration** — a drop-in on disk may never be included. Give `sshd -t/-T -f` a temporary host key and use `-C` to check that an owner's Match rules still work.

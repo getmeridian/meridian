@@ -43,6 +43,63 @@ def test_connection_defaults() -> None:
     assert conn.needs_sudo is False
 
 
+class TestFreshKeyLogin:
+    @pytest.mark.parametrize(
+        ("identity", "auth_record"),
+        [
+            ("", 'Authenticated to 198.51.100.25 ([198.51.100.25]:2222) using "publickey".'),
+            ("/example/deploy key", "debug1: Authentication succeeded (publickey)."),
+        ],
+    )
+    def test_fresh_probe_uses_the_configured_login_without_existing_control_socket(
+        self, identity: str, auth_record: str
+    ) -> None:
+        conn = ServerConnection("198.51.100.25", user="deploy", port=2222, identity_file=identity)
+
+        # Exercise both the ordinary multiplexed connection and an explicitly pinned identity.
+        def authenticate(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            assert cmd[-2:] == ["deploy@198.51.100.25", "true"] and cmd[cmd.index("-p") + 1] == "2222"
+            assert cmd[cmd.index("-S") + 1] == "none" and "ControlMaster=no" in cmd and "ControlMaster=auto" not in cmd
+            assert {"BatchMode=yes", "PreferredAuthentications=publickey", "StrictHostKeyChecking=yes", "-a"} <= set(
+                cmd
+            )
+            assert kwargs["stdin"] == subprocess.DEVNULL and kwargs.get("env") is None
+            if identity:
+                assert cmd[cmd.index("-i") + 1] == identity and "IdentitiesOnly=yes" in cmd
+            log = Path(cmd[cmd.index("-E") + 1])
+            log.write_text(auth_record + "\n")
+            return _done()
+
+        with patch("meridian.ssh.subprocess.run", side_effect=authenticate) as process:
+            assert conn.verify_fresh_key_login()
+        process.assert_called_once()
+
+    @pytest.mark.parametrize(
+        "failure", ["none", "connection refused", FileNotFoundError("ssh"), subprocess.TimeoutExpired("ssh", 15)]
+    )
+    def test_rejects_non_key_logins_or_transport_failures_without_using_saved_password(self, failure: str | Exception):
+        conn = ServerConnection("198.51.100.25", password="not-for-probe")
+
+        def attempt(cmd: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+            assert "BatchMode=no" not in cmd and conn.password not in cmd and kwargs.get("env") is None
+            if isinstance(failure, Exception):
+                raise failure
+            # Server-controlled output cannot masquerade as the SSH client's success record.
+            Path(cmd[cmd.index("-E") + 1]).write_text('Authenticated to example using "none".\n')
+            return _done(
+                returncode=255 if failure == "connection refused" else 0,
+                stderr='Authenticated to example using "publickey".\n',
+            )
+
+        with patch("meridian.ssh.subprocess.run", side_effect=attempt):
+            assert not conn.verify_fresh_key_login()
+
+    def test_local_administration_does_not_require_an_ssh_login(self) -> None:
+        with patch("meridian.ssh.subprocess.run") as process:
+            assert ServerConnection("198.51.100.25", local_mode=True).verify_fresh_key_login()
+        process.assert_not_called()
+
+
 class TestServerConnectionRun:
     def test_remote_command_uses_strict_batch_ssh(self) -> None:
         cmd, kwargs = _spawned(ServerConnection(ip="198.51.100.11", user="root"), "whoami")

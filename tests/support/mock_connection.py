@@ -80,6 +80,10 @@ class MockConnection:
         """Mock ServerConnection.get_text."""
         return self.run(f"cat {path} 2>/dev/null", timeout=timeout, **kwargs)
 
+    def verify_fresh_key_login(self) -> bool:
+        """By default, the fixture's operator has confirmed access via a fresh key-only connection."""
+        return True
+
     def put_text(self, path: str, text: str, timeout: int = 30, **kwargs: object) -> subprocess.CompletedProcess[str]:
         """Mock ServerConnection.put_text.
 

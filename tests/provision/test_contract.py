@@ -33,10 +33,6 @@ def _make_pipeline_conn() -> MockConnection:
     # SetTimezone: already UTC
     conn.when("timedatectl show", stdout="Timezone=UTC\n")
 
-    # HardenSSH: already hardened
-    conn.when("grep -qE", rc=0)
-    conn.when("grep -c", stdout="0\n")
-
     # ConfigureBBR
     conn.when("sysctl -n net.core.default_qdisc", stdout="fq\n")
     conn.when("sysctl -n net.ipv4.tcp_congestion_control", stdout="bbr\n")
@@ -58,7 +54,8 @@ def _make_pipeline_conn() -> MockConnection:
     conn.when("mkdir", rc=0)
     conn.when("chown", rc=0)
     conn.when("crontab", rc=0)
-    conn.when("python3", rc=0)
+    # The isolated SSH hardening helper must report a recognized outcome.
+    conn.when("python3", rc=0, stdout="ok\n")
 
     # Xray verify
     conn.when("pgrep", stdout="12345\n")

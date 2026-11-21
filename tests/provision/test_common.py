@@ -9,7 +9,6 @@ from __future__ import annotations
 import pytest
 
 from meridian.provision.common import (
-    _SSH_HARDENING_DROPIN,
     AUTO_UPGRADES_CONF,
     FAIL2BAN_JAIL_CONF,
     REQUIRED_PACKAGES,
@@ -130,59 +129,24 @@ class TestSetTimezone:
 
 
 class TestHardenSSH:
-    def test_already_hardened_returns_ok(self, mock_conn: MockConnection, base_ctx):
-        mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", stdout=_SSH_HARDENING_DROPIN)
-        mock_conn.when("sshd -t", rc=0)
-        mock_conn.when("sshd -T", rc=0)
-
+    def test_unconfirmed_key_access_refuses_before_changing_host(self, mock_conn, base_ctx, monkeypatch):
+        monkeypatch.setattr(mock_conn, "verify_fresh_key_login", lambda: False)
         result = HardenSSH().run(mock_conn, base_ctx)
-
-        assert result.status == "ok"
-
-    def test_fresh_write_restarts_sshd_and_migrates_old_dropins(self, mock_conn: MockConnection, base_ctx):
-        mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", rc=1)
-        mock_conn.when("sshd -t", rc=0)
-        mock_conn.when("sshd -T", rc=0)
-
-        result = HardenSSH().run(mock_conn, base_ctx)
-
-        assert result.status == "changed"
-        mock_conn.assert_called_with_pattern("systemctl restart sshd")
-        mock_conn.assert_called_with_pattern("rm -f /etc/ssh/sshd_config.d/99-meridian.conf")
-        mock_conn.assert_called_with_pattern("/etc/ssh/sshd_config.d/00-meridian.conf")
-
-    def test_sshd_validation_fails_returns_failed(self, mock_conn: MockConnection, base_ctx):
-        mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", rc=1)
-        mock_conn.when("sshd -t", rc=1, stderr="sshd_config: bad configuration")
-
-        result = HardenSSH().run(mock_conn, base_ctx)
-
         assert result.status == "failed"
-        assert "validation failed" in result.detail
+        assert not mock_conn.calls and not mock_conn.writes
 
-    def test_effective_setting_mismatch_returns_failed(self, mock_conn: MockConnection, base_ctx):
-        mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", stdout=_SSH_HARDENING_DROPIN.strip())
-        mock_conn.when("sshd -t", rc=0)
-        mock_conn.when("sshd -T | grep -q '^passwordauthentication no$'", rc=1)
-
-        result = HardenSSH().run(mock_conn, base_ctx)
-
-        assert result.status == "failed"
-        assert "effective sshd setting mismatch" in result.detail
-
-    def test_debianbanner_unrecognized_skips_verification(self, mock_conn: MockConnection, base_ctx):
-        """When sshd doesn't recognize DebianBanner, skip its verification (issue #20)."""
-        mock_conn.when("cat /etc/ssh/sshd_config.d/00-hardening.conf", stdout=_SSH_HARDENING_DROPIN)
-        mock_conn.when("sshd -t", rc=0)
-        # Required settings pass
-        mock_conn.when("sshd -T | grep -q '^passwordauthentication no$'", rc=0)
-        mock_conn.when("sshd -T | grep -q '^kbdinteractiveauthentication no$'", rc=0)
-        # sshd doesn't recognize DebianBanner — grep for the key returns nothing
-        mock_conn.when("sshd -T | grep -qi '^debianbanner'", rc=1)
+    @pytest.mark.parametrize(
+        ("reply", "code", "status"),
+        [("ok", 0, "ok"), ("changed", 0, "changed"), ("", 0, "failed"), ("unexpected", 0, "failed"), ("", 1, "failed")],
+    )
+    def test_reports_only_the_validated_target_result(self, mock_conn, base_ctx, reply, code, status):
+        mock_conn.when("python3", stdout=reply, rc=code, stderr="provider configuration rejected" if code else "")
 
         result = HardenSSH().run(mock_conn, base_ctx)
 
-        assert result.status == "ok"
+        assert result.status == status
+        assert len(mock_conn.calls) == 1
+        assert mock_conn.run_kwargs[0].get("sensitive") is True
 
 
 class TestConfigureFail2ban:
