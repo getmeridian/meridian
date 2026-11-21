@@ -489,9 +489,7 @@ impl<'a> Agent<'a> {
                 .count();
             info!(
                 "revision {}/{}: {failed} resource(s) not applied, {} not retired",
-                target.fleet_epoch,
-                target.revision,
-                pass.unretired.len()
+                target.fleet_epoch, target.revision, pass.unretired_count
             );
         }
         self.state.save(&self.opts.state_dir)

@@ -716,12 +716,14 @@ fn a_unit_that_will_not_stop_keeps_the_document_unconverged() {
 
     let pass = host.apply(std::slice::from_ref(&kept));
     assert!(!pass.converged, "{:?}", pass.observations);
-    assert_eq!(pass.unretired, ["unit:fwd"]);
+    assert_eq!(pass.unretired_count, 1);
+    assert!(host.ledger.iter().any(|entry| entry.id == "unit:fwd"));
     assert!(host.exists("/etc/systemd/system/netfwd-a.service"));
     assert!(host.exec.unit("netfwd-a.service").active);
 
     host.exec.stuck.lock().unwrap().clear();
     let pass = host.apply(&[kept]);
-    assert!(pass.converged && pass.unretired.is_empty());
+    assert!(pass.converged && pass.unretired_count == 0);
+    assert!(!host.ledger.iter().any(|entry| entry.id == "unit:fwd"));
     assert!(!host.exists("/etc/systemd/system/netfwd-a.service"));
 }
