@@ -74,11 +74,8 @@ def test_verification_panel_selects_service_users_like_panel_users(url: str) -> 
     with ControlClient(url, ADMIN_TOKEN) as client:
         record = client.put_user("alice")
         client.put_endpoint("main:main-reality:direct", REALITY)
-    cluster = ClusterConfig()
-    cluster.topology_intent = single_server_intent(None, server_ref="srv-a")
-
     with ServiceAccessPanel(url, ADMIN_TOKEN, 5) as panel:
-        user = select_active_client(panel, cluster, "")
+        user = select_active_client(panel, "")
         assert user is not None
         assert (user.username, user.short_uuid, user.status) == ("alice", record.sub_token, "ACTIVE")
         document = panel.fetch_subscription(user.short_uuid, client_type=XRAY_JSON_CLIENT_TYPE)
