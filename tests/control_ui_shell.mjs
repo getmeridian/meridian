@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { loadStyles as resolveStyles } from './support/console_styles.mjs';
+import { loadStyles as resolveStyles, withPhoneViewport } from './support/console_styles.mjs';
 
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
@@ -276,7 +276,7 @@ function loadStyles(width = 390, coarse = width <= 640) {
     .replace(/@media\s*\(pointer:\s*coarse\)(?:\s*,\s*\(max-width:\s*(\d+)px\))?/g,
       (_, limit) => coarse || Number(limit) >= width ? '@media all' : '@media not all')
     .replace(/@media\s*\(max-width:\s*(\d+)px\)/g, (_, limit) => Number(limit) >= width ? '@media all' : '@media not all');
-  document.head.appendChild(M.h('style', { text: css }));
+  document.head.appendChild(M.h('style', { text: width <= 640 ? withPhoneViewport(css, width) : css }));
 }
 if (scenario === 'shell-phone-targets') {
   loadStyles(390, data.coarse);
@@ -299,7 +299,7 @@ if (scenario === 'overview-layout') {
     headerDisplay: w.getComputedStyle(header).display,
     position: style.position || 'static',
     order: style.order || '0',
-    surface: style.background,
+    surface: style.backgroundColor,
     border: style.borderBlockStart,
     shadow: style.boxShadow,
     safePadding: style.paddingBlockEnd,

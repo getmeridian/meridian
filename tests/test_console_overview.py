@@ -372,9 +372,10 @@ def test_quick_actions_use_the_desktop_header_and_reserve_a_solid_phone_bar(loca
     else:
         assert layout["position"] == "sticky" and layout["headerDisplay"] == "contents"
         assert layout["order"] == "1"
-        assert "var(--s1)" in layout["surface"] and "solid" in layout["border"] and layout["shadow"]
-        assert "safe-area-inset-bottom" in layout["safePadding"]
-        assert "safe-area-inset-bottom" in layout["pagePadding"] and "44px" in layout["pagePadding"]
+        assert layout["surface"] == "rgb(255, 255, 255)" and "solid" in layout["border"]
+        assert layout["shadow"] not in {"", "none"}
+        # A 20px bottom inset sits below the actions; the page also reserves the bar's space.
+        assert layout["safePadding"] == "32px" and layout["pagePadding"] == "104px"
 
 
 def test_an_initial_read_failure_keeps_an_honest_state_and_retry_recovers() -> None:
@@ -419,7 +420,7 @@ def test_phone_theme_and_rtl_contracts_cover_the_shared_components(
     result = run_console("overview-visual", locale, {**overview_data, "storage": {"mrd.theme": theme}})
     visual = result["visual"]
     assert visual["background"] == background
-    assert visual["columns"] == "minmax(0, 1fr)"
+    assert visual["columns"] in {"minmax(0, 1fr)", "minmax(0px, 1fr)"}
     assert visual["readAlignment"] == "start" and visual["menuEdge"] == "0px"
     assert all(height >= 44 for height in visual["targets"])
     assert result["dir"] == ("rtl" if locale == "fa" else "ltr")

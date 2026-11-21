@@ -26,7 +26,7 @@
 - Terminal readers use poll/selectors rather than select's fixed descriptor limit; full suites exhaust that small limit.
 - Pinned Xray blocks private freedom targets by default; loopback revocation tests need an explicit allow before judging traffic.
 - Console scenarios go over stdin, since Linux limits an individual argument's size.
-- DOM scenarios require `needs_console_dom`, make the document visible and include head; hidden screens defer requests, and optional script parents match real pages.
+- DOM scenarios require `needs_console_dom`, make the document visible and include head; hidden screens defer requests, and optional script parents match real pages. Phone style checks provide viewport and inset values, then assert computed sizes and colors.
 - Console drivers wait until controls are enabled. Shared component builders and real fetch replies preserve row identity and guards.
 - Count visible DOM markers; hidden retained badges do not represent current state.
 - Strip styling before help assertions, and normalize Persian digits before comparing displayed counts.
