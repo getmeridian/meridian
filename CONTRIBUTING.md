@@ -51,6 +51,34 @@ Key modules:
 4. For deployment changes, run `make system-lab` or test on a real server
 5. Open a PR with a clear description of what and why
 
+## Reusing PR checks on main
+
+By default, a main push runs its checks and reports any matching PR in the **Changes** job summary. Before enabling reuse, find a “Would reuse checks” link on a green main run and confirm the linked PR covered the same jobs. Then set the repository Actions variable `MERIDIAN_CI_REUSE` to `enabled`. Delete the variable to return to observation. A manual CI dispatch always runs the full suite.
+
+## Tagging a beta
+
+After merging the version bump, fetch main and confirm that the commit and version below are the ones you intend to release:
+
+```sh
+git fetch origin main
+sha=$(git rev-parse origin/main)
+git show -s --oneline "$sha"
+git show "$sha:VERSION"
+```
+
+Wait from your machine for the **push to main** at that commit. If GitHub hasn't listed the run yet, repeat this block once it appears:
+
+```sh
+repo=getmeridian/meridian
+run=$(gh run list -R "$repo" -w ci.yml --event push --branch main --commit "$sha" --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+tag="v$(git show "$sha:VERSION")"
+test -n "$run" && gh run watch -R "$repo" "$run" --exit-status &&
+  printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$' &&
+  git tag -a "$tag" -m "$tag" "$sha" && git push origin "refs/tags/$tag"
+```
+
+An early tag stops before creating a release. Once its main CI passes, **rerun the failed tag job**; leave the tag in place. Independent beta branches still run unit tests on the tagged checkout. Both paths verify the release package and require PyPI approval.
+
 ## Architecture Notes
 
 See [CLAUDE.md](CLAUDE.md) for detailed architecture, implicit dependencies, and conventions. Key points:
