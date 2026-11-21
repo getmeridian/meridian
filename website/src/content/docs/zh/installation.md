@@ -20,7 +20,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 在 [GitHub 发布页](https://github.com/getmeridian/meridian/releases)选择一个附有 `install.sh` 和 `SHA256SUMS` 的版本。在下面的命令中，将 `VERSION` 设为该标签去掉开头 `v` 的版本号，然后下载并校验文件：
 
 ```
-VERSION=4.0.0b19  # 示例：请改为你选择的版本
+VERSION=4.0.0b20  # 示例：请改为你选择的版本
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS

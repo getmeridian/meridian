@@ -20,7 +20,7 @@ This script:
 Choose a published [GitHub release](https://github.com/getmeridian/meridian/releases) with `install.sh` and `SHA256SUMS` attached. Set `VERSION` below to its tag without the leading `v`, then download and verify the files:
 
 ```
-VERSION=4.0.0b19  # example: use the release you chose
+VERSION=4.0.0b20  # example: use the release you chose
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
