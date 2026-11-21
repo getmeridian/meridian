@@ -177,7 +177,7 @@ Tier alpha runs by default with no user involvement.
 - SSH password auth refused after hardened redeploy
 - fail2ban active
 - `meridian fleet status` reports the node connected
-- Client add/list/remove round-trip via real panel API
+- Client add/list/remove round-trip through the control service
 - `meridian plan` exits 0 or 2 (converged or changes pending — both OK)
 - Subscription URL returns HTTP 200
 
@@ -269,9 +269,9 @@ it Read & Write permission. Export it in the shell session.
 **"SSH on X.X.X.X:22 did not come up within 120s"** — VM booted but cloud-init
 is still running. Rare, but can happen on first-ever image pull. Try again.
 
-**"subscription URL returned HTTP 503"** — Remnawave panel didn't fully come
-up. CX23 is the minimum viable size; if testing on smaller (not recommended),
-bump to CX33.
+**"subscription URL returned HTTP 503"** — check the control service and
+nginx on the test VM. From the managing machine, run
+`meridian logs ADDRESS -c panel -c nginx` to inspect their recent redacted logs.
 
 **"certificate issuer does not mention Let's Encrypt"** after several rapid runs —
 you've likely tripped LE's IP-cert rate limit (~5 shortlived issuances per

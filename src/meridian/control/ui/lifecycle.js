@@ -2,13 +2,6 @@
 (function () {
   "use strict";
   var M = window.M, h = M.h;
-  var fields = ["traffic_reset_anchor_day", "activation_duration_days", "renewal_interval_days",
-    "renewal_interval_months", "renewal_limit"];
-
-  M.sameLifecycle = function (before, after) {
-    return fields.every(function (field) { return before[field] === after[field]; });
-  };
-
   function exactDate(value, compact) {
     if (compact) return h("bdi", {}, h("time", { datetime: value, title: value + " UTC", text: M.date(value, true) }));
     return h("span", { class: "stack-sm" }, h("bdi", { text: M.date(value, true) }),

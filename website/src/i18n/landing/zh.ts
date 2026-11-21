@@ -12,7 +12,6 @@ export const zh: LandingStrings = {
   'hero.sub': 'Meridian 在你的服务器上搭建 VPN，Reality 连接看起来像普通的 HTTPS 流量。你邀请的每个人都有自己的专属链接。',
   'hero.cta': '开始搭建',
   'hero.demo': '体验演示',
-  'hero.docs': '阅读文档',
   'hero.grab': '旋转地球或查看连接路线',
   'hero.keys': '用方向键旋转，按 Home 复位，按 Enter 查看连接路线。',
   'hero.pause': '暂停地球动画',

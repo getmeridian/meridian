@@ -267,7 +267,7 @@ def test_client_list_attention_filters_console_people_and_adds_reasons(
     with serve_control(tmp_path, clock=lambda: datetime.fromisoformat(NOW).timestamp()) as url:
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN),
-            topology_intent=single_server_intent(None, server_ref="srv-a", client_name="alice"),
+            topology_intent=single_server_intent(None, server_ref="srv-a"),
         )
         monkeypatch.setattr(client, "load_topology_cluster", lambda **_: cluster)
         try:

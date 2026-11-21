@@ -185,7 +185,7 @@ class TestServerRegistry:
         registry.add(ServerEntry("198.51.100.10", "root", "control"))
         entry = registry.find("control")
         assert entry is not None
-        cluster = ClusterConfig(topology_intent=single_exit_intent(control=entry.id, users=["alice"]))
+        cluster = ClusterConfig(topology_intent=single_exit_intent(control=entry.id))
 
         with pytest.raises(LocalStateError, match="the control plane"):
             registry.remove(entry.id, cluster=cluster)

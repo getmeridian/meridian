@@ -83,8 +83,8 @@ pub struct PassResult {
     pub observations: Vec<ResourceObservation>,
     /// Every resource applied and everything vanished retired: the document counts as fully applied.
     pub converged: bool,
-    /// Ledger entries the document dropped whose retirement failed (retried next pass).
-    pub unretired: Vec<String>,
+    /// Number of dropped entries still in the ledger for the next retirement attempt.
+    pub unretired_count: usize,
     /// Resource IDs that changed on the node in this pass.
     pub changed: BTreeSet<String>,
     /// Authentication applies independently; failed flow guards are reported and retried.
@@ -280,7 +280,7 @@ impl Engine<'_> {
         }
 
         // Ledger order: leftovers whose retirement failed first, then document order.
-        let unretired: Vec<String> = retained.iter().map(|entry| entry.id.clone()).collect();
+        let unretired_count = retained.len();
         let mut next: Vec<LedgerEntry> = retained;
         for resource in resources {
             if let Some(entry) = entries.remove(&resource.id) {
@@ -292,11 +292,11 @@ impl Engine<'_> {
         self.drop_kept(resources);
         let _ = fs::remove_dir_all(&self.cache_dir);
         let converged =
-            unretired.is_empty() && observations.iter().all(|obs| obs.status == "applied");
+            unretired_count == 0 && observations.iter().all(|obs| obs.status == "applied");
         PassResult {
             observations,
             converged,
-            unretired,
+            unretired_count,
             changed,
             flow_error,
         }

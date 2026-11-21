@@ -24,7 +24,6 @@ from meridian.core.schema import schema_model
 from meridian.remnawave import User
 from meridian.setup.single_server import single_server_intent
 from tests.support.control_service import ADMIN_TOKEN, seed_legacy_person, serve_control
-from tests.support.topology import single_exit_intent
 
 GIB = 1024**3
 FUTURE_DAY = "2031-12-31"
@@ -60,15 +59,6 @@ def test_usage_line(strategy: str, limit: int, shown: str) -> None:
 # --- Commands against a control service -------------------------------------------------------------------------
 
 
-def _mocked_cluster(tmp_path: Path) -> ClusterConfig:
-    cluster = ClusterConfig(
-        panel=PanelConfig(url="https://198.51.100.1/panel", api_token="test-token", server_ip="198.51.100.1"),
-        topology_intent=single_exit_intent(users=["alice", "bob"]),
-    )
-    cluster.save(tmp_path / "cluster.yml")
-    return cluster
-
-
 @contextmanager
 def _fleet(
     tmp_path: Path, *, json_mode: bool = False, clock: Callable[[], float] | None = None
@@ -80,7 +70,7 @@ def _fleet(
             url = stack.enter_context(serve_control(tmp_path, clock=clock))
             cluster = ClusterConfig(
                 panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-                topology_intent=single_server_intent(None, server_ref="srv-a", client_name="alice"),
+                topology_intent=single_server_intent(None, server_ref="srv-a"),
             )
             client = stack.enter_context(ControlClient(url, ADMIN_TOKEN))
             client.put_user("alice")

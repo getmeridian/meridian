@@ -14,8 +14,10 @@
 - `subset_fonts.py` rebuilds the website's WOFF2 subsets from the upstream font releases (instanced axes, per-script `unicode-range` files; network, never CI); keep its ranges equal to `website/src/styles/fonts.css`.
 - `bump_pins.py` raises Realm, RealiTLScanner, and acme.sh (hashed here; it publishes no assets) to the newest release in each tested major and rewrites `config.py` by exact substring, refusing an ambiguous match; the weekly `bump-pins` workflow runs it and opens a PR.
 - `export_geodata_lists.py` writes `core/geodata_lists.py` from the geodata in the pinned Xray archive (network, never CI), the same files node agents install; a test fails until it is rerun after `XRAY_VERSION` moves.
-- `cli_map.py` renders the concept map, traffic and plan/apply diagrams, and every command's live help (walked from `cli_root()`) into one self-contained `build/cli-map.html` (`--hidden` adds the control-service commands, `--json` dumps the commands); draft visuals for the docs, never shipped.
+- `cli_map.py` renders the concept map, traffic and plan/apply diagrams, and every command's live help (walked from `cli_root()`) into one self-contained `build/cli-map.html` (`--hidden` shows hidden commands by default, `--json` dumps the commands); draft visuals for the docs, never shipped.
 ## Pitfalls
+- Search shell scripts and workflow YAML before removing a Python argument. For example, System Lab builds its panel-domain topology from Python embedded in a shell stage, outside the AST checker's inputs.
+- Use Typer's `display_name_raw` and `display_type(ctx)` when rendering parameter help: the installed parser no longer exposes Click's `human_readable_name` or `type`.
 - Before moving the Xray pin, compare both geodata inventories with the released ones. An archive missing an existing country or domain list prevents fleets using that list from starting.
 - Capture the named demo route (the console starts on Overview). Use `showcase_screenshots.py --landing-only EXPORT` to refresh just the three images the public tour displays.
 - Copy the running service’s asset snapshot when exporting the showcase. Reading assets from disk again can publish a different version from the one the demo HTML references if a checkout changes mid-export.

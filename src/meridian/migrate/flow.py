@@ -158,7 +158,7 @@ class ControlMigrator:
         carried: CarriedUsers | None = None
         if migration is None or not migration.reached("imported"):
             SSHApplyFence(self._control_connection(flipped)).ensure(local_fence_view(self.cluster))
-            carried = self._read_users(flipped)
+            carried = self._read_users()
         return MigrationReview(
             intent=flipped,
             setup=setup,
@@ -241,7 +241,7 @@ class ControlMigrator:
         self._on_step("Installing the control service beside the panel")
         install_beside_panel(control, self.cluster, migration.service_token)
         # Read again right before importing, so the usage carried over is as fresh as it can be.
-        carried = self._read_users(review.intent)
+        carried = self._read_users()
         backup = Path(migration.backup_dir)
         write_snapshot(backup, SNAPSHOT_NAME, carried.batch.model_dump_json(indent=2))
         # The links users hold now, from the panel's own address: the apply must keep every one.
@@ -343,7 +343,7 @@ class ControlMigrator:
                 agent_binary(arch)
                 checked.add(arch)
 
-    def _read_users(self, intent: SetupIntent) -> CarriedUsers:
+    def _read_users(self) -> CarriedUsers:
         panel = self._panel_factory(self.cluster.panel.url, self.cluster.panel.api_token)
         try:
             users = panel.list_users()

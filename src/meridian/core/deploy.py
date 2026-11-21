@@ -6,7 +6,7 @@ from typing import Literal, Self
 
 from pydantic import Field, field_validator, model_validator
 
-from meridian.core.defaults import DEFAULT_SNI
+from meridian.core.defaults import DEFAULT_CLIENT, DEFAULT_SNI
 from meridian.core.inputs import (
     PAGE_PALETTES,
     DeployIpValue,
@@ -191,7 +191,7 @@ def _deploy_input_fields(request: DeployRequest) -> list[InputField]:
             id="client_name",
             label="First client",
             kind="text",
-            default=request.client_name or "default",
+            default=request.client_name or DEFAULT_CLIENT,
             help_text="Initial connection profile name.",
         ),
         InputField(

@@ -20,7 +20,6 @@ from tests.support.topology import compile_panel_pass, single_exit_intent
 def _intent(*, warp: bool = False, geo_block: bool = False, overrides: list[EgressOverrideIntent] | None = None):
     return single_exit_intent(
         control="srv-exit",
-        users=["alice"],
         exit_fields={"warp": warp, "geo_block": geo_block, "egress_overrides": overrides or []},
     )
 

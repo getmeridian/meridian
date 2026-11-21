@@ -35,7 +35,7 @@ def _fleet(tmp_path: Path, *, json_mode: bool = False) -> Iterator[ControlClient
         with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN) as client:
             cluster = ClusterConfig(
                 panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-                topology_intent=single_exit_intent(users=["alice"]),
+                topology_intent=single_exit_intent(),
             )
             client.put_user("alice")
             with patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster):

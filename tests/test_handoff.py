@@ -66,7 +66,7 @@ def test_handoff_reads_users_without_publishing_or_saving(monkeypatch) -> None:
 def test_handoff_greets_the_person_by_the_name_they_typed() -> None:
     from tests.support.topology import single_exit_intent
 
-    intent = single_exit_intent(users=("guest",))
+    intent = single_exit_intent()
     intent = intent.model_copy(
         update={"access": intent.access.model_copy(update={"display_names": {"guest": "Old label"}})}
     )

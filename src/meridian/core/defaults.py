@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from typing import Literal
 
+# First person created by deploy when no --client-name is given.
+DEFAULT_CLIENT = "default"
+
 # Default Reality camouflage target.  Duplicated from ``meridian.config``
 # so that the core contract layer stays free of CLI-specific state such as
 # paths, image tags, and environment-variable readers.

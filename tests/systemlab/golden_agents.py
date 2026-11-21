@@ -117,4 +117,3 @@ UNKNOWN_AGENT_IDS = ("happ", "browser", "curl")
 
 # Explicit format selectors (``/sub/<short>/<selector>``); Meridian's own checks use ``json``.
 SELECTORS = ("json", "mihomo", "singbox")
-SELECTOR_AGENT_ID = "curl"

@@ -46,7 +46,6 @@ def single_exit_intent(
     exit_id: str = "exit-a",
     exit_ref: str = "srv-exit",
     paths: Sequence[ProtocolPathIntent] | None = None,
-    users: Sequence[str] = ("default",),
     exit_fields: Mapping[str, Any] | None = None,
     **intent_fields: Any,
 ) -> SetupIntent:

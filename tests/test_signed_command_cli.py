@@ -54,7 +54,7 @@ def cluster() -> ClusterConfig:
             server_ip="198.51.100.10",
             sub_path="pages",
         ),
-        topology_intent=single_exit_intent(users=["person-a", "person-b"]),
+        topology_intent=single_exit_intent(),
     )
 
 

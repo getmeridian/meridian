@@ -60,12 +60,8 @@ class TestCloudProviderAbstract:
                 return VMInstance(
                     id="x",
                     name="x",
-                    status="running",
                     public_ipv4="198.51.100.10",
-                    public_ipv6=None,
-                    region="r",
                     labels={},
-                    provider=self.name,
                 )
 
         with pytest.raises(TypeError):
@@ -79,19 +75,12 @@ class TestCloudProviderAbstract:
                 return VMInstance(
                     id="1",
                     name=spec.name,
-                    status="running",
                     public_ipv4="198.51.100.1",
-                    public_ipv6=None,
-                    region=spec.region,
                     labels=spec.labels,
-                    provider=self.name,
                 )
 
             def destroy_vm(self, vm_id: str) -> None:
                 pass
-
-            def get_vm(self, vm_id: str) -> VMInstance | None:
-                return None
 
             def list_vms(self, labels: dict[str, str] | None = None) -> list[VMInstance]:
                 return []
@@ -105,7 +94,6 @@ class TestCloudProviderAbstract:
         p = Stub()
         spec = VMSpec(name="n", image="i", size="s", region="r", labels={"a": "b"})
         inst = p.create_vm(spec)
-        assert inst.provider == "stub"
         assert inst.name == "n"
         assert inst.labels == {"a": "b"}
         assert p.estimate_cost(spec) is None  # default base impl
@@ -144,20 +132,19 @@ class TestHetznerProviderImportable:
             HetznerProvider(token="")
         assert "token is empty" in str(exc_info.value).lower()
 
-    @pytest.mark.parametrize("has_location", [True, False])
-    def test_labelled_server_remains_identifiable_for_cleanup(self, has_location) -> None:
+    @pytest.mark.parametrize("ip", [None, "198.51.100.1"])
+    def test_labelled_server_remains_identifiable_for_cleanup(self, ip: str | None) -> None:
         from tests.realvm.providers.hetzner import HetznerProvider
 
         labels = {"meridian-realvm-test": "1"}
-        # Current server payloads have a top-level location and no datacenter.
-        server = SimpleNamespace(id=42, name="test-vm", status="running", public_net=None, labels=labels)
-        if has_location:
-            server.location = SimpleNamespace(name="hel1")
+        # Cleanup must still work without an address or SDK location/datacenter metadata.
+        public_net = SimpleNamespace(ipv4=SimpleNamespace(ip=ip)) if ip else None
+        server = SimpleNamespace(id=42, name="test-vm", public_net=public_net, labels=labels)
         p = object.__new__(HetznerProvider)
         p._client = Mock()
         p._client.servers.get_all.return_value = [server]
         (instance,) = p.list_vms(labels)
-        assert (instance.id, instance.region, instance.labels) == ("42", "hel1" if has_location else "", labels)
+        assert (instance.id, instance.name, instance.public_ipv4, instance.labels) == ("42", "test-vm", ip, labels)
         p._client.servers.get_all.assert_called_once_with(label_selector="meridian-realvm-test=1")
 
     def test_estimate_cost_known_size(self) -> None:

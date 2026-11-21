@@ -95,9 +95,6 @@ class DeliveryPortRange(CoreModel):
             raise ValueError("The end port must be at least the start port.")
         return self
 
-    def contains(self, port: int) -> bool:
-        return self.start <= port <= (self.end or self.start)
-
     def text(self) -> str:
         return str(self.start) if self.end == self.start else f"{self.start}-{self.end}"
 

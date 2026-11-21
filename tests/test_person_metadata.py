@@ -144,7 +144,7 @@ def test_client_set_show_and_tag_filter_include_console_people(
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-            topology_intent=single_exit_intent(users=["declared"]),
+            topology_intent=single_exit_intent(),
         )
         admin.put_user("declared")
         admin.put_user("sample")

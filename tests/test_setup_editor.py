@@ -26,7 +26,6 @@ def _intent() -> SetupIntent:
         ),
         exit_id="exit-primary",
         paths=[reality_path("path-primary")],
-        users=["alice"],
         delivery=DeliveryIntent(formats=["xray_json"]),
     )
 

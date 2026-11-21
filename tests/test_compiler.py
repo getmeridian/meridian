@@ -934,15 +934,6 @@ class TestCompilerFailures:
             ResourcePlan.model_validate(payload)
 
 
-def profiles_inbound_refs(plan: ResourcePlan, workload_id: str) -> list[str]:
-    profile = next(
-        resource.payload
-        for resource in plan.resources
-        if isinstance(resource.payload, ConfigProfilePayload) and resource.payload.workload_id == workload_id
-    )
-    return profile.inbound_refs
-
-
 def client_inbound_refs(plan: ResourcePlan, workload_id: str) -> list[str]:
     profile = next(
         resource.payload

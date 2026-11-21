@@ -99,7 +99,7 @@ def test_panel_teardown_local_state_failure_reports_remote_completion(failure_po
 
 
 def test_v4_teardown_fails_before_ssh_or_remote_mutation() -> None:
-    cluster = ClusterConfig(topology_intent=single_exit_intent(users=["alice"]))
+    cluster = ClusterConfig(topology_intent=single_exit_intent())
     registry = MagicMock()
     registry.find.return_value = ServerEntry(
         id="srv-exit",
@@ -127,7 +127,7 @@ def test_v4_teardown_fails_before_ssh_or_remote_mutation() -> None:
 
 def test_teardown_of_a_remnawave_fleet_server_points_at_migrate_or_its_own_release() -> None:
     """`setup` refuses a Remnawave fleet, so the usual hint would loop; its own release still edits it."""
-    intent = single_exit_intent(users=["alice"])
+    intent = single_exit_intent()
     intent = intent.model_copy(update={"control": intent.control.model_copy(update={"backend": "remnawave"})})
     cluster = ClusterConfig(panel=PanelConfig(deployed_with="4.0.0b8"), topology_intent=intent)
     registry = MagicMock()
@@ -185,7 +185,7 @@ def test_v4_teardown_of_a_single_server_fleet_removes_everything(tmp_home) -> No
 
 
 def test_v4_teardown_allows_server_after_role_and_workload_are_retired() -> None:
-    cluster = ClusterConfig(topology_intent=single_exit_intent(exit_ref="srv-current-exit", users=["alice"]))
+    cluster = ClusterConfig(topology_intent=single_exit_intent(exit_ref="srv-current-exit"))
     retired = ServerEntry(id="srv-retired", host="198.51.100.9", name="retired")
 
     assert _topology_references(cluster, retired) == []

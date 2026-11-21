@@ -97,7 +97,10 @@ def test_delete_removes_every_person_even_when_an_older_revision_listed_them(peo
     from tests.support.topology import single_exit_intent
 
     seed(people_service)
-    commit_topology(people_service, single_exit_intent(users=["p-b", "p-d"]))
+    legacy = single_exit_intent().to_data()
+    legacy["access"]["users"] = ["p-b", "p-d"]
+    revision = commit_topology(people_service, legacy)
+    assert revision.intent["access"]["users"] == ["p-b", "p-d"]
     review = preview(people_service, "delete", names=["p-a", "p-b"])
     assert not review.reversible
     declared = next(person for person in review.people if person.username == "p-b")

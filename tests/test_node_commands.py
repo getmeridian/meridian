@@ -7,7 +7,6 @@ a reviewed intent change, check/list read the projected topology.
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -100,11 +99,6 @@ def _make_panel_mock() -> MagicMock:
         disable_node=None,
         delete_node=None,
     )
-
-
-def _ssh_result(stdout: str = "", rc: int = 0) -> subprocess.CompletedProcess[str]:
-    """Build a fake SSH CompletedProcess."""
-    return subprocess.CompletedProcess(args=[], returncode=rc, stdout=stdout, stderr="")
 
 
 @pytest.fixture(autouse=True)
