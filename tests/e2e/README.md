@@ -15,8 +15,9 @@ uv run --group e2e pytest tests/e2e -k toast --durations=0 --junitxml=/tmp/e2e.x
 ```
 
 The dependency group pins a compatible Playwright minor release. After upgrading
-it, repeat the browser install. CI caches the browser by the resolved version and
-runs this suite only for control/PWA, harness, dependency or workflow changes.
+it, repeat the browser install. CI installs Chromium, WebKit and their system
+libraries on each E2E run. It runs this suite for control/PWA, harness,
+dependency or workflow changes, and on manual dispatch.
 
 ## Reusing the harness
 
