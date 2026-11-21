@@ -17,7 +17,6 @@ export const en = {
   'hero.sub': 'Meridian sets up a VPN on your server that can blend in with ordinary web traffic. Each person you invite gets a private connection link.',
   'hero.cta': 'Set up Meridian',
   'hero.demo': 'Try the demos',
-  'hero.docs': 'Read the docs',
   'hero.grab': 'Spin globe or trace connections',
   'hero.keys': 'Use the arrow keys to rotate, Home to reset, or Enter to trace the connections.',
   'hero.pause': 'Pause globe animation',

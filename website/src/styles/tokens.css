@@ -47,14 +47,6 @@
   --warn: var(--ac);
   --warn2: light-dark(#C8933A14, #D4A24E14);
 
-  /* Protocol card colors (connection page) */
-  --blue: light-dark(#2b7de9, #5b9cf5);
-  --blue-bg: light-dark(#2b7de90a, #5b9cf512);
-  --blue-br: light-dark(#2b7de925, #5b9cf530);
-  --amber: light-dark(#c4882a, #e5a44e);
-  --amber-bg: light-dark(#c4882a0a, #e5a44e12);
-  --amber-br: light-dark(#c4882a25, #e5a44e30);
-
   /* Landing illustrations, specimen mounts and calls to action */
   --landing-action: light-dark(#202a36, #e7c280);
   --landing-action-hover: light-dark(#344455, #f2d6a2);
@@ -63,9 +55,6 @@
   --atlas-grid: light-dark(#d8cfbd, #444a51);
   --atlas-night: #202b38;
   --atlas-night-line: #384452;
-  --atlas-paper: #fbf7ef;
-  --atlas-brass: #e3b972;
-  --atlas-silver: #c6cdd2;
 
   /* Shadows — ink-tinted in light, deeper black in dark */
   --shadow-sm: 0 1px 2px light-dark(rgba(26, 29, 46, 0.05), rgba(0, 0, 0, 0.25));
@@ -90,8 +79,6 @@
   --heading-tracking: -0.015em;
   --label-font: var(--mono); /* small uppercase labels */
 
-  /* Alias used by demo pages */
-  --sans: var(--body);
 }
 
 :root[data-theme='light'] {

@@ -177,13 +177,6 @@ svg{flex-shrink:0}
   padding:5px 14px;border-radius:99px;flex-shrink:0;
 }
 
-.import-list{display:flex;flex-direction:column;gap:8px}
-
-.list-heading{
-  font-size:.7rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
-  color:var(--tx3);margin:6px 0 -2px;
-}
-
 /* Disclosure rows inside the setup card */
 .disclose > summary{
   display:inline-flex;align-items:center;gap:4px;
@@ -352,8 +345,7 @@ svg{flex-shrink:0}
   .setup{padding:28px}
   .setup-wide{display:grid;grid-template-columns:minmax(0,1fr) 260px;gap:32px;align-items:start}
   .setup-wide .setup-qr{padding:18px;background:var(--sf2);border:1px solid var(--br);border-radius:var(--r2)}
-  .setup:not(.setup-wide) .app-list,.setup:not(.setup-wide) .import-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .setup-wide .import-list .btn{justify-content:flex-start}
+  .setup:not(.setup-wide) .app-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .panel > summary,.panel-link{padding:16px 20px}
   .panel-body{padding:4px 20px 20px}
 }
