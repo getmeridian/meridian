@@ -1,5 +1,6 @@
 # scripts — Repository automation
 ## Design decisions
+- **CI evidence** — `ci_reuse.py` verifies a PR run for a main merge; `prerelease_ci.py` checks a tag against main. Missing proof reruns the main checks or stops an on-main release. Neither script writes to GitHub.
 - **App tester contracts stay generated** — export response-rule models, the narrow admin route, and its fleet command envelope together; CLI validation maps the leaf to the fleet section.
 - Admin OpenAPI joins `export_contracts.py` and its drift check; `validate_api_docs.py` checks all four localized API operation tables against the committed document, and `make validate` runs both gates.
 **Contract export** — `export_contracts.py` writes `contracts/meridian/`; its rules live in `contracts/CLAUDE.md`.

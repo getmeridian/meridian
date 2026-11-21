@@ -195,6 +195,7 @@ jobs:
     if: github.event_name == 'push' && github.repository == 'getmeridian/meridian'
     permissions:
       contents: write
+      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -215,18 +216,29 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "base=$(echo "$VERSION" | sed -E 's/(a|b|rc)[0-9]+$//')" >> "$GITHUB_OUTPUT"
 
+      - name: Check main CI for the tagged commit
+        id: verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mode=$(python3 scripts/prerelease_ci.py)
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
       - name: Set up uv
+        if: steps.verification.outputs.mode == 'unit-tests'
         uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
           version-file: .github/.tool-versions
           require-checksums: true
 
       - name: Unit tests
+        if: steps.verification.outputs.mode == 'unit-tests'
         run: |
           uv sync --locked --extra dev
           uv run --locked pytest -n 3 --dist=worksteal -q --tb=short --durations=12 -p no:cacheprovider
 
       - name: Create pre-release
+        if: steps.verification.outputs.mode == 'unit-tests' || steps.verification.outputs.mode == 'main-ci'
         id: create_release
         env:
           GH_TOKEN: ${{ github.token }}
