@@ -27,6 +27,7 @@
 - `tests/test_i18n.py` enforces key order/parity, identical placeholders, no reply-word collisions, and that every literal key used in code exists.
 
 ## Pitfalls
+- Check both literal callers and keys assembled at runtime before pruning a message. The owner panel reads its own catalogs under `control/ui/locales`.
 - **Dynamic validation keys cover every request field** — add each `preview.invalid_<field>` to all four CLI catalogs, or invalid input crashes before the user error can render.
 - **Saved-review errors never echo file contents** — describe the mismatch and recovery without exposing unexpected credential fields from untrusted JSON.
 - **Ambiguous names need native recovery text** — the shared client resolver names every match and asks for the exact service username in each locale.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import re
 from collections.abc import Iterator
 from pathlib import Path
@@ -53,10 +54,25 @@ def test_reply_words_never_collide_or_shadow_role_names(locale: i18n.Locale) -> 
 
 
 def test_every_literal_key_used_in_code_exists_in_english() -> None:
+    def literal_keys(expr: ast.expr) -> Iterator[str]:
+        if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+            yield expr.value
+        elif isinstance(expr, ast.IfExp):
+            yield from literal_keys(expr.body)
+            yield from literal_keys(expr.orelse)
+
     english = i18n.catalog("en")
     used: set[str] = set()
     for path in SRC.rglob("*.py"):
-        used |= set(re.findall(r'\b(?:t|words|primary_word)\("([a-z_]+\.[a-z_.]+)"', path.read_text(encoding="utf-8")))
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if not isinstance(node, ast.Call) or not node.args:
+                continue
+            func = node.func
+            if isinstance(func, ast.Name) and func.id in {"t", "words", "primary_word"}:
+                used.update(literal_keys(node.args[0]))
+            elif isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id == "i18n":
+                if func.attr in {"t", "words"}:
+                    used.update(literal_keys(node.args[0]))
     assert used, "no catalog keys found"
     assert sorted(used - set(english)) == []
 
@@ -69,7 +85,7 @@ def test_dynamic_key_families_are_complete() -> None:
         assert f"stage.{stage}" in english and f"details.{stage}" in english
     for kind in ("country", "domain", "ip", "network"):
         assert f"routing.match_{kind}" in english
-    for name in ("back", "save", "quit", "details", "yes", "no", "all", "add", "none"):
+    for name in ("back", "save", "quit", "details", "yes", "no", "all", "add"):
         assert f"word.{name}" in english
     wizard = (SRC / "commands" / "setup_wizard.py").read_text(encoding="utf-8")
     assert _DYNAMIC.search(wizard)
