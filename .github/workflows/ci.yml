@@ -334,22 +334,6 @@ jobs:
       - name: Install browser test dependencies
         run: uv sync --locked --extra dev --group e2e
 
-      - name: Read the installed Playwright version
-        id: playwright
-        run: |
-          uv run --locked --group e2e python - <<'PY'
-          import os
-          from importlib.metadata import version
-          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"version={version('playwright')}\n")
-          PY
-
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-chromium-webkit-${{ steps.playwright.outputs.version }}
-
-      # OS libraries are needed on cache hits too; Playwright reuses the cached browser.
       - name: Install Chromium, WebKit and system libraries
         run: uv run --locked --group e2e playwright install --with-deps chromium webkit
 
