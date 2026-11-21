@@ -357,7 +357,7 @@ _PWA_APPS: list[dict[str, Any]] = [
                 "platform": "Android",
                 "kind": "apk",
                 "arch": "universal",
-                "url": "https://github.com/2dust/v2rayNG/releases/download/1.10.31/v2rayNG_1.10.31_universal.apk",
+                "url": "https://github.com/2dust/v2rayNG/releases/download/2.3.15/v2rayNG_2.3.15_universal.apk",
             }
         ],
     },
