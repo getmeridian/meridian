@@ -27,22 +27,25 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Install package
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Resolve newer releases
         id: bump
         run: |
           status=0
-          uv run python scripts/bump_pins.py --write --summary "$RUNNER_TEMP/pr.md" || status=$?
+          uv run --locked python scripts/bump_pins.py --write --summary "$RUNNER_TEMP/pr.md" || status=$?
           echo "status=$status" >> "$GITHUB_OUTPUT"
           git diff --quiet || echo "changed=1" >> "$GITHUB_OUTPUT"
 

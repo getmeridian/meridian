@@ -121,7 +121,9 @@ def serve_control(
     options = {"clock": clock} if clock is not None else {}
     service = ControlService(state_dir / "control.db", fleet_id=FLEET_ID, version=version, **options)
     server = ControlServer(("127.0.0.1", 0), service, token_sha256(ADMIN_TOKEN), public_path=public_path)
-    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    # shutdown() waits for the next poll. The production half-second interval is unnecessary
+    # for a short-lived loopback fixture, especially when a test starts several services.
+    thread = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     try:
         yield f"http://127.0.0.1:{server.server_address[1]}"

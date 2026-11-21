@@ -36,20 +36,20 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           # Starlight dates each docs page from its last commit.
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
-          version: 10.33.3
+          package_json_file: website/package.json
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .github/.tool-versions
           cache: pnpm
           cache-dependency-path: website/pnpm-lock.yaml
 
@@ -60,10 +60,13 @@ jobs:
           pnpm run build
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Generate the website demos
-        run: uv run python scripts/build_showcase.py website/dist/demo
+        run: uv run --locked python scripts/build_showcase.py website/dist/demo
 
       # The demo joins dist after the build's own check.
       - name: Check the site and demo for external requests
@@ -84,13 +87,13 @@ jobs:
           cd website/dist
           sha256sum install.sh > SHA256SUMS
 
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: website/dist
 
       - name: Deploy to GitHub Pages
         id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
   release:
     name: Create GitHub Release
@@ -104,7 +107,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
@@ -216,7 +219,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -236,12 +239,15 @@ jobs:
           echo "base=$(echo "$VERSION" | sed -E 's/(a|b|rc)[0-9]+$//')" >> "$GITHUB_OUTPUT"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Unit tests
         run: |
-          uv sync --extra dev
-          uv run pytest -q -p no:cacheprovider
+          uv sync --locked --extra dev
+          uv run --locked pytest -n 3 --dist=worksteal -q --tb=short --durations=12 -p no:cacheprovider
 
       - name: Create pre-release
         id: create_release
@@ -278,32 +284,37 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
       # Node runs the AI reference script, which imports nothing from node_modules.
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .github/.tool-versions
 
       # Both static musl netagent builds go into agent/dist, which the build hook packages;
       # `verify_package_assets.py --release` refuses a wheel without them.
       - name: Build node agent
         run: make agent
 
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
+
       - name: Build package
         run: |
-          pip install hatchling build
           # The AI reference for doctor --ai (not committed, built fresh)
           node website/scripts/ai-docs.mjs reference src/meridian/data/ai-reference.md
-          python -m build
+          uv sync --locked --extra dev
+          uv build --no-build-isolation --python .venv/bin/python
           python scripts/verify_package_assets.py --release dist/*.whl
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3

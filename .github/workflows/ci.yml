@@ -24,25 +24,30 @@ jobs:
   python-test:
     name: Python Tests
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: ${{ matrix.python-version }}
     strategy:
       matrix:
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python-version }}
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Install package with dev dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Prepare pinned Xray for client routing tests
         if: matrix.python-version == '3.12'
         run: |
-          uv run python - <<'PY'
+          uv run --locked python - <<'PY'
           import os
           from meridian.xray_client import ensure_xray_binary
 
@@ -53,22 +58,25 @@ jobs:
               env.write(f"MERIDIAN_TEST_XRAY={binary}\n")
           PY
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         if: matrix.python-version == '3.12'
         with:
-          version: 10.33.3
+          package_json_file: website/package.json
 
       - name: Prepare the agent for real Xray session tests
         if: matrix.python-version == '3.12'
         run: |
-          rustup toolchain install stable --profile minimal
-          rustup default stable
-          cargo fetch --locked --manifest-path agent/Cargo.toml
+          toolchain=$(awk '$1 == "rust" { print $2 }' .github/.tool-versions)
+          rustup toolchain install "$toolchain" --profile minimal
+          cargo +"$toolchain" fetch --locked --manifest-path agent/Cargo.toml
+          echo "RUSTUP_TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
+          # Workers compiling the same integration driver share Cargo's locked target directory.
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/xray-agent-target" >> "$GITHUB_ENV"
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: matrix.python-version == '3.12'
         with:
-          node-version: 24
+          node-version-file: .github/.tool-versions
           cache: pnpm
           cache-dependency-path: website/pnpm-lock.yaml
 
@@ -79,70 +87,82 @@ jobs:
           echo "MERIDIAN_TEST_CONSOLE=1" >> "$GITHUB_ENV"
 
       - name: Run tests
-        run: uv run pytest tests/ -v --tb=short
+        run: uv run --locked pytest tests/ -n 3 --dist=worksteal -q --tb=short --durations=12
 
   python-lint:
     name: Python Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Install dev dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Ruff check
-        run: uv run ruff check src/ tests/ scripts/
+        run: uv run --locked ruff check src/ tests/ scripts/
 
       - name: Ruff format check
-        run: uv run ruff format --check src/ tests/ scripts/
+        run: uv run --locked ruff format --check src/ tests/ scripts/
 
       # Findings surface as PR annotations; the step never fails the build.
       - name: Dead-code report (warnings only)
         continue-on-error: true
-        run: uv run python scripts/find_dead_code.py
+        run: uv run --locked python scripts/find_dead_code.py
 
   typecheck:
     name: Type Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Install package with dev dependencies
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Run mypy
-        run: uv run mypy src/meridian/
+        run: uv run --locked mypy src/meridian/
 
       # Scripts import each other as `scripts.*`; explicit bases keep one module name per file.
       - name: Run mypy on scripts
-        run: uv run mypy --explicit-package-bases scripts/
+        run: uv run --locked mypy --explicit-package-bases scripts/
 
   validate:
     name: Validate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
+
+      - name: Install the locked validation dependencies
+        run: uv sync --locked --extra dev
+
       - name: Validate templates render
-        run: |
-          pip install jinja2
-          python3 tests/render_templates.py
+        run: uv run --locked python tests/render_templates.py
 
       - name: Verify VERSION file format
         run: |
@@ -164,25 +184,20 @@ jobs:
           fi
           echo "OK: CHANGELOG.md has entry for $VERSION"
 
-      - name: Install meridian for CLI validation
-        run: |
-          pip install uv
-          uv sync --extra dev
-
       - name: Verify CLI flags are documented
-        run: uv run python tests/validate_cli_docs.py
+        run: uv run --locked python tests/validate_cli_docs.py
 
       - name: Verify _PWA_APPS matches apps.json
-        run: uv run python tests/validate_apps_sync.py
+        run: uv run --locked python tests/validate_apps_sync.py
 
       - name: Verify generated Meridian contracts are current
-        run: uv run python scripts/export_contracts.py --check
+        run: uv run --locked python scripts/export_contracts.py --check
 
   shellcheck:
     name: Shell
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check script syntax
         run: bash -n install.sh
@@ -195,20 +210,29 @@ jobs:
   agent:
     name: Agent
     runs-on: ubuntu-latest
+    needs: changes
+    outputs:
+      lab-agent-id: ${{ steps.lab-agent.outputs.artifact-id }}
     defaults:
       run:
         working-directory: agent
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Install package with dev dependencies
         working-directory: .
-        run: uv sync --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Rust toolchain
-        run: rustup toolchain install stable --profile minimal --component clippy,rustfmt && rustup default stable
+        run: |
+          toolchain=$(awk '$1 == "rust" { print $2 }' "$GITHUB_WORKSPACE/.github/.tool-versions")
+          rustup toolchain install "$toolchain" --profile minimal --component clippy,rustfmt
+          echo "RUSTUP_TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
 
       - name: Format
         run: cargo fmt --check
@@ -225,7 +249,18 @@ jobs:
         run: |
           make agent
           uv build --wheel --out-dir "$RUNNER_TEMP/wheel"
-          uv run python scripts/verify_package_assets.py --agent-only "$RUNNER_TEMP"/wheel/*.whl
+          uv run --locked python scripts/verify_package_assets.py --agent-only "$RUNNER_TEMP"/wheel/*.whl
+
+      - name: Share the verified runner-architecture agent with System Lab
+        if: needs.changes.outputs.system-lab == 'true'
+        id: lab-agent
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: systemlab-agent-${{ github.run_attempt }}
+          path: agent/dist/netagent-x86_64-unknown-linux-musl*
+          if-no-files-found: error
+          # A failed System Lab job can rerun against this same artifact for 30 days.
+          retention-days: 30
 
   # System Lab costs ~15 minutes of Docker, so it runs only when a change can alter what
   # a real deploy does: runtime code, the node agent, the lab itself, dependencies, or CI.
@@ -237,7 +272,7 @@ jobs:
       system-lab: ${{ steps.filter.outputs.system-lab }}
       e2e: ${{ steps.filter.outputs.e2e }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -253,7 +288,7 @@ jobs:
             while IFS= read -r changed; do
               case "$changed" in
                 src/meridian/*.md | src/meridian/i18n/locales/*) ;;
-                src/meridian/* | agent/* | tests/systemlab/* | tests/test_control_subscription_corpus.py | pyproject.toml | uv.lock | .github/workflows/ci.yml)
+                src/meridian/* | agent/* | tests/systemlab/* | tests/test_control_subscription_corpus.py | Makefile | pyproject.toml | uv.lock | .github/workflows/ci.yml | .github/.tool-versions)
                   needed=true
                   echo "System Lab needed: $changed"
                   break ;;
@@ -269,7 +304,7 @@ jobs:
                 *.md) ;;
                 src/meridian/* | website/demo/* | scripts/showcase_*.py | scripts/build_showcase.py \
                   | tests/e2e/* | tests/conftest.py | tests/support/* | Makefile \
-                  | .github/workflows/ci.yml | pyproject.toml | uv.lock)
+                  | .github/workflows/ci.yml | .github/.tool-versions | pyproject.toml | uv.lock)
                   e2e=true
                   echo "E2E needed: $changed"
                   break ;;
@@ -285,13 +320,16 @@ jobs:
     if: needs.changes.outputs.e2e == 'true'
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Install browser test dependencies
         run: uv sync --locked --extra dev --group e2e
@@ -299,28 +337,28 @@ jobs:
       - name: Read the installed Playwright version
         id: playwright
         run: |
-          uv run --group e2e python - <<'PY'
+          uv run --locked --group e2e python - <<'PY'
           import os
           from importlib.metadata import version
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
               output.write(f"version={version('playwright')}\n")
           PY
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chromium-webkit-${{ steps.playwright.outputs.version }}
 
       # OS libraries are needed on cache hits too; Playwright reuses the cached browser.
       - name: Install Chromium, WebKit and system libraries
-        run: uv run --group e2e playwright install --with-deps chromium webkit
+        run: uv run --locked --group e2e playwright install --with-deps chromium webkit
 
       - name: Run browser journeys
         run: make e2e
 
       - name: Upload failure traces and screenshots
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-failures
           path: test-results/e2e/
@@ -330,18 +368,32 @@ jobs:
   system-lab:
     name: System Lab
     runs-on: ubuntu-latest
-    needs: [changes, python-test, python-lint]
+    needs: [changes, agent, python-lint]
     if: needs.changes.outputs.system-lab == 'true'
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Generate test fixtures
         run: bash tests/systemlab/scripts/setup-fixtures.sh
 
-      # The controller deploys this checkout's agent; build the runner's architecture only.
-      - name: Build the node agent
-        run: make system-lab-agent
+      # Agent already built and checked this exact checkout. Restrict the download to its
+      # immutable artifact in this run; release jobs always rebuild from their own checkouts.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ needs.agent.outputs.lab-agent-id }}
+          path: agent/dist
+          merge-multiple: true
+
+      - name: Verify the native agent before deploying it
+        working-directory: agent/dist
+        run: |
+          binary=netagent-x86_64-unknown-linux-musl
+          printf '%s  %s\n' "$(cat "$binary.sha256")" "$binary" | sha256sum --check --status
+          chmod 755 "$binary"
+          expected=$(cat "$binary.version")
+          actual=$("./$binary" --version)
+          test -n "$expected" && test "$actual" = "$expected"
 
       - name: Run system lab
         run: docker compose -f tests/systemlab/compose.yml up --build --abort-on-container-exit --exit-code-from controller
@@ -358,15 +410,15 @@ jobs:
     name: Website Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
-          version: 10.33.3
+          package_json_file: website/package.json
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .github/.tool-versions
           cache: pnpm
           cache-dependency-path: website/pnpm-lock.yaml
 
@@ -380,11 +432,14 @@ jobs:
         run: cd website && pnpm exec astro check --minimumSeverity warning
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v7
+        uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version-file: .github/.tool-versions
+          require-checksums: true
 
       - name: Validate the website demos
         run: |
-          uv run python scripts/build_showcase.py website/dist/demo
+          uv run --locked python scripts/build_showcase.py website/dist/demo
           # The connection page demo: shared assets, a disabled worker, and rendered pages
           test -f website/dist/demo/index.html
           assets=$(echo website/dist/demo/sub/~pwa/pwa-*)
