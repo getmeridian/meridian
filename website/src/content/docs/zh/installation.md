@@ -20,7 +20,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 在 [GitHub 发布页](https://github.com/getmeridian/meridian/releases)选择一个附有 `install.sh` 和 `SHA256SUMS` 的版本。在下面的命令中，将 `VERSION` 设为该标签去掉开头 `v` 的版本号，然后下载并校验文件：
 
 ```
-VERSION=4.0.0b20  # 示例：请改为你选择的版本
+VERSION=4.0.0b21  # 示例：请改为你选择的版本
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
@@ -78,7 +78,7 @@ Meridian 4 把自己的状态保存在 `~/.config/meridian/`，从不读取或�
 
 ## 系统要求
 
-- **Python 3.11+**（uv 会自动为你安装和管理）
+- 命令行工具支持 **Python 3.11–3.15**。uv 会在 VPS 上为管理服务单独安装 Python 3.15，不会更改系统的 Python。
 - 对服务器的 **SSH 访问权限**，使用 `root` 或拥有免密 `sudo` 权限的用户。优先使用密钥登录；如果服务器只接受密码，`meridian deploy` 和 `meridian setup` 会提示为 Meridian 创建密钥，并用该密码一次性完成安装（见[仅密码登录的服务器](/zh/deploy/#仅密码登录的服务器)）
 
 终端二维码由内置的 `segno` 包渲染，不需要额外系统依赖。

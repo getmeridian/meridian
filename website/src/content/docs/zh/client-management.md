@@ -262,8 +262,8 @@ Xray JSON 首先列出 **Automatic**，然后为每个主要连接提供一个�
 | 格式 | 应用 | 测试的引擎 | 实验室检查内容 |
 |--------|------|---------------|---------------------|
 | Xray JSON | Happ、v2rayNG、v2rayN、Streisand、V2Box | Xray 26.7.28 | 流量通过每个入口以及自动故障转移；错误的密钥会被拒绝 |
-| Mihomo | FlClashX, Clash Mi | Mihomo 1.19.32 | `mihomo -t` 加载配置文件、其规则及其回退组 |
-| sing-box | sing-box (SFA, SFI), Karing | sing-box 1.14.3 | `sing-box check` 加载配置文件，其自动组是默认路由 |
+| Mihomo | FlClashX, Clash Mi | Mihomo 1.19.34 | `mihomo -t` 加载配置文件、其规则及其回退组 |
+| sing-box | sing-box (SFA, SFI), Karing | sing-box 1.14.4 | `sing-box check` 加载配置文件，其自动组是默认路由 |
 | Base64 链接 | 其他 Xray/V2Ray 应用（v2RayTun、Shadowrocket） | — | 每个链接都能解析，并指向与其他格式相同的服务器和密钥 |
 
 应用会自行发布引擎更新，因此应用运行的引擎可能比测试的版本略旧或略新。

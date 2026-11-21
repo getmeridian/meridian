@@ -1,5 +1,6 @@
 /* Execute the shipped scripts with a DOM and local API doubles. */
 import { peoplePage } from './console_people_page.mjs';
+import { withPhoneViewport } from './support/console_styles.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
@@ -554,8 +555,9 @@ if (mode.startsWith('locale-')) {
 if (mode.startsWith('phone-')) {
   const style = w.document.createElement('style');
   // jsdom has no pointer devices; apply the coarse-pointer branch for this style-contract check.
-  style.textContent = ['styles.css', 'screens.css'].map(file => fs.readFileSync(path.join(ui, file), 'utf8'))
+  const css = ['styles.css', 'screens.css'].map(file => fs.readFileSync(path.join(ui, file), 'utf8'))
     .join('\n').replace(/@media\s*\(pointer:\s*coarse\)/g, '@media all');
+  style.textContent = withPhoneViewport(css, 390);
   w.document.head.appendChild(style);
   if (mode === 'phone-app') {
     const app = M.h('div', { id: 'app', class: 'boot' });

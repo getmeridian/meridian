@@ -44,7 +44,7 @@ pub fn service_uri(fleet_id: &str) -> String {
 /// Fill a buffer from the operating system's CSPRNG.
 pub fn random_bytes<const N: usize>() -> Result<[u8; N], String> {
     let mut bytes = [0u8; N];
-    getrandom::getrandom(&mut bytes).map_err(|err| format!("no system randomness: {err}"))?;
+    getrandom::fill(&mut bytes).map_err(|err| format!("no system randomness: {err}"))?;
     Ok(bytes)
 }
 
@@ -130,18 +130,18 @@ impl Ca {
 
     /// Check that the CA signed `certificate` (Ed25519 only).
     fn issued(&self, certificate: &Certificate, what: &str) -> Result<(), String> {
-        let tbs = &certificate.tbs_certificate;
-        if certificate.signature_algorithm.oid != ED25519 || tbs.signature.oid != ED25519 {
+        let tbs = certificate.tbs_certificate();
+        if certificate.signature_algorithm().oid != ED25519 || tbs.signature().oid != ED25519 {
             return Err(format!("the {what} certificate is not signed with Ed25519"));
         }
-        if tbs.issuer != self.certificate.tbs_certificate.subject {
+        if tbs.issuer() != self.certificate.tbs_certificate().subject() {
             return Err(format!(
                 "the {what} certificate is not issued by the fleet CA"
             ));
         }
         let ca_key = ed25519_key(&self.certificate, "CA")?;
         let signature = certificate
-            .signature
+            .signature()
             .as_bytes()
             .and_then(|raw| Signature::from_slice(raw).ok())
             .ok_or(format!("the {what} certificate signature is malformed"))?;
@@ -175,8 +175,8 @@ impl ServiceCert {
             return Err("the service certificate does not name this fleet's service".into());
         }
         let not_after = certificate
-            .tbs_certificate
-            .validity
+            .tbs_certificate()
+            .validity()
             .not_after
             .to_unix_duration()
             .as_secs();
@@ -222,7 +222,7 @@ fn parse(pem: &str, what: &str) -> Result<Certificate, String> {
 }
 
 fn ed25519_key(certificate: &Certificate, what: &str) -> Result<VerifyingKey, String> {
-    let spki = &certificate.tbs_certificate.subject_public_key_info;
+    let spki = certificate.tbs_certificate().subject_public_key_info();
     if spki.algorithm.oid != ED25519 {
         return Err(format!(
             "the {what} certificate does not carry an Ed25519 key"
@@ -237,7 +237,10 @@ fn ed25519_key(certificate: &Certificate, what: &str) -> Result<VerifyingKey, St
 }
 
 fn uris(certificate: &Certificate) -> Vec<String> {
-    match certificate.tbs_certificate.get::<SubjectAltName>() {
+    match certificate
+        .tbs_certificate()
+        .get_extension::<SubjectAltName>()
+    {
         Ok(Some((_, san))) => san
             .0
             .iter()
@@ -252,11 +255,11 @@ fn uris(certificate: &Certificate) -> Vec<String> {
 
 fn is_ca(certificate: &Certificate) -> bool {
     matches!(
-        certificate.tbs_certificate.get::<BasicConstraints>(),
+        certificate.tbs_certificate().get_extension::<BasicConstraints>(),
         Ok(Some((_, constraints))) if constraints.ca
     ) || certificate
-        .tbs_certificate
-        .get::<BasicConstraints>()
+        .tbs_certificate()
+        .get_extension::<BasicConstraints>()
         .is_err()
 }
 

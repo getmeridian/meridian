@@ -20,7 +20,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 Выберите [релиз на GitHub](https://github.com/getmeridian/meridian/releases) с файлами `install.sh` и `SHA256SUMS`. В примере ниже укажите в `VERSION` тег этого релиза без начальной `v`, затем скачайте и проверьте файлы:
 
 ```
-VERSION=4.0.0b20  # пример: укажите выбранный релиз
+VERSION=4.0.0b21  # пример: укажите выбранный релиз
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # на macOS: shasum -a 256 -c SHA256SUMS
@@ -78,7 +78,7 @@ Meridian 4 хранит свои файлы в `~/.config/meridian/` и нико
 
 ## Системные требования
 
-- **Python 3.11+** (`uv` скачивает и настраивает нужную версию Python автоматически)
+- Командная строка Meridian работает с **Python 3.11–3.15**. На VPS uv устанавливает отдельный Python 3.15 для сервиса управления. Системный Python менять не нужно.
 - **Доступ к серверу по SSH** от имени `root` или пользователя с беспарольным `sudo`. Рекомендуется вход по SSH-ключу; если новый сервер принимает только пароль, интерактивные команды `meridian deploy` и `meridian setup` сами предложат сгенерировать ключ и один раз установят его на сервер по паролю (см. [Серверы только с паролем](/ru/deploy/#серверы-только-с-паролем))
 
 QR-коды в терминале формируются встроенной библиотекой `segno` и не требуют установки системных утилит.

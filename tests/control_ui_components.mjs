@@ -64,13 +64,16 @@ if (scenario === 'component-tip') {
   const details = M.h('details', { open: true }, M.h('summary', {}, 'Filters', heading));
   const inside = M.tip('Quota', 'Share of the cap.');
   details.append(inside); app.append(details);
+  const toggleDetails = open => new Promise(resolve => {
+    details.addEventListener('toggle', resolve, { once: true });
+    details.open = open;
+  });
   inside.querySelector('button').click();
-  details.open = false;
-  await new Promise(resolve => setTimeout(resolve, 0));
+  await toggleDetails(false);
   report.disclosureClosed = state(inside);
   heading.querySelector('button').click();
-  details.open = true; await new Promise(resolve => setTimeout(resolve, 0));
-  details.open = false; await new Promise(resolve => setTimeout(resolve, 0));
+  await toggleDetails(true);
+  await toggleDetails(false);
   report.summaryTip = state(heading);
 }
 

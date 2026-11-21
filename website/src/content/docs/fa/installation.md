@@ -20,7 +20,7 @@ curl -sSf https://getmeridian.org/install.sh | bash
 از [انتشارهای GitHub](https://github.com/getmeridian/meridian/releases) نسخه‌ای را انتخاب کنید که `install.sh` و `SHA256SUMS` را به پیوست دارد. در مثال زیر، برچسب انتشار را بدون `v` ابتدایی در `VERSION` قرار دهید و سپس فایل‌ها را دانلود و بررسی کنید:
 
 ```
-VERSION=4.0.0b20  # نمونه: نسخه‌ای را که انتخاب کردید وارد کنید
+VERSION=4.0.0b21  # نمونه: نسخه‌ای را که انتخاب کردید وارد کنید
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
@@ -78,7 +78,7 @@ Meridian 4 وضعیت خودش را در `~/.config/meridian/` نگه می‌د�
 
 ## نیازمندی‌ها
 
-- **Python 3.11+** (uv آن را نصب و مدیریت می‌کند)
+- ابزار خط فرمان با **Python 3.11 تا 3.15** کار می‌کند. روی سرور، uv نسخهٔ جداگانه‌ای از Python 3.15 را برای سرویس مدیریت نصب می‌کند. نیازی به تغییر پایتون سیستم نیست.
 - **دسترسی SSH** به سرور شما، به‌عنوان root یا کاربر با sudo بدون گذرواژه. ورود با کلید بهترین است؛ اگر سرور فقط گذرواژه می‌پذیرد، `meridian deploy` و `meridian setup` پیشنهاد می‌کنند برای Meridian کلیدی بسازند و یک بار با همان گذرواژه نصبش کنند (ببینید [سرورهای فقط با گذرواژه](/fa/deploy/#سرورهای-فقط-با-گذرواژه))
 
 کدهای QR ترمینال با بستهٔ موجود `segno` رسم می‌شوند؛ به وابستگی سیستمی نیاز ندارد.

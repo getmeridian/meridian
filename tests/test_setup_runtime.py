@@ -11,6 +11,8 @@ import pytest
 
 from meridian.cluster import ClusterConfig, ManagedResourceBinding, PanelConfig
 from meridian.compiler.models import ControlServicePayload, RealmHopPayload, ResourcePlan
+from meridian.control.client import ControlClient
+from meridian.control.service import ControlService
 from meridian.core.cancellation import OperationCancelledError
 from meridian.core.defaults import DEFAULT_SNI
 from meridian.core.errors import LocalStateError, ProvisioningError
@@ -196,6 +198,10 @@ def test_reviewed_apply_resumes_to_a_no_op_and_verifies_canonical_subscription(
 ) -> None:
     registry = ServerRegistry(tmp_path / "servers.json")
     _add_servers(registry)
+    # Profile discovery reads the service even when the topology has no named profiles.
+    # Give it the new controller's real default catalog, not a timeout at the example address.
+    service = ControlService(tmp_path / "control.db", fleet_id="setup-test", version="4.0.0")
+    monkeypatch.setattr(ControlClient, "access_profiles", lambda _client: service.access.catalog())
     cluster = ClusterConfig(
         panel=PanelConfig(
             url="https://198.51.100.10/secret",

@@ -7,6 +7,9 @@ runs only manually on a developer machine — see tests/realvm/README.md.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+from unittest.mock import Mock
+
 import pytest
 
 from tests.realvm.providers.base import CloudProvider, ProviderError, VMInstance, VMSpec
@@ -140,6 +143,22 @@ class TestHetznerProviderImportable:
         with pytest.raises(ProviderError) as exc_info:
             HetznerProvider(token="")
         assert "token is empty" in str(exc_info.value).lower()
+
+    @pytest.mark.parametrize("has_location", [True, False])
+    def test_labelled_server_remains_identifiable_for_cleanup(self, has_location) -> None:
+        from tests.realvm.providers.hetzner import HetznerProvider
+
+        labels = {"meridian-realvm-test": "1"}
+        # Current server payloads have a top-level location and no datacenter.
+        server = SimpleNamespace(id=42, name="test-vm", status="running", public_net=None, labels=labels)
+        if has_location:
+            server.location = SimpleNamespace(name="hel1")
+        p = object.__new__(HetznerProvider)
+        p._client = Mock()
+        p._client.servers.get_all.return_value = [server]
+        (instance,) = p.list_vms(labels)
+        assert (instance.id, instance.region, instance.labels) == ("42", "hel1" if has_location else "", labels)
+        p._client.servers.get_all.assert_called_once_with(label_selector="meridian-realvm-test=1")
 
     def test_estimate_cost_known_size(self) -> None:
         from tests.realvm.providers.hetzner import HetznerProvider

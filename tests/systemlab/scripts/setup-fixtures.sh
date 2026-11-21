@@ -20,7 +20,7 @@ chmod 0644 "$DIR/id_ed25519.pub" "$DIR/controller_authorized_keys"
 
 # This static CA authenticates Pebble's HTTPS endpoint. Pebble 2.10 generates
 # its certificate-issuance root at runtime; 00-bootstrap installs that root.
-PEBBLE_IMAGE=ghcr.io/letsencrypt/pebble:2.10.0
+PEBBLE_IMAGE=ghcr.io/letsencrypt/pebble:2.10.3@sha256:0c81f05db371f436c97fb894bd6d2ab8fc9c8e2ce40f8bef8a8e15941bcd75ef
 PEBBLE_CA="$DIR/pebble-ca.pem"
 PEBBLE_TMP=$(mktemp -d "$DIR/.pebble-ca.XXXXXX")
 CID=""

@@ -12,6 +12,11 @@ describes your whole fleet; a small agent on every server applies it; and no
 server needs Docker. The first sections list what changed in each beta,
 newest first; the last is what 4.0 changes compared with 3.x.
 
+### Since 4.0.0b20
+
+- The CLI now supports Python 3.11–3.15. Installing or upgrading the control service uses a separate Python 3.15 environment on the VPS; the system Python is unchanged. The installer and node agent use refreshed dependencies. Xray stays on 26.7.28 because newer releases omit country lists used by existing routing policies.
+- The Android download on personal connection pages points to the current universal v2rayNG installer. Delivered configurations are tested with sing-box 1.14.4 and Mihomo 1.19.34.
+
 ### Since 4.0.0b19
 
 - Setup can now harden SSH on a VPS whose provider omitted the drop-in include or set password authentication before it. Meridian checks a fresh key login, preserves the provider’s SSH port and conditional rules, and reloads the service only after OpenSSH validates the settings.

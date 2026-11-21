@@ -2,7 +2,7 @@
   "name": "meridian-video",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@10.33.3",
+  "packageManager": "pnpm@12.21.0",
   "scripts": {
     "studio": "remotion studio",
     "tts": "node scripts/tts.mjs",
@@ -17,12 +17,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@remotion/cli": "4.0.534",
-    "@remotion/fonts": "4.0.534",
-    "@remotion/media": "4.0.534",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "remotion": "4.0.534"
+    "@remotion/cli": "4.0.543",
+    "@remotion/fonts": "4.0.543",
+    "@remotion/media": "4.0.543",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.543"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

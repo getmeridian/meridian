@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { withPhoneViewport } from './support/console_styles.mjs';
 
 const require = createRequire(new URL('../website/package.json', import.meta.url));
 const { JSDOM } = require('jsdom');
@@ -99,14 +100,17 @@ if (scenario === 'records-layout') {
     .replace(/@media\s*\(pointer:\s*coarse\)(?:\s*,\s*\(max-width:\s*(\d+)px\))?/g,
       (_, limit) => Number(limit) >= width ? '@media all' : '@media not all')
     .replace(/@media\s*\(max-width:\s*(\d+)px\)/g, (_, limit) => Number(limit) >= width ? '@media all' : '@media not all');
-  document.head.appendChild(M.h('style', { text: css }));
+  document.head.appendChild(M.h('style', { text: width <= 640 ? withPhoneViewport(css, width) : css }));
   const list = view()?.querySelector('.record-list'), row = rows()[0], panel = menu()?.querySelector('.row-menu-panel');
   report.targets = [...(view()?.querySelectorAll('.row-menu > summary, .row-menu-panel .btn') || [])].map(node => {
     const style = w.getComputedStyle(node); return Math.max(parseFloat(style.minHeight) || 0, parseFloat(style.minBlockSize) || 0);
   });
   report.menuOverflow = list ? w.getComputedStyle(list).overflow : null;
-  report.phoneCards = !!list && w.getComputedStyle(list).display === 'flex' && !!row && w.getComputedStyle(row).borderRadius === 'var(--r2)';
-  report.menuBounded = !!panel && w.getComputedStyle(panel).maxInlineSize.includes('100vw') && w.getComputedStyle(panel).overflowY === 'auto';
+  const radius = w.getComputedStyle(document.documentElement).getPropertyValue('--r2').trim();
+  report.phoneCards = !!list && w.getComputedStyle(list).display === 'flex' && !!row && parseFloat(radius) > 0 &&
+    w.getComputedStyle(row).borderRadius === radius;
+  report.menuBounded = !!panel && w.getComputedStyle(panel).maxInlineSize === (width - 32) + 'px' &&
+    w.getComputedStyle(panel).overflowY === 'auto';
   report.surface = w.getComputedStyle(document.documentElement).getPropertyValue('--s1').trim();
 }
 if (scenario === 'records-permissions') {

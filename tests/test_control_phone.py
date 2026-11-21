@@ -21,7 +21,8 @@ def test_nested_identity_checks_have_distinct_labelled_titles() -> None:
 def test_long_dialogs_scroll_the_body_and_keep_form_actions_sticky() -> None:
     result = run_console("phone-dialog")
     assert result["bodyOverflow"] == "auto" and result["footerPosition"] == "sticky"
-    assert "dvh" in result["maxHeight"]
+    # 700px dynamic viewport minus the dialog gap (24px) and both device insets (10px, 20px).
+    assert result["maxHeight"] == "646px"
     assert result["submitted"] is True and result["buttonsDisabled"] is True
     assert result["focusedScrolled"] is True
 

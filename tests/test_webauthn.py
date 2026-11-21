@@ -48,7 +48,7 @@ def test_malformed_cbor_attestations_raise_a_plain_refusal(raw: bytes) -> None:
     assert refused.value.code == "passkey_invalid"
 
 
-@pytest.mark.parametrize("value", ["_x", "AA=", "+w", "AB", "x" * 1400])
+@pytest.mark.parametrize("value", ["_x", "AA=", "+w", "/w", "AB", "x" * 1400])
 def test_binary_fields_need_bounded_canonical_base64url(value: str) -> None:
     with pytest.raises(ServiceError):
         decode_bytes(value, maximum=1024)

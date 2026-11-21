@@ -20,7 +20,7 @@ This script:
 Choose a published [GitHub release](https://github.com/getmeridian/meridian/releases) with `install.sh` and `SHA256SUMS` attached. Set `VERSION` below to its tag without the leading `v`, then download and verify the files:
 
 ```
-VERSION=4.0.0b20  # example: use the release you chose
+VERSION=4.0.0b21  # example: use the release you chose
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/install.sh
 curl -fLO https://github.com/getmeridian/meridian/releases/download/v$VERSION/SHA256SUMS
 sha256sum -c SHA256SUMS          # macOS: shasum -a 256 -c SHA256SUMS
@@ -78,7 +78,7 @@ These docs describe Meridian 4. The [Meridian 3.17.3 docs](https://github.com/ge
 
 ## Requirements
 
-- **Python 3.11+** (uv installs and manages it for you)
+- The CLI supports **Python 3.11–3.15**. On the VPS, uv installs Python 3.15 for the control service and leaves the system Python unchanged.
 - **SSH access** to your server, as root or a user with passwordless sudo. Key login is best; if the server accepts only a password, `meridian deploy` and `meridian setup` offer to create a key for Meridian and install it with that password once (see [Password-only servers](/en/deploy/#password-only-servers))
 
 Terminal QR codes are rendered by the bundled `segno` package; no system dependency is required.

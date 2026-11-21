@@ -40,7 +40,10 @@ def test_settings_subnavigation_is_a_desktop_column_and_a_visible_phone_grid(loc
     assert all(target >= 44 for target in result["targets"])
     assert result["layout"] == ("flex" if width == 390 else "grid")
     if width == 390:
-        assert result["navDisplay"] == "grid" and result["navColumns"] == "repeat(3, minmax(0, 1fr))"
+        assert result["navDisplay"] == "grid" and result["navColumns"] in {
+            "repeat(3, minmax(0, 1fr))",
+            "repeat(3, minmax(0px, 1fr))",
+        }
     else:
         assert result["navDirection"] == "column"
 
