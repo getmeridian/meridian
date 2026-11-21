@@ -44,13 +44,8 @@ class VMInstance:
 
     id: str  # provider-native VM id
     name: str
-    status: str  # "running", "off", "initializing", etc. — provider-specific but normalized where possible
     public_ipv4: str | None
-    public_ipv6: str | None
-    region: str
     labels: dict[str, str]
-    provider: str  # "hetzner", "scaleway", ...
-    raw: Any = None  # the native SDK object, for provider-specific fallback
 
 
 class ProviderError(Exception):
@@ -91,11 +86,6 @@ class CloudProvider(ABC):
         """Delete a VM. Idempotent — destroying an already-gone VM is OK.
         Also releases any attached resources that were created alongside
         (e.g. Hetzner Primary IPs — if the VM owned them exclusively)."""
-        ...
-
-    @abstractmethod
-    def get_vm(self, vm_id: str) -> VMInstance | None:
-        """Fetch a VM by id. Returns None if no such VM exists."""
         ...
 
     @abstractmethod

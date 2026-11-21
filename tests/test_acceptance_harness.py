@@ -301,12 +301,8 @@ def test_realvm_verification_isolates_home_outside_checkout_and_redacts_streamed
     instance = VMInstance(
         id="vm-1",
         name="test-exit",
-        status="running",
         public_ipv4="198.51.100.10",
-        public_ipv6=None,
-        region="nbg1",
         labels={orchestrator.FLEET_ID_LABEL: "test-fleet"},
-        provider="stub",
     )
 
     assert orchestrator.run_verification(topology, [instance]) == 75
@@ -331,12 +327,8 @@ def test_realvm_keep_retains_a_private_fleet_id_for_usable_cleanup(
     instance = VMInstance(
         id="vm-1",
         name="test-exit",
-        status="running",
         public_ipv4="198.51.100.10",
-        public_ipv6=None,
-        region="nbg1",
         labels={orchestrator.FLEET_ID_LABEL: fleet_id},
-        provider="stub",
     )
     try:
         assert orchestrator.run_verification(topology, [instance], keep=True) == 0

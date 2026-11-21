@@ -155,8 +155,8 @@ def confirm_cost(provider: CloudProvider, topology: Topology, hours: float = 0.5
         _fail("Aborted by user.")
 
 
-def _read_ssh_public_key() -> tuple[str, str]:
-    """Return (key_path, public_key_contents). Falls back to ed25519 default."""
+def _read_ssh_public_key() -> str:
+    """Read the configured public key, falling back to the Ed25519 default."""
     override = os.environ.get("MERIDIAN_TEST_SSH_KEY", "")
     path = Path(override) if override else DEFAULT_SSH_KEY
     if not path.exists():
@@ -166,7 +166,7 @@ def _read_ssh_public_key() -> tuple[str, str]:
             f"  1. Generate one: ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519\n"
             f"  2. Set MERIDIAN_TEST_SSH_KEY=/path/to/your/key.pub"
         )
-    return str(path), path.read_text().strip()
+    return path.read_text().strip()
 
 
 # --------------------------------------------------------------------------
@@ -239,7 +239,7 @@ def require_agent_build() -> None:
 
 
 def provision(provider: CloudProvider, topology: Topology, fleet_id: str) -> list[VMInstance]:
-    ssh_path, ssh_pub = _read_ssh_public_key()
+    ssh_pub = _read_ssh_public_key()
     key_name = f"meridian-realvm-{fleet_id[:8]}"
     _print(f"  → Uploading SSH key {key_name} ...")
     ssh_key_id = provider.upload_ssh_key(name=key_name, public_key=ssh_pub)

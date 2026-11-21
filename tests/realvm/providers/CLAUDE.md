@@ -11,14 +11,14 @@ Python-first VM lifecycle for the real-VM harness. No Terraform, no Pulumi.
 
 ## What's done well
 
-- **Small `CloudProvider` surface** — VM create/destroy/get/list, SSH key upload/delete, and `estimate_cost`; provider-specific knobs ride `VMSpec.extras` instead of widening it.
+- **Small `CloudProvider` surface** — VM create/destroy/list, SSH key upload/delete, and `estimate_cost`; provider-specific knobs ride `VMSpec.extras` instead of widening it.
 - **Cost before provisioning** — providers expose hourly rates so the harness prints an estimate before creating anything.
 
 ## Pitfalls
 
 - **Never let label schema drift** between provision and destroy. If `create_vm` writes `meridian-fleet-id`, `destroy_fleet` MUST read the same key.
 - **Use Hetzner Primary IPs, not legacy Floating IPs**, for multi-IP scenarios.
-- **Map regions from the server’s location** — modern hcloud responses omit the former datacenter field, including inventory used for cleanup.
+- **Keep inventory independent of optional SDK metadata** — cleanup needs only the server ID, name, IPv4 address and labels; current hcloud responses can omit location and datacenter.
 - **SSH key pinning** — `upload_ssh_key` is idempotent on name + fingerprint match; different material with the same name raises.
 
 ## Links

@@ -160,15 +160,6 @@ class HetznerProvider(CloudProvider):
                 cause=e,
             ) from e
 
-    def get_vm(self, vm_id: str) -> VMInstance | None:
-        try:
-            server = self._client.servers.get_by_id(int(vm_id))
-        except (ValueError, _APIException):
-            return None
-        if server is None:
-            return None
-        return _to_vm_instance(server)
-
     def list_vms(self, labels: dict[str, str] | None = None) -> list[VMInstance]:
         # hcloud accepts a label selector string (LHS=RHS,LHS2=RHS2).
         label_selector = None
@@ -239,25 +230,9 @@ class HetznerProvider(CloudProvider):
 def _to_vm_instance(server: Any) -> VMInstance:
     """Convert an hcloud Server object to our normalized VMInstance."""
     ipv4 = server.public_net.ipv4.ip if server.public_net and server.public_net.ipv4 else None
-    # hcloud's ipv6 is a /64 subnet; the "first" address is the server's own.
-    # Subnets look like '2a01:4f8:...:1234::/64' — strip the mask, append '::1' or
-    # leave as-is if already specific. Hetzner assigns a routable /64; the
-    # server's typical public v6 is <prefix>::1.
-    ipv6_raw = server.public_net.ipv6.ip if server.public_net and server.public_net.ipv6 else None
-    if ipv6_raw and "/" in ipv6_raw:
-        ipv6 = ipv6_raw.split("/")[0].rstrip(":") + "::1"
-    else:
-        ipv6 = ipv6_raw
-    # Inventory and cleanup need the server ID even when the provider omits location metadata.
-    location = getattr(server, "location", None)
     return VMInstance(
         id=str(server.id),
         name=server.name,
-        status=server.status,
         public_ipv4=ipv4,
-        public_ipv6=ipv6,
-        region=location.name if location else "",
         labels=dict(server.labels) if server.labels else {},
-        provider="hetzner",
-        raw=server,
     )

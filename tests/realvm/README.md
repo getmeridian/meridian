@@ -269,9 +269,9 @@ it Read & Write permission. Export it in the shell session.
 **"SSH on X.X.X.X:22 did not come up within 120s"** — VM booted but cloud-init
 is still running. Rare, but can happen on first-ever image pull. Try again.
 
-**"subscription URL returned HTTP 503"** — Remnawave panel didn't fully come
-up. CX23 is the minimum viable size; if testing on smaller (not recommended),
-bump to CX33.
+**"subscription URL returned HTTP 503"** — check the control service and
+nginx on the test VM. From the managing machine, run `meridian logs ADDRESS
+-c panel -c nginx` to inspect their recent redacted logs.
 
 **"certificate issuer does not mention Let's Encrypt"** after several rapid runs —
 you've likely tripped LE's IP-cert rate limit (~5 shortlived issuances per
