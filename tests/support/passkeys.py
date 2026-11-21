@@ -29,10 +29,6 @@ def b64(data: bytes) -> str:
     return base64.urlsafe_b64encode(data).decode().rstrip("=")
 
 
-def unb64(data: str) -> bytes:
-    return base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
-
-
 def cbor(value: Any) -> bytes:
     """Encode test authenticator output independently of the production decoder."""
     if isinstance(value, int):
