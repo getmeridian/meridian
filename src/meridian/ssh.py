@@ -14,6 +14,7 @@ import os
 import re
 import shlex
 import subprocess
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -187,22 +188,65 @@ class ServerConnection(_FileTransferMixin):
 
     @property
     def _ssh_opts(self) -> list[str]:
+        return self._connection_options()
+
+    def _connection_options(self, *, fresh_key: bool = False) -> list[str]:
         opts = [
             "-o",
-            "BatchMode=no" if self.password else "BatchMode=yes",
+            "BatchMode=no" if self.password and not fresh_key else "BatchMode=yes",
             "-o",
             "ConnectTimeout=10",
             "-o",
             "StrictHostKeyChecking=yes",
             *_KEEPALIVE_OPTS,
         ]
-        if self.multiplex and not self.local_mode:
+        if fresh_key:
+            # Even a user-configured ControlPath would reuse a login with the old policy.
+            opts.extend(["-S", "none", "-o", "ControlMaster=no", "-o", "PreferredAuthentications=publickey"])
+            opts.extend(["-T", "-a", "-x", "-o", "ClearAllForwardings=yes", "-o", "PermitLocalCommand=no"])
+        elif self.multiplex and not self.local_mode:
             opts.extend(multiplex_opts(self.user, self.ip, self.port))
         if self.identity_file:
             opts.extend(["-i", self.identity_file, "-o", "IdentitiesOnly=yes"])
         if self.port != 22:
             opts.extend(["-p", str(self.port)])
         return opts
+
+    def verify_fresh_key_login(self) -> bool:
+        """Prove a new key login before changing sshd; leave the existing administration channel open."""
+        if self.local_mode:
+            return True
+        try:
+            # OpenSSH always tries the "none" method before publickey. Its exit code alone
+            # cannot prove a key was used. Keep the client's own log separate from server output.
+            with tempfile.TemporaryDirectory(prefix="meridian-ssh-") as directory:
+                log = Path(directory) / "auth.log"
+                result = subprocess.run(
+                    [
+                        "ssh",
+                        *self._connection_options(fresh_key=True),
+                        "-E",
+                        str(log),
+                        "-o",
+                        "LogLevel=DEBUG1",
+                        f"{self.user}@{self.ip}",
+                        "true",
+                    ],
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=15,
+                )
+                if result.returncode:
+                    return False
+                with log.open(encoding="utf-8", errors="replace") as lines:
+                    return any(
+                        re.fullmatch(r'Authenticated to .+ using "publickey"\.', line.rstrip())
+                        or line.rstrip() == "debug1: Authentication succeeded (publickey)."  # older OpenSSH clients
+                        for line in lines
+                    )
+        except (OSError, subprocess.TimeoutExpired):
+            return False
 
     def reset_multiplex(self) -> None:
         """Drop the shared control connection so the next command dials a fresh one.

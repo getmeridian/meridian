@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shlex
+from importlib.resources import files
 
 from meridian.facts import ServerFacts
 from meridian.provision.ensure import ensure_file_content, ensure_packages, ensure_service_running, ensure_ufw_rule
@@ -52,16 +53,6 @@ _BBR_SETTINGS = {
     "net.core.default_qdisc": "fq",
     "net.ipv4.tcp_congestion_control": "bbr",
 }
-
-_SSH_HARDENING_DROPIN_PATH = "/etc/ssh/sshd_config.d/00-hardening.conf"
-# Earlier releases named the drop-in after the project; a neutral name keeps hosts unremarkable.
-_SSH_HARDENING_DROPIN_OLD_PATHS = ("/etc/ssh/sshd_config.d/99-meridian.conf", "/etc/ssh/sshd_config.d/00-meridian.conf")
-_SSH_HARDENING_DROPIN = """\
-PasswordAuthentication no
-KbdInteractiveAuthentication no
-ChallengeResponseAuthentication no
-DebianBanner no
-"""
 
 
 def detect_ssh_ports(conn: ServerConnection) -> list[int]:
@@ -172,106 +163,22 @@ class SetTimezone:
 
 
 class HardenSSH:
-    """Install an authoritative sshd drop-in and restart sshd."""
+    """Apply global sshd defaults without changing provider-specific configuration."""
 
     name = "Harden SSH configuration"
 
     def run(self, conn: ServerConnection, ctx: ProvisionContext) -> StepResult:
-        commands: list = []
-        changed = False
-        ensure = ensure_file_content(
-            conn,
-            _SSH_HARDENING_DROPIN_PATH,
-            _SSH_HARDENING_DROPIN,
-            mode="644",
-            create_parent=True,
-        )
-        if not ensure.ok:
+        if not conn.verify_fresh_key_login():
             return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"failed to write sshd hardening drop-in: {ensure.detail}",
-                commands=commands,
+                name=self.name, status="failed", detail="A fresh SSH key login failed. SSH settings were kept."
             )
-        if ensure.changed:
-            rm_result = conn.run(f"rm -f {' '.join(_SSH_HARDENING_DROPIN_OLD_PATHS)}", timeout=15)
-            commands.append(rm_result)
-            # Neutralize conflicting settings in other drop-ins (e.g., cloud-init)
-            # so our values are authoritative regardless of load order.
-            neutralize = conn.run(
-                "for f in /etc/ssh/sshd_config.d/*.conf; do "
-                f'[ "$f" = "{_SSH_HARDENING_DROPIN_PATH}" ] && continue; '
-                "sed -i -E "
-                r"'s/^[[:space:]]*(PasswordAuthentication"
-                r"|KbdInteractiveAuthentication"
-                r"|ChallengeResponseAuthentication)"
-                r"[[:space:]]/#\1 /' "
-                '"$f" 2>/dev/null; done',
-                timeout=15,
-            )
-            commands.append(neutralize)
-            changed = True
-
-        # Validate config before restarting
-        validate = conn.run("sshd -t", timeout=15)
-        commands.append(validate)
-        if validate.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"sshd config validation failed: {validate.stderr.strip()[:200]}",
-                commands=commands,
-            )
-
-        # Validate effective settings too — cloud-init drop-ins can override the main file.
-        # DebianBanner is a Debian/Ubuntu-specific directive that some OpenSSH
-        # builds don't recognize — sshd -T silently omits it.  We still write
-        # it (harmless when unsupported), but skip verification when absent.
-        _required = ("passwordauthentication no", "kbdinteractiveauthentication no")
-        _optional = ("debianbanner no",)
-
-        for setting in _required:
-            effective = conn.run(f"sshd -T | grep -q '^{setting}$'", timeout=15)
-            commands.append(effective)
-            if effective.returncode != 0:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"effective sshd setting mismatch: expected '{setting}'",
-                    commands=commands,
-                )
-
-        for setting in _optional:
-            effective = conn.run(f"sshd -T | grep -qi '^{setting.split()[0]}'", timeout=15)
-            commands.append(effective)
-            if effective.returncode != 0:
-                # sshd doesn't recognize this directive — skip verification
-                continue
-            check = conn.run(f"sshd -T | grep -q '^{setting}$'", timeout=15)
-            commands.append(check)
-            if check.returncode != 0:
-                return StepResult(
-                    name=self.name,
-                    status="failed",
-                    detail=f"effective sshd setting mismatch: expected '{setting}'",
-                    commands=commands,
-                )
-
-        if not changed:
-            return StepResult(name=self.name, status="ok", detail="already hardened", commands=commands)
-
-        # Restart sshd (service is named "sshd" on some distros, "ssh" on others)
-        restart = conn.run("systemctl restart sshd 2>/dev/null || systemctl restart ssh", timeout=15)
-        commands.append(restart)
-        if restart.returncode != 0:
-            return StepResult(
-                name=self.name,
-                status="failed",
-                detail=f"sshd restart failed: {restart.stderr.strip()[:200]}",
-                commands=commands,
-            )
-
-        return StepResult(name=self.name, status="changed", commands=commands)
+        source = files("meridian.provision").joinpath("ssh_hardening.py").read_text(encoding="utf-8")
+        result = conn.run("python3 -", input=source, sensitive=True, timeout=90, operation_name=self.name)
+        status = result.stdout.strip()
+        if result.returncode or status not in {"changed", "ok"}:
+            detail = (result.stderr.strip().splitlines() or ["Could not confirm the SSH hardening result."])[-1][:300]
+            return StepResult(name=self.name, status="failed", detail=detail, commands=[result])
+        return StepResult(name=self.name, status="ok" if status == "ok" else "changed", commands=[result])
 
 
 class ConfigureFail2ban:
