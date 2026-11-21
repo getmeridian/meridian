@@ -2,8 +2,8 @@
 
 ## Design decisions
 
-- **Two-stage pipeline** — CI validates on every push/PR. Release triggers only on CI success on main via `workflow_run`. Prevents accidental releases from failed builds.
-- **Python matrix** — each of Python 3.11–3.15 runs the whole unit suite with the locked dependencies. Three pytest workers share the work on each hosted runner; tag releases run the same complete suite before publishing.
+- **Main CI reuse** — on a normal merge, compare the trusted PR's tested tree, both parents, CI policy and job results with the push to main. The Shell job's relative workflow call records the actual test commit in GitHub's `referenced_workflows`; the run's `head_sha` is the feature branch tip. Start in observation mode; only `MERIDIAN_CI_REUSE=enabled` allows skipping. Missing evidence runs CI normally.
+- **Python matrix** — Python 3.11–3.15 each run the whole locked suite with three pytest workers. Manual dispatch always runs it.
 - **System Lab only where it matters** — the `changes` job diffs the PR (or push) and runs System Lab only when runtime code (`src/meridian` minus Markdown and locale catalogs), the agent, `tests/systemlab` (or the corpus comparison it reuses), dependencies, or `ci.yml` change; a skipped job still satisfies required checks and Release. `workflow_dispatch` always runs it. Widen the path list when the lab starts depending on something new.
 - **E2E only where it matters** — the same `changes` job gates browser journeys on package code, the demo and its build scripts, shared test support, CI, or dependencies. The ten-minute budget includes a fresh Chromium and WebKit install. Failure traces and screenshots live for seven days.
 - **Tool pins** — action references are full commit SHAs with release labels. CI reads Node, Rust and uv from `.github/.tool-versions` and pnpm from `website/package.json`; frozen installs retain the workspace supply-chain guardrails.

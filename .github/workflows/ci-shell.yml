@@ -1,0 +1,21 @@
+name: CI Shell
+
+# A relative workflow_call records the tested merge ref and its resolved SHA
+# in GitHub's referenced_workflows metadata, even after the PR ref disappears.
+on: workflow_call
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    name: Shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check script syntax
+        run: bash -n install.sh
+
+      - name: Shellcheck
+        run: shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning install.sh

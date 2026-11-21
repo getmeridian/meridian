@@ -51,6 +51,10 @@ Key modules:
 4. For deployment changes, run `make system-lab` or test on a real server
 5. Open a PR with a clear description of what and why
 
+## Reusing PR checks on main
+
+By default, a main push runs its checks and reports any matching PR in the **Changes** job summary. Before enabling reuse, find a “Would reuse checks” link on a green main run and confirm the linked PR covered the same jobs. Then set the repository Actions variable `MERIDIAN_CI_REUSE` to `enabled`. Delete the variable to return to observation. A manual CI dispatch always runs the full suite.
+
 ## Architecture Notes
 
 See [CLAUDE.md](CLAUDE.md) for detailed architecture, implicit dependencies, and conventions. Key points:

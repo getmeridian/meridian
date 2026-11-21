@@ -23,6 +23,8 @@ concurrency:
 jobs:
   python-test:
     name: Python Tests
+    needs: changes
+    if: needs.changes.outputs.reuse != 'true'
     runs-on: ubuntu-latest
     env:
       UV_PYTHON: ${{ matrix.python-version }}
@@ -91,6 +93,8 @@ jobs:
 
   python-lint:
     name: Python Lint
+    needs: changes
+    if: needs.changes.outputs.reuse != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,6 +124,8 @@ jobs:
 
   typecheck:
     name: Type Check
+    needs: changes
+    if: needs.changes.outputs.reuse != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -145,6 +151,8 @@ jobs:
 
   validate:
     name: Validate
+    needs: changes
+    if: needs.changes.outputs.reuse != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -195,15 +203,9 @@ jobs:
 
   shellcheck:
     name: Shell
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Check script syntax
-        run: bash -n install.sh
-
-      - name: Shellcheck
-        run: shellcheck -e SC2086,SC2029,SC2087,SC2155 -S warning install.sh
+    needs: changes
+    if: needs.changes.outputs.reuse != 'true'
+    uses: ./.github/workflows/ci-shell.yml
 
   # The node agent's own suite, including the round trip against the real Python
   # control service (tests/service.rs), which needs uv and the package installed.
@@ -211,6 +213,7 @@ jobs:
     name: Agent
     runs-on: ubuntu-latest
     needs: changes
+    if: needs.changes.outputs.reuse != 'true'
     outputs:
       lab-agent-id: ${{ steps.lab-agent.outputs.artifact-id }}
     defaults:
@@ -268,7 +271,12 @@ jobs:
   changes:
     name: Changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
     outputs:
+      reuse: ${{ steps.reuse.outputs.reuse }}
       system-lab: ${{ steps.filter.outputs.system-lab }}
       e2e: ${{ steps.filter.outputs.e2e }}
     steps:
@@ -313,11 +321,41 @@ jobs:
           fi
           echo "e2e=$e2e" >> "$GITHUB_OUTPUT"
 
+      # Only GitHub's own check records cross the PR boundary. An unavailable
+      # verifier or API falls back to running every applicable check on main.
+      - name: Check for an equivalent successful PR run
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && github.repository == 'getmeridian/meridian'
+        id: reuse
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: ${{ github.event.before }}
+          LAB: ${{ steps.filter.outputs.system-lab }}
+          E2E: ${{ steps.filter.outputs.e2e }}
+          MODE: ${{ vars.MERIDIAN_CI_REUSE }}
+        run: |
+          reuse=false
+          if git diff --quiet --no-ext-diff "$BASE" "$GITHUB_SHA" -- .github/workflows .github/actions \
+              .github/.tool-versions .github/CODEOWNERS scripts/ci_reuse.py scripts/prerelease_ci.py; then
+            if proof=$(python3 -I scripts/ci_reuse.py "$BASE" "$GITHUB_SHA" "$LAB" "$E2E"); then
+              if [ "$MODE" = enabled ]; then
+                reuse=true
+                echo "Reusing checks: $proof" >> "$GITHUB_STEP_SUMMARY"
+              else
+                echo "Would reuse checks: $proof. Running main CI in observation mode." >> "$GITHUB_STEP_SUMMARY"
+              fi
+            else
+              echo "No verified equivalent PR run; running main checks." >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "CI policy changed or couldn't be compared; running main checks." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "reuse=$reuse" >> "$GITHUB_OUTPUT"
+
   e2e:
     name: E2E
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.e2e == 'true'
+    if: needs.changes.outputs.reuse != 'true' && needs.changes.outputs.e2e == 'true'
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -353,7 +391,7 @@ jobs:
     name: System Lab
     runs-on: ubuntu-latest
     needs: [changes, agent, python-lint]
-    if: needs.changes.outputs.system-lab == 'true'
+    if: needs.changes.outputs.reuse != 'true' && needs.changes.outputs.system-lab == 'true'
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
