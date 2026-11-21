@@ -3,17 +3,17 @@
   "url": "https://context7.com/getmeridian/meridian",
   "public_key": "pk_R58z5wZTxUVy0RZz9dL0f",
   "projectTitle": "Meridian",
-  "description": "CLI that deploys a correctly hardened VLESS+Reality VPN (Remnawave panel, XHTTP, Hysteria2, relays) on your own servers and hands each person a connection page and QR code.",
+  "description": "Meridian deploys a self-hosted VPN with a built-in owner panel, relays, and a connection page and QR code for each person.",
   "folders": ["website/src/content/docs/en"],
   "excludeFiles": ["contributing.md"],
   "rules": [
-    "Install with `uv tool install meridian-vpn` (or `curl -sSf https://getmeridian.org/install.sh | bash`); the PyPI package is meridian-vpn and the command is `meridian`.",
+    "These docs cover Meridian 4. Install it with `uv tool install 'meridian-vpn>=4.0.0b0,<5'` or use the installer at https://getmeridian.org/install.sh. The command is `meridian`.",
     "Start with `meridian setup` for a guided fleet of one or more servers, or `meridian deploy IP` for one server; both end with each person's connection page and subscription URL.",
-    "Change a fleet only through Meridian commands (`setup`, `client|node|relay add/remove`, `plan`, `apply`); never edit `cluster.yml` by hand or change Meridian-managed objects in the Remnawave panel.",
+    "Manage servers and relays through Meridian commands. Manage people through the CLI or the owner panel. To edit a fleet as a file, use `meridian fleet export` and `meridian fleet import`; do not edit `cluster.yml` directly.",
     "Run `meridian plan` before `meridian apply --yes`; plan exits 0 when converged and 2 when changes are pending.",
     "Commands that accept `--json` print a `meridian.output/v1` envelope; read results under `data`. Exit codes: 2 user error, 3 evidence unavailable, 4 a check found problems, 5 cancelled.",
     "`meridian check` inspects servers over SSH; `meridian test` sends real traffic from the current machine, and `meridian test --probe` shows what a censor sees.",
-    "Connection pages and subscription URLs grant access: treat them as secrets. The admin password is printed only by `meridian panel --show-password`.",
+    "Treat connection pages, subscription URLs and owner setup links as secrets. `meridian panel` shows the panel address and offers a one-time setup link until the panel has an owner.",
     "Never use apple.com or www.microsoft.com as the Reality camouflage target (`--sni`); prefer what `meridian scan` finds in the server's own network.",
     "`meridian help agents` prints the full guide for AI agents operating Meridian."
   ]

@@ -23,7 +23,7 @@ from meridian import cli_types as click
 from meridian.cli_catalog import cli_root
 
 PANEL_ORDER = ["Get started", "Clients", "Servers", "Check & fix", "Advanced"]
-HIDDEN_PANEL = "Control service (hidden until #95 ships)"
+HIDDEN_PANEL = "Hidden commands"
 _MARKUP = re.compile(r"\[/?[a-z ]+\]")
 
 
@@ -75,11 +75,10 @@ CONCEPTS: list[dict[str, object]] = [
         "id": "fleet",
         "name": "Fleet",
         "tag": "cluster.yml",
-        "text": "Every server and person you manage together, described as a reviewed <em>topology intent</em>: "
-        "which server is the control server, which are exits, relays, and gateways, the routes, and "
-        "who may connect. Commands edit the intent; <code>plan</code> shows the difference from the live "
-        "servers and <code>apply</code> makes them match. <code>fleet export</code>/<code>import</code> "
-        "edit it as one file.",
+        "text": "The topology describes the control server, exits, relays, gateways, routes, and access profiles. "
+        "<code>plan</code> compares it with the live servers; <code>apply</code> makes them match. "
+        "Use <code>fleet export</code> and <code>fleet import</code> to edit it as one file. "
+        "The control service keeps the people and their profile memberships.",
         "commands": ["fleet", "plan", "apply", "setup"],
     },
     {
@@ -269,7 +268,7 @@ def traffic_svg() -> str:
 
 def lifecycle_svg() -> str:
     steps = [
-        (20, "Edit the intent", "client · node · route · import", "k-fleet"),
+        (20, "Edit the intent", "node, relay, route, import", "k-fleet"),
         (215, "plan", "compile, observe, diff", "k-plan"),
         (410, "apply", "reconcile each resource", "k-plan"),
         (605, "Servers converge", "SSH + control service", "k-exit"),
@@ -308,15 +307,13 @@ def _panel(command: click.Command, inherited: str) -> str:
     return panel if isinstance(panel, str) else inherited
 
 
-def collect(include_hidden: bool) -> list[Command]:
+def collect() -> list[Command]:
     root = cli_root()
     found: list[Command] = []
 
     def walk(group: click.Group, prefix: list[str], panel: str, hidden: bool) -> None:
         for name, command in group.commands.items():
             is_hidden = hidden or command.hidden
-            if is_hidden and not include_hidden:
-                continue
             path = [*prefix, name]
             own_panel = HIDDEN_PANEL if is_hidden else _panel(command, panel)
             if isinstance(command, click.Group):
@@ -328,10 +325,10 @@ def collect(include_hidden: bool) -> list[Command]:
                 if param.name in {"help", "context"}:
                     continue
                 if isinstance(param, click.Argument):
-                    params.append(Param(param.human_readable_name, "argument", required=param.required))
+                    params.append(Param(param.display_name_raw, "argument", required=param.required))
                 elif isinstance(param, click.Option):
                     flags = ", ".join([*param.opts, *param.secondary_opts])
-                    metavar = "" if param.is_flag else (param.metavar or param.type.name.upper())
+                    metavar = "" if param.is_flag else (param.metavar or param.display_type(ctx))
                     params.append(Param(flags, "option", _clean(param.help or ""), metavar, hidden=param.hidden))
             help_text = _clean(command.help or "")
             found.append(
@@ -501,9 +498,9 @@ Meridian manages, how traffic flows, how a change reaches your servers, and ever
 <figure>{traffic_svg()}<figcaption>Relays forward TCP without decrypting it; gateways choose per destination; the
 control server only hands out links and configuration — user traffic never passes through it unless it is also an
 exit.</figcaption></figure>
-<h2 id="lifecycle">Plan &amp; apply</h2><p class="lede">Every change edits the intent first; servers follow.</p>
-<figure>{lifecycle_svg()}<figcaption><code>deploy</code> and <code>setup</code> run the same steps for you; commands
-such as <code>client add</code> or <code>node add</code> edit the intent and apply it in one go.</figcaption></figure>
+<h2 id="lifecycle">Plan &amp; apply</h2><p class="lede">A topology change starts with a plan for the servers.</p>
+<figure>{lifecycle_svg()}<figcaption><code>deploy</code>, <code>setup</code>, and <code>node add</code> apply the topology.
+<code>client add</code> updates the control service immediately, without a fleet apply.</figcaption></figure>
 <h2 id="concepts">Concepts</h2><div class="concepts">{_concept_cards()}</div>
 <h2 id="reference">Command reference</h2>
 <div class="tools"><input id="q" type="search" placeholder="Filter commands, e.g. limit, sni, warp">
@@ -518,7 +515,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--hidden", action="store_true", help="Show hidden commands by default")
     parser.add_argument("--json", action="store_true", help="Print the collected commands as JSON instead")
     args = parser.parse_args(argv)
-    commands = collect(include_hidden=True)
+    commands = collect()
     if args.json:
         print(json.dumps([asdict(c) for c in commands], indent=2))
         return 0
