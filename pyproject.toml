@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
 ]
 dependencies = [
     "typer>=0.26,<0.30",
@@ -48,10 +49,11 @@ Issues = "https://github.com/getmeridian/meridian/issues"
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "pytest-xdist>=3.8,<4",
     "ruff>=0.4",
     "mypy>=1.0",
     "types-PyYAML>=6.0",
-    "hatchling>=1.31.0",
+    "hatchling==1.33.0",
     "pexpect>=4.9; sys_platform != 'win32'",
 ]
 
@@ -59,11 +61,11 @@ dev = [
 # Real-browser journeys, deliberately excluded from normal pytest collection.
 e2e = [
     "axe-playwright-python>=0.1.8,<0.2",
-    "playwright>=1.64,<1.65",
+    "playwright>=1.65,<1.66",
     "pytest>=8,<10",
 ]
 # Cloud SDKs for the local-only real-VM harness (tests/realvm/); never published.
-realvm = ["hcloud>=2.0"]
+realvm = ["hcloud>=2.27,<3"]
 
 [tool.hatch.version]
 path = "VERSION"

@@ -248,13 +248,15 @@ def _to_vm_instance(server: Any) -> VMInstance:
         ipv6 = ipv6_raw.split("/")[0].rstrip(":") + "::1"
     else:
         ipv6 = ipv6_raw
+    # Inventory and cleanup need the server ID even when the provider omits location metadata.
+    location = getattr(server, "location", None)
     return VMInstance(
         id=str(server.id),
         name=server.name,
         status=server.status,
         public_ipv4=ipv4,
         public_ipv6=ipv6,
-        region=server.datacenter.location.name if server.datacenter else "",
+        region=location.name if location else "",
         labels=dict(server.labels) if server.labels else {},
         provider="hetzner",
         raw=server,

@@ -35,7 +35,7 @@ Owner console assets: `ui/CLAUDE.md`. Formats: `formats/CLAUDE.md`.
 - The ensure route fills empty names inside its transaction so a concurrent rename wins; preserve live settings during adoption; schema backfills validate historical names and skip conflicts instead of blocking startup.
 - Only reviewed profile IDs exempt secret-shaped keys in delivery defaults; all other keys and all values undergo secret validation.
 - `executescript()` commits on its own; use `Store.create()` outside write transactions for migration setup.
-- Decode percent-encoded IDs before routing, bound bodies before authentication, and answer misses like nginx without logging secret paths.
+- Decode percent-encoded IDs before routing, bound bodies before authentication, and answer misses like nginx without logging secret paths. WebAuthn binary fields require the URL-safe alphabet and a canonical encoding; Python's decoder varies by version.
 - Treat uncertain 502/503/504 writes as uncertain outcomes; never retry before observing. Emit Retry-After for named throttling errors.
 - Use the injected service clock for reads, schedules, history and report freshness; accepted receipt time, not a replayed hello, renews evidence.
 - Validate requested lifecycle fields before enforcement; renewal anchors, counts and expiry must agree and remain before 2099.

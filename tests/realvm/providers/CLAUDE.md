@@ -7,7 +7,7 @@ Python-first VM lifecycle for the real-VM harness. No Terraform, no Pulumi.
 - **Per-cloud SDK, not an external IaC tool** — no `terraform` / `pulumi` binary; harness-only, never part of the published package.
 - **Label-based discovery, no state file** — every resource is tagged `meridian-realvm-test=1` + `meridian-fleet-id=<uuid>`, so `list_vms(labels=…)` finds orphans after lost context.
 - **Deferred SDK import** — `HetznerProvider.__init__` validates the token BEFORE importing `hcloud`, so missing optional dependency raises a typed `ProviderError`, not `ImportError`. Unit-testable without the SDK installed.
-- **SDKs live in the `realvm` dependency group** — `uv sync --group realvm` pulls `hcloud>=2.0`; `make real-lab*` targets pass `--group realvm`. Add a provider's SDK to that group.
+- **SDKs live in the `realvm` dependency group** — `make real-lab*` targets pass `--group realvm`. Add a provider's SDK to that group.
 
 ## What's done well
 
@@ -18,6 +18,7 @@ Python-first VM lifecycle for the real-VM harness. No Terraform, no Pulumi.
 
 - **Never let label schema drift** between provision and destroy. If `create_vm` writes `meridian-fleet-id`, `destroy_fleet` MUST read the same key.
 - **Use Hetzner Primary IPs, not legacy Floating IPs**, for multi-IP scenarios.
+- **Map regions from the server’s location** — modern hcloud responses omit the former datacenter field, including inventory used for cleanup.
 - **SSH key pinning** — `upload_ssh_key` is idempotent on name + fingerprint match; different material with the same name raises.
 
 ## Links

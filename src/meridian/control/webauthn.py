@@ -70,7 +70,8 @@ def encode_bytes(value: bytes) -> str:
 def decode_bytes(value: str, *, maximum: int) -> bytes:
     """Refuse noncanonical base64url, padding, and oversized values before binary parsing."""
     try:
-        if len(value) > (maximum * 4 + 2) // 3:
+        # Some Python versions accept the standard alphabet alongside altchars; WebAuthn doesn't.
+        if len(value) > (maximum * 4 + 2) // 3 or "+" in value or "/" in value:
             raise invalid_passkey()
         result = base64.b64decode(value + "=" * (-len(value) % 4), altchars=b"-_", validate=True)
     except (ValueError, binascii.Error) as exc:
