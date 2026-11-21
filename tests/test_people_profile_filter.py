@@ -116,7 +116,7 @@ def test_list_and_bulk_cli_share_profile_filters_and_preserve_profile_counts(tmp
         admin.create_user(UserCreate(username="sample-b"))
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-            topology_intent=single_exit_intent(users=["topology-person"]),
+            topology_intent=single_exit_intent(),
         )
         try:
             with patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster):

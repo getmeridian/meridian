@@ -21,7 +21,6 @@ from meridian.core.topology import (
 from meridian.setup.default_paths import default_exit_paths
 
 DEFAULT_EXIT_ID = "main"
-DEFAULT_CLIENT = "default"
 # Stands in for a server that has no saved profile yet (dry runs only).
 PENDING_SERVER_REF = "srv-pending"
 
@@ -33,7 +32,6 @@ def single_server_intent(
     sni: str = "",
     domain: str = "",
     self_steal: bool = False,
-    client_name: str = "",
     warp: bool = False,
     geo_block: bool = True,
     hysteria2: bool = True,
@@ -45,7 +43,7 @@ def single_server_intent(
 
     A fresh fleet gets a control plane plus one exit on ``server_ref``. An
     existing fleet may only be redeployed on a server that already runs an
-    exit; its other exits, relays, gateways, and users are preserved.
+    exit; its other exits, relays, gateways, and access settings are preserved.
     """
     if existing is None:
         exit_ = ExitIntent(
@@ -119,7 +117,6 @@ def request_intent(
         sni=request.reality_sni,
         domain=request.domain,
         self_steal=request.self_steal,
-        client_name=request.client_name,
         warp=request.warp,
         geo_block=request.geo_block,
         hysteria2=request.hysteria2,

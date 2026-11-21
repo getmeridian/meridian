@@ -425,7 +425,7 @@ def _run_canonical_subscription(
     selected: User | None = None
     try:
         with panel_factory(cluster.panel.url, cluster.panel.api_token, timeout) as panel:
-            selected = select_active_client(panel, cluster, requested_client)
+            selected = select_active_client(panel, requested_client)
             if selected is None:
                 message = (
                     f"Client {requested_client!r} is missing, inactive, or has no subscription"
@@ -715,7 +715,7 @@ def _classify_attempt(
     )
 
 
-def select_active_client(panel: VerificationPanel, cluster: ClusterConfig, requested_client: str) -> User | None:
+def select_active_client(panel: VerificationPanel, requested_client: str) -> User | None:
     """Choose a deterministic active user with a usable canonical subscription."""
     if requested_client:
         user = panel.get_user(requested_client)

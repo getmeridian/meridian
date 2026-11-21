@@ -45,7 +45,7 @@ def _json_off():
 
 
 def _intent(overrides: list[EgressOverrideIntent] | None = None) -> SetupIntent:
-    return single_exit_intent(control="srv-exit", users=["alice"], exit_fields={"egress_overrides": overrides or []})
+    return single_exit_intent(control="srv-exit", exit_fields={"egress_overrides": overrides or []})
 
 
 def _run(call, intent: SetupIntent, runtime: _Runtime | None = None, **patches) -> int:

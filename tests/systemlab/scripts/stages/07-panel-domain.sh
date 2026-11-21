@@ -23,7 +23,7 @@ from meridian.setup.single_server import single_server_intent
 address, panel_domain, output = sys.argv[1:]
 entry = ServerRegistry(SERVER_PROFILES_FILE).find(address)
 assert entry is not None, f"{address} is not on the server shelf"
-intent = single_server_intent(None, server_ref=entry.id, address=address, client_name="solo")
+intent = single_server_intent(None, server_ref=entry.id, address=address)
 data = intent.model_dump(mode="json")
 data["control"]["public_hostname"] = panel_domain
 with open(output, "w", encoding="utf-8") as handle:

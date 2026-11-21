@@ -39,7 +39,7 @@ def test_cli_language_changes_are_service_owned_and_null_clears_person_override(
         with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as client:
             client.put_user("person")
             cluster = ClusterConfig(
-                panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=single_exit_intent(users=["person"])
+                panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=single_exit_intent()
             )
             original = cluster.topology_intent.model_dump()
             with patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster):

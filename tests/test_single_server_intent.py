@@ -14,7 +14,7 @@ from tests.support.topology import compile_panel_pass
 
 
 def test_fresh_ip_deploy_is_a_reality_exit_on_the_control_server() -> None:
-    intent = single_server_intent(None, server_ref="srv-a", client_name="alice")
+    intent = single_server_intent(None, server_ref="srv-a")
 
     assert intent.control.server_ref == "srv-a" and intent.control.public_hostname == ""
     (exit_,) = intent.exits
@@ -50,16 +50,18 @@ def test_every_invisible_method_is_on_by_default_even_without_a_domain() -> None
     assert {path.tls_sni for path in ip_paths if path.protocol != "reality"} == {"198.51.100.10"}
 
 
-def test_redeploy_keeps_transport_paths_users_and_other_exits() -> None:
-    first = single_server_intent(None, server_ref="srv-a", domain="vpn.example.com", client_name="alice")
+def test_redeploy_keeps_transport_paths_access_and_other_exits() -> None:
+    first = single_server_intent(None, server_ref="srv-a", domain="vpn.example.com")
     other = ExitIntent(
         id="eu",
         server_ref="srv-b",
         paths=[ProtocolPathIntent(id="eu-reality", protocol="reality", reality_sni="www.microsoft.com")],
     )
-    fleet = first.model_copy(update={"exits": [*first.exits, other], "access": AccessIntent()})
+    fleet = first.model_copy(
+        update={"exits": [*first.exits, other], "access": AccessIntent(squad_name="Custom access")}
+    )
 
-    again = single_server_intent(fleet, server_ref="srv-a", domain="vpn.example.com", client_name="carol", warp=True)
+    again = single_server_intent(fleet, server_ref="srv-a", domain="vpn.example.com", warp=True)
 
     before = {path.protocol: path.path for path in first.exits[0].paths}
     after = {path.protocol: path.path for path in again.exits[0].paths}

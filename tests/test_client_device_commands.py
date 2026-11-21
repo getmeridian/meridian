@@ -29,7 +29,7 @@ def fleet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[ControlCl
         client.put_user("alice")
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.10"),
-            topology_intent=single_exit_intent(users=["alice"]),
+            topology_intent=single_exit_intent(),
         )
         monkeypatch.setattr("meridian.commands._helpers.ClusterConfig.load", lambda: cluster)
         set_json_mode(True)

@@ -421,7 +421,7 @@ def test_reviewed_runtime_carries_atomic_cut_off_results_back_to_the_command(
 
     service.put_user("person-a")
     session(http, clock)
-    intent = single_exit_intent(users=["other-person"])
+    intent = single_exit_intent()
     saved = ClusterConfig(panel=PanelConfig(url=http, api_token=ADMIN_TOKEN), topology_intent=intent)
     binding = ManagedResourceBinding(resource_kind="control_user", remote_id="person-a")
     commands = []

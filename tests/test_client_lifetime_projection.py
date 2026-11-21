@@ -42,7 +42,7 @@ def fleet(tmp_path: Path) -> Iterator[tuple[ClusterConfig, str]]:
         )
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.10"),
-            topology_intent=single_server_intent(None, server_ref="srv-a", client_name="sample"),
+            topology_intent=single_server_intent(None, server_ref="srv-a"),
         )
         yield cluster, stamp
 

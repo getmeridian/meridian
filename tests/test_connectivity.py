@@ -21,7 +21,6 @@ from meridian.core.verification import VerificationFinding, aggregate_verificati
 from meridian.remnawave import RemnawaveAuthError, RemnawaveError, RemnawaveNetworkError, SubscriptionDocument, User
 from meridian.verification import DeploymentVerificationContext, VerificationHttpsRoute
 from meridian.xray_client import ConnectionAttempt
-from tests.support.topology import single_exit_intent
 
 
 def _alice(status: str = "ACTIVE", **panel_kwargs) -> FakePanel:
@@ -246,22 +245,20 @@ def test_basic_test_checks_managed_certificate_alongside_reality() -> None:
 
 
 def test_client_selection_uses_service_username_order() -> None:
-    intent = single_exit_intent(users=["preferred", "fallback"])
     panel = FakePanel(
         [
-            User(username="fallback", status="ACTIVE", short_uuid="short-fallback"),
             User(username="preferred", status="ACTIVE", short_uuid="short-preferred"),
+            User(username="fallback", status="ACTIVE", short_uuid="short-fallback"),
         ]
     )
 
-    selected = select_active_client(panel, ClusterConfig(topology_intent=intent), "")  # type: ignore[arg-type]
+    selected = select_active_client(panel, "")  # type: ignore[arg-type]
 
     assert selected is not None
     assert selected.username == "fallback"
 
 
 def test_default_client_selection_includes_every_active_service_person() -> None:
-    intent = single_exit_intent(users=["alice"])
     panel = FakePanel(
         [
             User(username="alice", status="DISABLED", short_uuid="short-alice"),
@@ -269,37 +266,21 @@ def test_default_client_selection_includes_every_active_service_person() -> None
         ]
     )
 
-    selected = select_active_client(panel, ClusterConfig(topology_intent=intent), "")  # type: ignore[arg-type]
+    selected = select_active_client(panel, "")  # type: ignore[arg-type]
 
     assert selected is not None and selected.username == "meridian-route-123"
 
 
 def test_requested_client_selection_includes_service_people() -> None:
-    intent = single_exit_intent(users=["alice"])
     panel = FakePanel([User(username="meridian-route-123", status="ACTIVE", short_uuid="short-service")])
     with patch.object(panel, "get_user", wraps=panel.get_user) as get_user:
         selected = select_active_client(
             panel,  # type: ignore[arg-type]
-            ClusterConfig(topology_intent=intent),
             "meridian-route-123",
         )
 
     assert selected is not None and selected.username == "meridian-route-123"
     get_user.assert_called_once_with("meridian-route-123")
-
-
-def test_legacy_default_client_selection_still_uses_panel_users() -> None:
-    panel = FakePanel(
-        [
-            User(username="zeta", status="ACTIVE", short_uuid="short-zeta"),
-            User(username="alpha", status="ACTIVE", short_uuid="short-alpha"),
-        ]
-    )
-
-    selected = select_active_client(panel, ClusterConfig(), "")  # type: ignore[arg-type]
-
-    assert selected is not None
-    assert selected.username == "alpha"
 
 
 def test_full_test_executes_fallback_and_target_hysteria_without_rebuilding(tmp_path: Path) -> None:

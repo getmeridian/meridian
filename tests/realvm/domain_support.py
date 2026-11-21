@@ -60,14 +60,13 @@ def panel_domain(ip: str, override: str = "") -> str:
     return chosen
 
 
-def build_intent(server_ref: str, ip: str, domain: str, *, shared: bool = False, client_name: str = "alice") -> str:
+def build_intent(server_ref: str, ip: str, domain: str, *, shared: bool = False) -> str:
     """The setup intent JSON: the panel on `domain`, exit paths on the IP unless `shared`."""
     intent = single_server_intent(
         None,
         server_ref=server_ref,
         address=ip,
         domain=domain if shared else "",
-        client_name=client_name,
     )
     data = intent.model_dump(mode="json")
     data["control"]["public_hostname"] = domain

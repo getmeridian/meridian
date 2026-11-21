@@ -50,7 +50,6 @@ def command_modes(monkeypatch):
 
 def profile_intent(grants: list[str] | None = None) -> SetupIntent:
     return single_exit_intent(
-        users=["person"],
         access_profiles=[AccessProfileIntent(id="limited", grants=["exit:exit-a"] if grants is None else grants)],
     )
 
@@ -87,7 +86,7 @@ def test_unreviewed_apply_refuses_saved_profile_edits_before_fence_or_node_write
     from meridian import config
 
     registry = registry_at(config.SERVER_PROFILES_FILE)
-    wanted = single_exit_intent(users=["person"]) if edit == "remove-last" else profile_intent([])
+    wanted = single_exit_intent() if edit == "remove-last" else profile_intent([])
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
         keys = seed_profiles(admin, profile_intent())
         if fingerprinted:
@@ -220,7 +219,6 @@ def expansion_intents(edit: str) -> tuple[SetupIntent, SetupIntent]:
     before = profile_intent()
     if edit == "no-hysteria2":
         before = single_exit_intent(
-            users=["person"],
             access_profiles=before.access_profiles,
             paths=[reality_path(), ProtocolPathIntent(id="udp", protocol="hysteria2", tls_sni="198.51.100.20")],
         )

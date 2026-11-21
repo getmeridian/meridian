@@ -1,7 +1,6 @@
 """Tests for client add/list/show/reissue/remove/enable/disable commands.
 
-Clients are the access users declared in the saved topology; runtime user
-state lives in Remnawave and is read through MeridianPanel.
+People and their credentials are owned by the control service.
 """
 
 from __future__ import annotations
@@ -26,13 +25,12 @@ from meridian.commands.client import (
 )
 from meridian.commands.client_handoff import print_handoff_links
 from meridian.console import set_json_mode
-from meridian.core.topology import AccessIntent
 from meridian.remnawave import RemnawaveError, User
 from tests.support.topology import panel_mock, single_exit_intent
 
 
-def _make_cluster(tmp_path: Path, *, users: list[str] | None = None) -> ClusterConfig:
-    """Save a configured cluster whose topology declares the given access users (alice and bob by default)."""
+def _make_cluster(tmp_path: Path) -> ClusterConfig:
+    """Save the address and credentials for the test service."""
     cluster = ClusterConfig(
         panel=PanelConfig(
             url="https://198.51.100.1/panel",
@@ -40,7 +38,7 @@ def _make_cluster(tmp_path: Path, *, users: list[str] | None = None) -> ClusterC
             server_ip="198.51.100.1",
             sub_path="pages",
         ),
-        topology_intent=single_exit_intent(users=users or ["alice", "bob"]),
+        topology_intent=single_exit_intent(),
     )
     cluster.save(tmp_path / "cluster.yml")
     return cluster
@@ -157,13 +155,7 @@ class TestRunList:
     ) -> None:
         panel = _make_panel_mock()
         panel.list_users.return_value = [_make_user("[red]visible[/red]")]
-        cluster = _make_cluster(tmp_home)
-        assert cluster.topology_intent is not None
-        cluster.topology_intent = cluster.topology_intent.model_copy(
-            update={"access": AccessIntent.model_construct(users=["[red]visible[/red]"])}
-        )
-
-        with _cli(cluster, panel):
+        with _cli(_make_cluster(tmp_home), panel):
             run_list()
 
         assert "[red]visible[/red]" in capsys.readouterr().err
@@ -243,16 +235,12 @@ class TestRunReissue:
         }
 
     def test_finds_a_client_by_the_name_they_were_added_with(self, tmp_home: Path) -> None:
-        cluster = _make_cluster(tmp_home, users=["alice", "biba"])
-        cluster.topology_intent = cluster.topology_intent.model_copy(  # type: ignore[union-attr]
-            update={"access": AccessIntent()}
-        )
+        cluster = _make_cluster(tmp_home)
         panel = _make_panel_mock()
         person = _make_user("biba")
         person.display_name = "Биба"
         panel.list_users.return_value = [person]
         panel.get_user.return_value = person
-        panel.get_user.return_value = _make_user("biba")
         panel.revoke_user_subscription.return_value = _reissued("biba")
 
         with _reissue_cli(cluster, panel) as links:
@@ -261,16 +249,12 @@ class TestRunReissue:
         panel.get_user.assert_called_with("biba")
         assert links.call_args.kwargs["page_url"] == links.call_args.args[0]
 
-    @pytest.mark.parametrize(
-        ("name", "users"),
-        [("ghost", ["alice", "bob"]), ("default", ["alice"])],
-        ids=["unknown", "service-user"],
-    )
-    def test_refuses_names_outside_the_access_intent_and_lists_clients(
-        self, name: str, users: list[str], tmp_home: Path, capsys: pytest.CaptureFixture[str]
+    @pytest.mark.parametrize("name", ["ghost", "default"])
+    def test_unknown_service_person_has_a_client_list_hint(
+        self, name: str, tmp_home: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         with (
-            _cli(_make_cluster(tmp_home, users=users), json_mode=True) as panel_cls,
+            _cli(_make_cluster(tmp_home), json_mode=True) as panel_cls,
             pytest.raises(typer.Exit) as exc_info,
         ):
             run_reissue(name=name, yes=True)
@@ -408,7 +392,7 @@ class TestRunDisable:
     def test_v4_disable_lasts_until_enabled_not_until_next_apply(self, tmp_home: Path) -> None:
         panel = _make_panel_mock()
 
-        with _cli(_make_cluster(tmp_home, users=["alice"]), panel), patch("meridian.commands.client.warn") as warning:
+        with _cli(_make_cluster(tmp_home), panel), patch("meridian.commands.client.warn") as warning:
             run_disable(name="alice")
 
         panel.disable_user.assert_called_once()
@@ -419,7 +403,7 @@ class TestRunDisable:
         panel = _make_panel_mock()
         panel.get_user.return_value = None
         with (
-            _cli(_make_cluster(tmp_home, users=["default"]), panel),
+            _cli(_make_cluster(tmp_home), panel),
             pytest.raises(typer.Exit) as exc_info,
         ):
             run_disable(name="alice")

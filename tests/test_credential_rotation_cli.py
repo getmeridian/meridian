@@ -44,7 +44,7 @@ def scene():
     panel = panel_mock(get_user=before, list_users=[before], user_credentials=before, rotate_credentials=result)
     cluster = ClusterConfig(
         panel=PanelConfig(url="https://198.51.100.10/panel", api_token="test-token", server_ip="198.51.100.10"),
-        topology_intent=single_exit_intent(users=["alice", "bob"]),
+        topology_intent=single_exit_intent(),
     )
     return cluster, panel, result
 

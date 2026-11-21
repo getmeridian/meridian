@@ -23,9 +23,7 @@ from tests.support.topology import single_exit_intent
 def test_notice_cli_reviews_named_person_before_confirmation_and_declining_preserves_state(tmp_path, capsys) -> None:
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as client:
         client.put_user("person")
-        cluster = ClusterConfig(
-            panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=single_exit_intent(users=["person"])
-        )
+        cluster = ClusterConfig(panel=PanelConfig(url=url, api_token=ADMIN_TOKEN), topology_intent=single_exit_intent())
 
         def decline(*_args, **_kwargs):
             assert "Hello person" in capsys.readouterr().err

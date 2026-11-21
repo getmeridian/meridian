@@ -54,7 +54,7 @@ def test_bulk_json_preview_and_commit_match_the_list_query(tmp_path, tmp_home, l
         admin.update_user("sample-a", UserUpdate(tag="GROUP_A"))
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-            topology_intent=single_exit_intent(users=["topology-person"]),
+            topology_intent=single_exit_intent(),
         )
         with patch("meridian.commands._helpers.ClusterConfig.load", return_value=cluster):
             runner = CliRunner()
@@ -113,7 +113,7 @@ def test_client_list_json_keeps_secret_shaped_tag_counts_as_integers(tmp_path, t
             admin.update_user(username, UserUpdate(tag=tag))
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-            topology_intent=single_exit_intent(users=["topology-person"]),
+            topology_intent=single_exit_intent(),
         )
         with patch("meridian.commands.client.load_topology_cluster", return_value=cluster):
             result = CliRunner().invoke(app, ["--lang", locale, "client", "list", "--limit", "2", "--json"])
@@ -134,7 +134,7 @@ def test_uncertain_bulk_undo_reads_the_receipt_without_repeating_the_write(tmp_p
         receipt = admin.commit_bulk(BulkCommitRequest(preview_id=review.id, preview_hash=review.preview_hash))
         cluster = ClusterConfig(
             panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-            topology_intent=single_exit_intent(users=["topology-person"]),
+            topology_intent=single_exit_intent(),
         )
         original_undo, original_read = ControlClient.undo_bulk, ControlClient.bulk_receipt
         writes, reads = [], []
@@ -185,7 +185,7 @@ def test_bulk_undo_dry_run_checks_receipt_eligibility(people_service, tmp_home, 
     )
     cluster = ClusterConfig(
         panel=PanelConfig(url="https://198.51.100.1/console", api_token=ADMIN_TOKEN, server_ip="198.51.100.1"),
-        topology_intent=single_exit_intent(users=["topology-person"]),
+        topology_intent=single_exit_intent(),
     )
     with (
         patch("meridian.commands.client_bulk.load_topology_cluster", return_value=cluster),

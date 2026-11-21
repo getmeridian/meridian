@@ -46,7 +46,7 @@ from meridian.console import (
     warn,
 )
 from meridian.core.cancellation import CancellationToken, OperationCancelledError, raise_if_cancelled
-from meridian.core.defaults import DEFAULT_SNI, REALITY_SNI_CANDIDATES
+from meridian.core.defaults import DEFAULT_CLIENT, DEFAULT_SNI, REALITY_SNI_CANDIDATES
 from meridian.core.deploy import DeployPlan, DeployRequest, DeployResult, build_deploy_workflow
 from meridian.core.deploy_validation import DeployValidationError, normalize_deploy_request
 from meridian.core.errors import MeridianError, RemnawaveFleetError
@@ -65,7 +65,6 @@ from meridian.renderers import emit_json
 from meridian.resolve import connection_for_entry, merge_target, parse_target, resolve_deploy_target
 from meridian.servers import ServerEntry, ServerRegistry
 from meridian.setup.single_server import (
-    DEFAULT_CLIENT,
     PENDING_SERVER_REF,
     preview_single_server_deploy,
     request_intent,

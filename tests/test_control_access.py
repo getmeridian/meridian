@@ -75,7 +75,7 @@ def test_verification_panel_selects_service_users_like_panel_users(url: str) -> 
         record = client.put_user("alice")
         client.put_endpoint("main:main-reality:direct", REALITY)
     cluster = ClusterConfig()
-    cluster.topology_intent = single_server_intent(None, server_ref="srv-a", client_name="alice")
+    cluster.topology_intent = single_server_intent(None, server_ref="srv-a")
 
     with ServiceAccessPanel(url, ADMIN_TOKEN, 5) as panel:
         user = select_active_client(panel, cluster, "")

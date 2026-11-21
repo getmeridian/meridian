@@ -21,7 +21,7 @@ from meridian.core.people_seeds import PeopleSeeds
 from meridian.core.topology import SetupIntent
 from meridian.people_adoption import ensure_people
 from meridian.reconciler.agent_spec import build_node_spec
-from meridian.reconciler.meridian_drivers import ClientEndpointDriver, ControlUserDriver, ServiceSettingsDriver
+from meridian.reconciler.meridian_drivers import ClientEndpointDriver, ServiceSettingsDriver
 from meridian.reconciler.resources import build_resource_actions
 from meridian.reconciler.workloads import LocalRealityKeyFactory
 from tests.support.control_service import ADMIN_TOKEN, serve_control
@@ -30,7 +30,7 @@ from tests.support.topology import gateway_fleet_intent, single_exit_intent
 
 @pytest.mark.parametrize("named_profiles", [False, True])
 @pytest.mark.parametrize("builder", [single_exit_intent, gateway_fleet_intent])
-def test_settings_follow_workloads_and_endpoints_and_accounts_follow_settings(builder, named_profiles):
+def test_settings_follow_workloads_and_endpoints_and_plans_do_not_own_people(builder, named_profiles):
     intent = builder()
     if named_profiles:
         intent = SetupIntent.model_validate(
@@ -42,8 +42,7 @@ def test_settings_follow_workloads_and_endpoints_and_accounts_follow_settings(bu
     for row in plan.resources:
         if isinstance(row.payload, NodeWorkloadPayload | ClientEndpointPayload):
             assert order[row.logical_id] < settings_position, row.logical_id
-        if isinstance(row.payload, ControlUserPayload):
-            assert settings_position < order[row.logical_id], row.logical_id
+        assert not isinstance(row.payload, ControlUserPayload), row.logical_id
 
 
 @pytest.mark.parametrize(
@@ -55,8 +54,8 @@ def test_one_apply_stages_references_and_creates_people_without_invalidating_its
     tmp_path: Path, adding_profiles: bool, access_reviewed: bool
 ):
     profile = AccessProfileIntent(id="limited", grants=["exit:exit-a"])
-    before = single_exit_intent(users=["existing"], access_profiles=[] if adding_profiles else [profile])
-    after = single_exit_intent(users=["existing", "added"], access_profiles=[profile] if adding_profiles else [])
+    before = single_exit_intent(access_profiles=[] if adding_profiles else [profile])
+    after = single_exit_intent(access_profiles=[profile] if adding_profiles else [])
     previous, plan = compile_topology(before), compile_topology(after)
     keys = LocalRealityKeyFactory()("srv-exit")
     with serve_control(tmp_path) as url, ControlClient(url, ADMIN_TOKEN, report_mutations=False) as admin:
@@ -108,8 +107,6 @@ def test_one_apply_stages_references_and_creates_people_without_invalidating_its
                     for endpoint in wanted_endpoints:
                         assert admin.get_endpoint(endpoint.logical_id.removeprefix("endpoint:")).inbound_ref
                 ServiceSettingsDriver(context).apply(action, None)
-            elif isinstance(payload, ControlUserPayload):
-                ControlUserDriver(context).apply(action, None)
         ensure_people(
             admin,
             PeopleSeeds.model_validate(

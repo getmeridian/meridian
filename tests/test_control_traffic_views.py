@@ -76,7 +76,7 @@ def test_traffic_evidence_reaches_client_show_and_fleet_status(
             assert console["servers"][0]["runtime"]["health"] == runtime_report["health"]
             cluster = ClusterConfig(
                 panel=PanelConfig(url=url, api_token=ADMIN_TOKEN, server_ip="198.51.100.10"),
-                topology_intent=single_server_intent(None, server_ref="srv-a", client_name="alice"),
+                topology_intent=single_server_intent(None, server_ref="srv-a"),
             )
             topology = topology_from_cluster(cluster, servers=[ServerEntry(host="198.51.100.10", id="srv-a")])
             monkeypatch.setattr(client, "load_topology_cluster", lambda **_: cluster)
