@@ -4,10 +4,11 @@
 use std::str::FromStr;
 use std::time::Duration;
 
-use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+use ed25519_dalek::{SigningKey, VerifyingKey};
 use meridian_agent::jcs;
 use x509_cert::Certificate;
-use x509_cert::certificate::{TbsCertificate, Version};
+use x509_cert::builder::{Builder, CertificateBuilder, profile::BuilderProfile};
+use x509_cert::certificate::TbsCertificate;
 use x509_cert::der::asn1::{BitString, Ia5String, OctetString, UtcTime};
 use x509_cert::der::oid::{AssociatedOid, ObjectIdentifier};
 use x509_cert::der::pem::LineEnding;
@@ -18,7 +19,9 @@ use x509_cert::ext::pkix::{BasicConstraints, SubjectAltName};
 use x509_cert::name::Name;
 use x509_cert::request::CertReq;
 use x509_cert::serial_number::SerialNumber;
-use x509_cert::spki::{AlgorithmIdentifierOwned, SubjectPublicKeyInfoOwned};
+use x509_cert::spki::{
+    AlgorithmIdentifierOwned, SubjectPublicKeyInfoOwned, SubjectPublicKeyInfoRef,
+};
 use x509_cert::time::{Time, Validity};
 
 use super::FLEET_ID;
@@ -48,6 +51,30 @@ fn extension<T: AssociatedOid + Encode>(value: &T, critical: bool) -> Extension 
     }
 }
 
+// The service uses the same basic constraints and URI SANs throughout enrollment.
+struct TestCertificate {
+    issuer: Name,
+    subject: Name,
+    extensions: Vec<Extension>,
+}
+
+impl BuilderProfile for TestCertificate {
+    fn get_issuer(&self, _: &Name) -> Name {
+        self.issuer.clone()
+    }
+    fn get_subject(&self) -> Name {
+        self.subject.clone()
+    }
+    fn build_extensions(
+        &self,
+        _: SubjectPublicKeyInfoRef<'_>,
+        _: SubjectPublicKeyInfoRef<'_>,
+        _: &TbsCertificate,
+    ) -> x509_cert::builder::Result<Vec<Extension>> {
+        Ok(self.extensions.clone())
+    }
+}
+
 /// One certificate: `uri` adds a SAN, `ca` the CA basic constraint.
 pub fn certificate(
     issuer_key: &SigningKey,
@@ -71,31 +98,22 @@ pub fn certificate(
         )]);
         extensions.push(extension(&san, false));
     }
-    let tbs = TbsCertificate {
-        version: Version::V3,
-        serial_number: SerialNumber::new(&jcs::sha256_hex(subject.as_bytes()).as_bytes()[..16])
-            .unwrap(),
-        signature: algorithm(),
-        issuer: Name::from_str(&format!("CN={issuer}")).unwrap(),
-        validity: Validity {
-            not_before: time(NOT_BEFORE),
-            not_after: time(not_after),
+    CertificateBuilder::new(
+        TestCertificate {
+            issuer: Name::from_str(&format!("CN={issuer}")).unwrap(),
+            subject: Name::from_str(&format!("CN={subject}")).unwrap(),
+            extensions,
         },
-        subject: Name::from_str(&format!("CN={subject}")).unwrap(),
-        subject_public_key_info: SubjectPublicKeyInfoOwned {
+        SerialNumber::new(&jcs::sha256_hex(subject.as_bytes()).as_bytes()[..16]).unwrap(),
+        Validity::new(time(NOT_BEFORE), time(not_after)),
+        SubjectPublicKeyInfoOwned {
             algorithm: algorithm(),
             subject_public_key: BitString::from_bytes(subject_key.as_bytes()).unwrap(),
         },
-        issuer_unique_id: None,
-        subject_unique_id: None,
-        extensions: Some(extensions),
-    };
-    let signature = issuer_key.sign(&tbs.to_der().unwrap());
-    Certificate {
-        tbs_certificate: tbs,
-        signature_algorithm: algorithm(),
-        signature: BitString::from_bytes(&signature.to_bytes()).unwrap(),
-    }
+    )
+    .unwrap()
+    .build::<_, ed25519_dalek::Signature>(issuer_key)
+    .unwrap()
     .to_pem(LineEnding::LF)
     .unwrap()
 }

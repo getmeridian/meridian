@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from meridian.config import UV_VERSION
+from meridian.config import CONTROL_SERVICE_PYTHON, UV_VERSION
 from meridian.control.models import ServiceConfig
 from meridian.control_artifacts import ServicePackage
 from meridian.core.errors import MeridianError
@@ -141,7 +141,9 @@ def test_a_repair_reinstalls_the_recorded_package_and_keeps_the_configuration() 
 
     assert result.status == "changed"
     assert review.config == CONFIG
-    conn.assert_called_with_pattern("tool install --force --reinstall --python 3.12 meridian-vpn==4.0.0")
+    conn.assert_called_with_pattern(
+        f"tool install --force --reinstall --python {CONTROL_SERVICE_PYTHON} meridian-vpn==4.0.0"
+    )
     assert "/etc/ctld/config.json" not in conn.write_map
     conn.assert_called_with_pattern("systemctl restart ctld")
 

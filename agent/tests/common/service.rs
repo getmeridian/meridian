@@ -65,8 +65,8 @@ fn ok(body: Value) -> (u16, Vec<u8>) {
 fn certificate_key(pem: &str) -> Option<VerifyingKey> {
     let certificate = Certificate::from_pem(pem.as_bytes()).ok()?;
     let raw: [u8; 32] = certificate
-        .tbs_certificate
-        .subject_public_key_info
+        .tbs_certificate()
+        .subject_public_key_info()
         .subject_public_key
         .as_bytes()?
         .try_into()

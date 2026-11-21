@@ -137,7 +137,7 @@ ai-docs: ## Bundle the docs `doctor --ai` pastes into its prompt (needs Node)
 
 # Pinned toolchain image (multi-arch index digest), run on the host's own architecture;
 # agent/scripts/build-musl.sh cross-compiles the other target without emulation.
-AGENT_IMAGE := rust:1.99.1-alpine3.22@sha256:731f64e16c12af70970d9a3655eecb1eecab4898352f09688a8e5ca2ab8b77c5
+AGENT_IMAGE := rust:1.100.0-alpine3.24@sha256:8d0e82abfdf9a38071e07cabc5afba4ddbe077631a80e4e742a760c38beadc33
 AGENT_TARGETS ?= x86_64-unknown-linux-musl aarch64-unknown-linux-musl
 
 agent: ## Build static netagent binaries (musl, in Docker) into agent/dist/

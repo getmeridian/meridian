@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from meridian.config import UV_SHA256, UV_VERSION
+from meridian.config import CONTROL_SERVICE_PYTHON, UV_SHA256, UV_VERSION
 from meridian.control.models import ServiceConfig
 from meridian.control_artifacts import ServicePackage
 from meridian.provision.control_service import (
@@ -49,7 +49,7 @@ def test_fresh_install_verifies_uv_and_installs_the_pinned_package() -> None:
 
     assert result.status == "changed"
     conn.assert_called_with_pattern(f"{UV_SHA256['x86_64']}")
-    conn.assert_called_with_pattern("tool install --force --python 3.12 meridian-vpn==4.0.0")
+    conn.assert_called_with_pattern(f"tool install --force --python {CONTROL_SERVICE_PYTHON} meridian-vpn==4.0.0")
     assert conn.write_map[INSTALLED_MARKER].decode().strip() == PYPI.identity
 
 
@@ -99,7 +99,7 @@ def test_dev_build_uploads_the_wheel_and_installs_that_file() -> None:
 
     path = "/opt/ctld/wheels/meridian_vpn-4.0.0-py3-none-any.whl"
     assert conn.write_map[path] == wheel.wheel
-    conn.assert_called_with_pattern(f"tool install --force --python 3.12 {path}")
+    conn.assert_called_with_pattern(f"tool install --force --python {CONTROL_SERVICE_PYTHON} {path}")
 
 
 def test_the_package_installs_with_the_dependency_versions_it_was_tested_with() -> None:
@@ -112,7 +112,9 @@ def test_the_package_installs_with_the_dependency_versions_it_was_tested_with() 
     _install(pinned).run(conn, _ctx())
 
     assert conn.write_map[CONSTRAINTS_FILE].decode() == pins
-    conn.assert_called_with_pattern(f"tool install --force --python 3.12 --constraints {CONSTRAINTS_FILE} meridian-vpn")
+    conn.assert_called_with_pattern(
+        f"tool install --force --python {CONTROL_SERVICE_PYTHON} --constraints {CONSTRAINTS_FILE} meridian-vpn"
+    )
 
 
 def test_a_package_without_pins_installs_unconstrained() -> None:

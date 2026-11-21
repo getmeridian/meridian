@@ -12,6 +12,7 @@ Runtime rules (identity, sessions, apply, Xray, traffic, signed commands, host I
 
 ## What's done well
 - **Both sides of the wire are tested** — `tests/roundtrip.rs` drives a fake service with a Rust test CA; `tests/service.rs` runs the real Python `ControlServer` (`fixtures/control_server.py`, using `MERIDIAN_TEST_PYTHON` or `uv`), installing its pin from the service's blob store.
+- X.509 certificate builders and their signing features are test dependencies. The deployed agent generates requests and verifies certificates; it never issues them.
 
 ## Pitfalls
 - **Python round-trip fixtures load their own checkout's `src` before imports** — a shared interpreter can otherwise test another worktree's editable install.

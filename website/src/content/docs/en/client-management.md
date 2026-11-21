@@ -260,8 +260,8 @@ One subscription URL serves each app the format it reads; Stash gets a profile i
 | Format | Apps | Engine tested | What the lab checks |
 |--------|------|---------------|---------------------|
 | Xray JSON | Happ, v2rayNG, v2rayN, Streisand, V2Box | Xray 26.7.28 | Traffic passes through every entry and through automatic failover; a wrong key is refused |
-| Mihomo | FlClashX, Clash Mi | Mihomo 1.19.32 | `mihomo -t` loads the profile, its rules, and its fallback group |
-| sing-box | sing-box (SFA, SFI), Karing | sing-box 1.14.3 | `sing-box check` loads the profile, and its automatic group is the default route |
+| Mihomo | FlClashX, Clash Mi | Mihomo 1.19.34 | `mihomo -t` loads the profile, its rules, and its fallback group |
+| sing-box | sing-box (SFA, SFI), Karing | sing-box 1.14.4 | `sing-box check` loads the profile, and its automatic group is the default route |
 | Base64 links | other Xray/V2Ray apps (v2RayTun, Shadowrocket) | — | Every link parses and names the same servers and key as the other formats |
 
 Apps ship their own engine updates, so an app may run a slightly older or newer engine than the one tested.

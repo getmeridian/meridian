@@ -32,8 +32,8 @@ fi
 
 # uv's installer carries the SHA-256 of every uv archive it downloads, so pinning
 # the installer's own hash pins the whole chain. Bump both together.
-UV_VERSION="0.12.19"
-UV_INSTALLER_SHA256="61b349611f1b6e1ba33645f30c36da5287df2609dd7af8605d96a031435eb35b"
+UV_VERSION="0.13.9"
+UV_INSTALLER_SHA256="ccc888115ac831bd9c30855c1d4abeae32fce679701d2aac8e72eb0beffb41c2"
 
 printf "\n"
 printf "  ${B}Meridian Installer${R}\n"

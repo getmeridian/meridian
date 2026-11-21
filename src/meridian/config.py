@@ -148,8 +148,8 @@ APT_KEY_FINGERPRINTS: dict[str, frozenset[str]] = {
 }
 
 # acme.sh (TLS certificates) — the script is pinned and checksum-verified before it runs as root
-ACME_SH_VERSION = "3.1.6"
-ACME_SH_SHA256 = "c7d68b021cfd6380ea83a82962abde5b484779fee0b97d38681dfa1396bbc8d7"
+ACME_SH_VERSION = "3.1.7"
+ACME_SH_SHA256 = "35bf6b947478666be137f938f77c5089954f120798220e6fff390949c5ea5692"
 
 # Relay (Realm TCP relay)
 REALM_VERSION = "2.9.6"
@@ -168,13 +168,13 @@ LEGACY_REALM_BINARY_PATH = "/usr/local/bin/realm"
 
 # uv installs Meridian's control service (`meridian serve`) with its own Python on the control
 # server; the static musl build runs on every supported distribution.
-UV_VERSION = "0.13.6"
+UV_VERSION = "0.13.9"
 UV_GITHUB_URL = "https://github.com/astral-sh/uv/releases/download"
 UV_SHA256: dict[str, str] = {
-    "x86_64": "5d61f26b6c7213779eda90edc6971ea6b0b796bfb8d49a574c8ad69b59838548",
-    "aarch64": "819692e404d23e5aae6bc44c0e260f1f5492fd1910ab4693b2c650f926dbe800",
+    "x86_64": "58ccf5f1792b8a5a88d01bc910ea131a8b3db4a319a17ad5fad75e0845a3e271",
+    "aarch64": "37fbb7c5bc66cf99c12aa881949d216181e201dec449772c4329e56487d61179",
 }
-CONTROL_SERVICE_PYTHON = "3.12"
+CONTROL_SERVICE_PYTHON = "3.15"
 
 # RealiTLScanner (remote SNI discovery helper)
 REALITL_SCANNER_VERSION = "0.2.3"
